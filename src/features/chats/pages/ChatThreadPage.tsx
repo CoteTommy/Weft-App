@@ -3,15 +3,16 @@ import { Navigate, useParams } from 'react-router-dom'
 import { MessageComposer } from '../components/MessageComposer'
 import { MessageTimeline } from '../components/MessageTimeline'
 import { ThreadList } from '../components/ThreadList'
-import { chatThreads, findThreadById } from '../model/chatMocks'
+import { useChatsState } from '../state/ChatsProvider'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 
 export function ChatThreadPage() {
   const { chatId } = useParams()
-  const thread = useMemo(() => findThreadById(chatId), [chatId])
+  const { threads, loading, error, sendMessage } = useChatsState()
+  const thread = useMemo(() => threads.find((candidate) => candidate.id === chatId), [chatId, threads])
 
-  if (!thread) {
+  if (!loading && !thread) {
     return <Navigate to="/chats" replace />
   }
 
@@ -19,19 +20,26 @@ export function ChatThreadPage() {
     <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
       <Panel>
         <PageHeading title="Chats" subtitle="Recent conversations" />
-        <ThreadList threads={chatThreads} compact />
+        <ThreadList threads={threads} compact />
       </Panel>
 
       <Panel>
-        <PageHeading title={thread.name} subtitle="Connected • Messages auto-queue when offline" />
-        <div className="mb-4 max-h-[52vh] overflow-y-auto pr-1">
-          <MessageTimeline messages={thread.messages} />
-        </div>
-        <MessageComposer
-          onSend={(text) => {
-            console.log('queued message', text)
-          }}
-        />
+        {loading || !thread ? (
+          <p className="text-sm text-slate-500">Loading thread...</p>
+        ) : (
+          <>
+            <PageHeading title={thread.name} subtitle="Connected • Messages auto-queue when offline" />
+            {error ? <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
+            <div className="mb-4 max-h-[52vh] overflow-y-auto pr-1">
+              <MessageTimeline messages={thread.messages} />
+            </div>
+            <MessageComposer
+              onSend={(text) => {
+                void sendMessage(thread.id, text)
+              }}
+            />
+          </>
+        )}
       </Panel>
     </div>
   )
