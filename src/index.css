@@ -1,15 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
 @import 'tailwindcss';
 
 :root {
-  --bg-base: #070b11;
-  --panel-soft: rgba(19, 29, 41, 0.6);
-  --panel-strong: rgba(26, 39, 54, 0.8);
-  --text-strong: #f7fbff;
-  --text-soft: #dae6f3;
-  --text-muted: #8ea3bb;
-  --accent-cyan: #66dcff;
-  --accent-amber: #f1c27c;
+  --app-bg: #edf3fb;
 }
 
 * {
@@ -24,148 +17,17 @@ body,
 
 body {
   margin: 0;
-  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
-  color: var(--text-strong);
+  font-family: 'Outfit', 'Avenir Next', 'Segoe UI', sans-serif;
   background:
-    radial-gradient(circle at 18% 15%, rgba(58, 106, 139, 0.24), transparent 34%),
-    radial-gradient(circle at 83% 19%, rgba(123, 83, 47, 0.2), transparent 33%),
-    linear-gradient(135deg, #060a11 0%, #0d1520 35%, #0a121b 100%);
+    radial-gradient(circle at 13% 16%, rgba(96, 165, 250, 0.2), transparent 34%),
+    radial-gradient(circle at 89% 10%, rgba(56, 189, 248, 0.14), transparent 28%),
+    linear-gradient(155deg, #eef3fa 0%, #e6eef8 48%, #edf4fb 100%);
+  color: #0f172a;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-.font-display {
-  font-family: 'Syne', 'Avenir Next', sans-serif;
-  letter-spacing: -0.015em;
-}
-
-.mesh-a,
-.mesh-b,
-.grain {
-  position: absolute;
-  inset: -20%;
-}
-
-.mesh-a {
-  background:
-    radial-gradient(circle at 20% 20%, rgba(78, 176, 214, 0.22), transparent 38%),
-    radial-gradient(circle at 77% 24%, rgba(241, 194, 124, 0.16), transparent 33%),
-    radial-gradient(circle at 60% 72%, rgba(75, 92, 168, 0.12), transparent 34%);
-  filter: blur(34px);
-}
-
-.mesh-b {
-  background:
-    conic-gradient(from 160deg at 50% 50%, rgba(84, 160, 186, 0.07), rgba(36, 53, 72, 0.03), rgba(99, 77, 43, 0.07), rgba(84, 160, 186, 0.07));
-  mix-blend-mode: screen;
-  opacity: 0.45;
-}
-
-.grain {
-  opacity: 0.11;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.7) 0.7px, transparent 0.7px);
-  background-size: 3px 3px;
-}
-
-::selection {
-  background: rgba(102, 220, 255, 0.25);
-}
-
-.field {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(4, 8, 14, 0.5);
-  color: var(--text-soft);
-  outline: none;
-}
-
-.field:focus {
-  border-color: rgba(102, 220, 255, 0.55);
-  box-shadow: 0 0 0 1px rgba(102, 220, 255, 0.28);
-}
-
-.field::placeholder {
-  color: rgba(170, 192, 216, 0.65);
-}
-
-.panel {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 1.25rem;
-  background: linear-gradient(145deg, rgba(16, 25, 37, 0.65), rgba(12, 20, 30, 0.62));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 50px rgba(1, 5, 12, 0.35);
-}
-
-.section-title {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  color: var(--text-muted);
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-soft);
-}
-
-.action-button,
-.action-button-alt {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  border-radius: 0.85rem;
-  border: 1px solid transparent;
-  font-weight: 600;
-}
-
-.action-button {
-  background: linear-gradient(120deg, rgba(102, 220, 255, 0.24), rgba(241, 194, 124, 0.22));
-  border-color: rgba(102, 220, 255, 0.35);
-  color: var(--text-strong);
-}
-
-.action-button:hover {
-  filter: brightness(1.05);
-}
-
-.action-button-alt {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.17);
-  color: var(--text-soft);
-}
-
-.action-button-alt:hover {
-  background: rgba(255, 255, 255, 0.09);
-}
-
-.menu-action {
-  width: 100%;
-  border-radius: 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-soft);
-  padding: 0.5rem 0.7rem;
-  text-align: left;
-}
-
-.menu-action:hover {
-  border-color: rgba(102, 220, 255, 0.4);
-  background: rgba(102, 220, 255, 0.08);
-}
-
-.scroll-soft::-webkit-scrollbar {
-  width: 8px;
-}
-
-.scroll-soft::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 999px;
-}
-
-.scroll-soft::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: linear-gradient(rgba(102, 220, 255, 0.42), rgba(241, 194, 124, 0.37));
+.font-heading {
+  font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+  letter-spacing: -0.02em;
 }
