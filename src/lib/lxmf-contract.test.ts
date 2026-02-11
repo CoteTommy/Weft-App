@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { parseLxmfProbeReport } from './lxmf-probe'
+import { parseLxmfProbeReport } from './lxmf-contract'
 
 describe('parseLxmfProbeReport', () => {
   test('accepts probe payloads with nullable optional fields', () => {

@@ -4,7 +4,7 @@ import {
   parseLxmfProbeReport,
   type LxmfDaemonLocalStatus,
   type LxmfProbeReport,
-} from '../../shared/lxmf-probe'
+} from './lxmf-contract'
 
 export type ProbeOptions = {
   profile?: string
@@ -17,126 +17,162 @@ export type DaemonControlOptions = ProbeOptions & {
   transport?: string
 }
 
+export type LxmfSendMessageOptions = ProbeOptions & {
+  destination: string
+  content: string
+  title?: string
+  source?: string
+  id?: string
+  fields?: unknown
+  method?: string
+  stampCost?: number
+  includeTicket?: boolean
+}
+
+export type LxmfSendMessageResponse = {
+  result: unknown
+  resolved: {
+    source: string
+    destination: string
+  }
+}
+
+export type LxmfEvent = {
+  event_type: string
+  payload: unknown
+}
+
 export async function probeLxmf(options: ProbeOptions = {}): Promise<LxmfProbeReport> {
-  if (isTauriRuntime()) {
-    const payload = await invoke<unknown>('daemon_probe', {
-      profile: options.profile ?? null,
-      rpc: options.rpc ?? null,
-    })
-    return parseLxmfProbeReport(payload)
-  }
-
-  const query = new URLSearchParams()
-  if (options.profile) {
-    query.set('profile', options.profile)
-  }
-  if (options.rpc) {
-    query.set('rpc', options.rpc)
-  }
-
-  const response = await fetch(`/api/lxmf/probe${query.size ? `?${query.toString()}` : ''}`)
-  if (!response.ok) {
-    const detail = await readErrorDetail(response)
-    throw new Error(detail ?? `probe request failed with status ${response.status}`)
-  }
-
-  const payload = await response.json()
+  const payload = await invoke<unknown>('daemon_probe', {
+    profile: options.profile ?? null,
+    rpc: options.rpc ?? null,
+  })
   return parseLxmfProbeReport(payload)
 }
 
 export async function daemonStatus(options: ProbeOptions = {}): Promise<LxmfDaemonLocalStatus> {
-  if (isTauriRuntime()) {
-    const payload = await invoke<unknown>('daemon_status', {
-      profile: options.profile ?? null,
-      rpc: options.rpc ?? null,
-    })
-    return parseLxmfDaemonLocalStatus(payload)
-  }
-
-  const response = await fetch(buildApiPath('/api/lxmf/daemon/status', options))
-  if (!response.ok) {
-    const detail = await readErrorDetail(response)
-    throw new Error(detail ?? `daemon status request failed with status ${response.status}`)
-  }
-  return parseLxmfDaemonLocalStatus(await response.json())
+  const payload = await invoke<unknown>('daemon_status', {
+    profile: options.profile ?? null,
+    rpc: options.rpc ?? null,
+  })
+  return parseLxmfDaemonLocalStatus(payload)
 }
 
 export async function daemonStart(options: DaemonControlOptions = {}): Promise<LxmfDaemonLocalStatus> {
-  return daemonControlAction('/api/lxmf/daemon/start', 'daemon_start', options)
+  return daemonControlAction('daemon_start', options)
 }
 
 export async function daemonStop(options: ProbeOptions = {}): Promise<LxmfDaemonLocalStatus> {
-  return daemonControlAction('/api/lxmf/daemon/stop', 'daemon_stop', options)
+  return daemonControlAction('daemon_stop', options)
 }
 
 export async function daemonRestart(
   options: DaemonControlOptions = {},
 ): Promise<LxmfDaemonLocalStatus> {
-  return daemonControlAction('/api/lxmf/daemon/restart', 'daemon_restart', options)
+  return daemonControlAction('daemon_restart', options)
 }
 
-async function readErrorDetail(response: Response): Promise<string | null> {
-  try {
-    const body = (await response.json()) as { error?: unknown }
-    if (typeof body.error === 'string' && body.error.trim().length > 0) {
-      return body.error
-    }
+export async function listLxmfMessages(options: ProbeOptions = {}): Promise<unknown> {
+  return await invoke<unknown>('lxmf_list_messages', {
+    profile: options.profile ?? null,
+    rpc: options.rpc ?? null,
+  })
+}
+
+export async function listLxmfPeers(options: ProbeOptions = {}): Promise<unknown> {
+  return await invoke<unknown>('lxmf_list_peers', {
+    profile: options.profile ?? null,
+    rpc: options.rpc ?? null,
+  })
+}
+
+export async function announceLxmfNow(options: ProbeOptions = {}): Promise<unknown> {
+  return await invoke<unknown>('lxmf_announce_now', {
+    profile: options.profile ?? null,
+    rpc: options.rpc ?? null,
+  })
+}
+
+export async function pollLxmfEvent(options: ProbeOptions = {}): Promise<LxmfEvent | null> {
+  const payload = await invoke<unknown>('lxmf_poll_event', {
+    profile: options.profile ?? null,
+    rpc: options.rpc ?? null,
+  })
+  return parseLxmfEvent(payload)
+}
+
+export async function sendLxmfMessage(
+  options: LxmfSendMessageOptions,
+): Promise<LxmfSendMessageResponse> {
+  const payload = await invoke<unknown>('lxmf_send_message', {
+    profile: options.profile ?? null,
+    rpc: options.rpc ?? null,
+    destination: options.destination,
+    content: options.content,
+    title: options.title ?? null,
+    source: options.source ?? null,
+    id: options.id ?? null,
+    fields: options.fields ?? null,
+    method: options.method ?? null,
+    stamp_cost: options.stampCost ?? null,
+    include_ticket: options.includeTicket ?? null,
+  })
+
+  return parseLxmfSendMessageResponse(payload)
+}
+
+function parseLxmfEvent(value: unknown): LxmfEvent | null {
+  if (value === null || value === undefined) {
     return null
-  } catch {
-    return null
+  }
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('event must be an object or null')
+  }
+  const record = value as Record<string, unknown>
+  if (typeof record.event_type !== 'string') {
+    throw new Error('event.event_type must be a string')
+  }
+  return {
+    event_type: record.event_type,
+    payload: record.payload ?? null,
   }
 }
 
-function isTauriRuntime(): boolean {
-  if (typeof window === 'undefined') {
-    return false
+function parseLxmfSendMessageResponse(value: unknown): LxmfSendMessageResponse {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('send response must be an object')
   }
-  return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__)
-}
-
-function buildApiPath(path: string, options: ProbeOptions): string {
-  const query = new URLSearchParams()
-  if (options.profile) {
-    query.set('profile', options.profile)
+  const record = value as Record<string, unknown>
+  const resolved = record.resolved
+  if (typeof resolved !== 'object' || resolved === null || Array.isArray(resolved)) {
+    throw new Error('send response.resolved must be an object')
   }
-  if (options.rpc) {
-    query.set('rpc', options.rpc)
+  const resolvedRecord = resolved as Record<string, unknown>
+  if (typeof resolvedRecord.source !== 'string') {
+    throw new Error('send response.resolved.source must be a string')
   }
-  return query.size > 0 ? `${path}?${query.toString()}` : path
+  if (typeof resolvedRecord.destination !== 'string') {
+    throw new Error('send response.resolved.destination must be a string')
+  }
+  return {
+    result: record.result ?? null,
+    resolved: {
+      source: resolvedRecord.source,
+      destination: resolvedRecord.destination,
+    },
+  }
 }
 
 async function daemonControlAction(
-  path: string,
   tauriCommand: 'daemon_start' | 'daemon_stop' | 'daemon_restart',
   options: DaemonControlOptions | ProbeOptions,
 ): Promise<LxmfDaemonLocalStatus> {
-  if (isTauriRuntime()) {
-    const payload = await invoke<unknown>(tauriCommand, {
-      profile: options.profile ?? null,
-      rpc: options.rpc ?? null,
-      managed: 'managed' in options ? options.managed ?? null : null,
-      reticulumd: 'reticulumd' in options ? options.reticulumd ?? null : null,
-      transport: 'transport' in options ? options.transport ?? null : null,
-    })
-    return parseLxmfDaemonLocalStatus(payload)
-  }
-
-  const response = await fetch(buildApiPath(path, options), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      managed: 'managed' in options ? options.managed : undefined,
-      reticulumd: 'reticulumd' in options ? options.reticulumd : undefined,
-      transport: 'transport' in options ? options.transport : undefined,
-    }),
+  const payload = await invoke<unknown>(tauriCommand, {
+    profile: options.profile ?? null,
+    rpc: options.rpc ?? null,
+    managed: 'managed' in options ? options.managed ?? null : null,
+    reticulumd: 'reticulumd' in options ? options.reticulumd ?? null : null,
+    transport: 'transport' in options ? options.transport ?? null : null,
   })
-
-  if (!response.ok) {
-    const detail = await readErrorDetail(response)
-    throw new Error(detail ?? `${path} failed with status ${response.status}`)
-  }
-
-  return parseLxmfDaemonLocalStatus(await response.json())
+  return parseLxmfDaemonLocalStatus(payload)
 }
