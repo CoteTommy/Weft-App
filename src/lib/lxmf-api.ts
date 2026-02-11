@@ -5,6 +5,14 @@ import {
   type LxmfDaemonLocalStatus,
   type LxmfProbeReport,
 } from './lxmf-contract'
+import {
+  parseLxmfMessageList,
+  parseLxmfPeerList,
+  parseLxmfRpcEventOrNull,
+  type LxmfMessageListResponse,
+  type LxmfPeerListResponse,
+  type LxmfRpcEvent,
+} from './lxmf-payloads'
 
 export type ProbeOptions = {
   profile?: string
@@ -37,11 +45,6 @@ export type LxmfSendMessageResponse = {
   }
 }
 
-export type LxmfEvent = {
-  event_type: string
-  payload: unknown
-}
-
 export async function probeLxmf(options: ProbeOptions = {}): Promise<LxmfProbeReport> {
   const payload = await invoke<unknown>('daemon_probe', {
     profile: options.profile ?? null,
@@ -72,18 +75,22 @@ export async function daemonRestart(
   return daemonControlAction('daemon_restart', options)
 }
 
-export async function listLxmfMessages(options: ProbeOptions = {}): Promise<unknown> {
-  return await invoke<unknown>('lxmf_list_messages', {
+export async function listLxmfMessages(
+  options: ProbeOptions = {},
+): Promise<LxmfMessageListResponse> {
+  const payload = await invoke<unknown>('lxmf_list_messages', {
     profile: options.profile ?? null,
     rpc: options.rpc ?? null,
   })
+  return parseLxmfMessageList(payload)
 }
 
-export async function listLxmfPeers(options: ProbeOptions = {}): Promise<unknown> {
-  return await invoke<unknown>('lxmf_list_peers', {
+export async function listLxmfPeers(options: ProbeOptions = {}): Promise<LxmfPeerListResponse> {
+  const payload = await invoke<unknown>('lxmf_list_peers', {
     profile: options.profile ?? null,
     rpc: options.rpc ?? null,
   })
+  return parseLxmfPeerList(payload)
 }
 
 export async function announceLxmfNow(options: ProbeOptions = {}): Promise<unknown> {
@@ -93,12 +100,12 @@ export async function announceLxmfNow(options: ProbeOptions = {}): Promise<unkno
   })
 }
 
-export async function pollLxmfEvent(options: ProbeOptions = {}): Promise<LxmfEvent | null> {
+export async function pollLxmfEvent(options: ProbeOptions = {}): Promise<LxmfRpcEvent | null> {
   const payload = await invoke<unknown>('lxmf_poll_event', {
     profile: options.profile ?? null,
     rpc: options.rpc ?? null,
   })
-  return parseLxmfEvent(payload)
+  return parseLxmfRpcEventOrNull(payload)
 }
 
 export async function sendLxmfMessage(
@@ -119,23 +126,6 @@ export async function sendLxmfMessage(
   })
 
   return parseLxmfSendMessageResponse(payload)
-}
-
-function parseLxmfEvent(value: unknown): LxmfEvent | null {
-  if (value === null || value === undefined) {
-    return null
-  }
-  if (typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('event must be an object or null')
-  }
-  const record = value as Record<string, unknown>
-  if (typeof record.event_type !== 'string') {
-    throw new Error('event.event_type must be a string')
-  }
-  return {
-    event_type: record.event_type,
-    payload: record.payload ?? null,
-  }
 }
 
 function parseLxmfSendMessageResponse(value: unknown): LxmfSendMessageResponse {

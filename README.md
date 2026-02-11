@@ -43,6 +43,10 @@ Primary IPC commands:
 - `daemon_probe`, `daemon_status`, `daemon_start`, `daemon_stop`, `daemon_restart`
 - `lxmf_list_messages`, `lxmf_list_peers`, `lxmf_send_message`, `lxmf_announce_now`, `lxmf_poll_event`
 
+Payload contract reference:
+
+- `docs/payload-contract.md`
+
 ## Scripts
 
 - `bun run dev`: start Tauri desktop dev mode
