@@ -36,6 +36,19 @@ function extractFilesFromMessage(record: LxmfMessageRecord): FileItem[] {
       kind: kindFromMime(parsed.mime),
       sizeLabel: sizeLabel(parsed.size_bytes),
       owner,
+      mime: parsed.mime,
+      dataBase64: parsed.inline_base64,
+    })
+  }
+  for (const attachment of parseCanonicalAttachments(fields['5'])) {
+    items.push({
+      id: `${record.id}:${attachment.name}:${attachment.sizeBytes}`,
+      name: attachment.name,
+      kind: kindFromMime(attachment.mime),
+      sizeLabel: sizeLabel(attachment.sizeBytes),
+      owner,
+      mime: attachment.mime,
+      dataBase64: attachment.dataBase64,
     })
   }
 
@@ -47,6 +60,9 @@ function extractFilesFromMessage(record: LxmfMessageRecord): FileItem[] {
       kind: 'Note',
       sizeLabel: '—',
       owner,
+      paperUri: paper.uri,
+      paperTitle: paper.title,
+      paperCategory: paper.category,
     })
   }
 
@@ -98,4 +114,70 @@ function sizeLabel(sizeBytes: number | undefined): string {
     return `${(sizeBytes / 1024).toFixed(1)} KB`
   }
   return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function parseCanonicalAttachments(
+  value: unknown,
+): Array<{ name: string; sizeBytes: number; dataBase64: string; mime?: string }> {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const out: Array<{ name: string; sizeBytes: number; dataBase64: string; mime?: string }> = []
+  for (const entry of value) {
+    if (!Array.isArray(entry) || entry.length < 2) {
+      continue
+    }
+    const name = decodeWireText(entry[0]) ?? `Attachment ${out.length + 1}`
+    const bytes = decodeWireBytes(entry[1])
+    if (!bytes || bytes.length === 0) {
+      continue
+    }
+    out.push({
+      name,
+      sizeBytes: bytes.length,
+      dataBase64: bytesToBase64(bytes),
+    })
+  }
+  return out
+}
+
+function decodeWireText(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const normalized = value.trim()
+    return normalized.length > 0 ? normalized : null
+  }
+  const bytes = decodeWireBytes(value)
+  if (!bytes || bytes.length === 0) {
+    return null
+  }
+  try {
+    return new TextDecoder().decode(bytes).trim() || null
+  } catch {
+    return null
+  }
+}
+
+function decodeWireBytes(value: unknown): Uint8Array | null {
+  if (!Array.isArray(value) || value.length === 0) {
+    return null
+  }
+  const bytes = new Uint8Array(value.length)
+  for (let index = 0; index < value.length; index += 1) {
+    const entry = value[index]
+    if (typeof entry !== 'number' || !Number.isFinite(entry) || entry < 0 || entry > 255) {
+      return null
+    }
+    bytes[index] = entry
+  }
+  return bytes
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize)
+    binary += String.fromCharCode(...chunk)
+  }
+  return btoa(binary)
 }

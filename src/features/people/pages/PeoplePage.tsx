@@ -1,15 +1,33 @@
+import { useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 import type { PersonTrust } from '../../../shared/types/people'
+import {
+  buildNewChatHref,
+  parseLxmfContactReference,
+} from '../../../shared/utils/contactReference'
+import { matchesQuery } from '../../../shared/utils/search'
 import { usePeople } from '../state/usePeople'
 
 export function PeoplePage() {
+  const navigate = useNavigate()
   const { people, loading, error, refresh } = usePeople()
+  const [query, setQuery] = useState('')
+  const [destinationInput, setDestinationInput] = useState('')
+  const [nameInput, setNameInput] = useState('')
+  const [createError, setCreateError] = useState<string | null>(null)
+  const filteredPeople = useMemo(
+    () =>
+      people.filter((person) =>
+        matchesQuery(query, [person.name, person.id, person.lastSeen, person.trust]),
+      ),
+    [people, query],
+  )
 
   return (
-    <Panel>
+    <Panel className="flex h-full min-h-0 flex-col">
       <PageHeading
         title="People"
         subtitle="Contacts you can message"
@@ -24,34 +42,90 @@ export function PeoplePage() {
           </button>
         }
       />
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+        placeholder="Search peers by name, hash, or trust"
+      />
+      <form
+        className="mb-3 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2.5"
+        onSubmit={(event) => {
+          event.preventDefault()
+          const parsed = parseLxmfContactReference(destinationInput)
+          if (!parsed.ok) {
+            setCreateError(parsed.error)
+            return
+          }
+          setCreateError(null)
+          void navigate(buildNewChatHref(parsed.value.destinationHash, nameInput))
+          setDestinationInput('')
+          setNameInput('')
+        }}
+      >
+        <input
+          value={destinationInput}
+          onChange={(event) => {
+            setDestinationInput(event.target.value)
+            setCreateError(null)
+          }}
+          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+          placeholder="Add contact from hash or lxma:// link"
+        />
+        <div className="flex items-center gap-2">
+          <input
+            value={nameInput}
+            onChange={(event) => {
+              setNameInput(event.target.value)
+              setCreateError(null)
+            }}
+            className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+            placeholder="Optional display name"
+          />
+          <button
+            type="submit"
+            className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            Start chat
+          </button>
+        </div>
+        {createError ? <p className="text-xs text-rose-700">{createError}</p> : null}
+      </form>
 
       {loading ? <p className="text-sm text-slate-500">Loading people...</p> : null}
       {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
       {!loading && people.length === 0 ? (
         <p className="text-sm text-slate-500">No peers discovered yet. Keep Weft connected to the network.</p>
       ) : null}
+      {!loading && people.length > 0 && filteredPeople.length === 0 ? (
+        <p className="text-sm text-slate-500">No peers match your search.</p>
+      ) : null}
 
-      <ul className="space-y-2">
-        {people.map((person) => (
-          <li
-            key={person.id}
-            className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3"
-          >
-            <Link to={`/chats/${person.id}`} className="min-w-0 hover:opacity-90">
-              <p className="truncate text-sm font-semibold text-slate-900">{person.name}</p>
-              <p className="mt-0.5 text-xs text-slate-500">Last seen {person.lastSeen}</p>
-            </Link>
-            <span
-              className={clsx(
-                'rounded-full px-2 py-1 text-xs font-medium',
-                trustBadgeClasses(person.trust),
-              )}
-            >
-              {person.trust}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <ul className="space-y-2">
+          {filteredPeople.map((person) => (
+            <li key={person.id}>
+              <Link
+                to={buildNewChatHref(person.id, person.name)}
+                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300 hover:bg-slate-50/70"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">{person.name}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Last seen {person.lastSeen}</p>
+                </div>
+                <span
+                  className={clsx(
+                    'rounded-full px-2 py-1 text-xs font-medium',
+                    trustBadgeClasses(person.trust),
+                  )}
+                >
+                  {person.trust}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
     </Panel>
   )
 }
