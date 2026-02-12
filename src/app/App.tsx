@@ -13,6 +13,7 @@ import { InterfacesPage } from '../features/interfaces/pages/InterfacesPage'
 import { NetworkPage } from '../features/network/pages/NetworkPage'
 import { MapPage } from '../features/map/pages/MapPage'
 import { DeepLinkBridge } from './runtime/DeepLinkBridge'
+import { NotificationCenterProvider } from './state/NotificationCenterProvider'
 import {
   hasCompletedOnboarding,
   PREFERENCES_UPDATED_EVENT,
@@ -32,7 +33,7 @@ export default function App() {
   }, [])
 
   return (
-    <>
+    <NotificationCenterProvider>
       <DeepLinkBridge onboardingCompleted={onboardingCompleted} />
       <Routes>
         <Route
@@ -60,6 +61,6 @@ export default function App() {
           element={<Navigate to={onboardingCompleted ? '/chats' : '/welcome'} replace />}
         />
       </Routes>
-    </>
+    </NotificationCenterProvider>
   )
 }

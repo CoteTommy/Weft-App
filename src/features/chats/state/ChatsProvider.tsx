@@ -25,6 +25,7 @@ import {
   getWeftPreferences,
   PREFERENCES_UPDATED_EVENT,
 } from '../../../shared/runtime/preferences'
+import { publishAppNotification } from '../../../shared/runtime/notifications'
 import { fetchChatThreads, postChatMessage } from '../services/chatService'
 import {
   getStoredThreadPreferences,
@@ -228,6 +229,17 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       const draftThreads = [...draftThreadsRef.current.values()].map(applyThreadMetadata)
       setThreads(orderThreads([...draftThreads, ...hydratedThreads]))
       if (pendingNotifications.length > 0) {
+        for (const item of pendingNotifications) {
+          publishAppNotification({
+            kind: 'message',
+            title: item.threadName,
+            body:
+              item.count > 1
+                ? `${item.count} new messages`
+                : item.latestBody || 'New incoming message',
+            threadId: item.threadId,
+          })
+        }
         void emitIncomingNotifications(pendingNotifications)
       }
     } catch (refreshError) {
@@ -290,7 +302,14 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         await refresh()
         return outcome
       } catch (sendError) {
-        setError(sendError instanceof Error ? sendError.message : String(sendError))
+        const message = sendError instanceof Error ? sendError.message : String(sendError)
+        setError(message)
+        publishAppNotification({
+          kind: 'system',
+          title: 'Message failed',
+          body: message,
+          threadId,
+        })
         return {}
       }
     },
