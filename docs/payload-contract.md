@@ -1,199 +1,84 @@
-# LXMF Payload Contract (Desktop)
+# Payload Contract v2 (Weft Desktop Mirror)
 
-This document declares payload shapes used by Weft Desktop and the embedded `lxmf-rs` runtime.
+This file mirrors:
 
-## 1) Core Envelopes
+- `/Users/tommy/Documents/TAK/LXMF-rs/docs/payload-contract.md`
 
-- `RpcRequest`
-```json
-{
-  "id": 1,
-  "method": "string",
-  "params": { "optional": "object" }
-}
-```
+It defines the frontend/runtime contract used by Weft Tauri.
 
-- `RpcResponse`
-```json
-{
-  "id": 1,
-  "result": {},
-  "error": null
-}
-```
+## Version
 
-- `RpcEvent`
-```json
-{
-  "event_type": "string",
-  "payload": {}
-}
-```
+- Contract version: `v2`
+- Scope: Tauri desktop runtime (no standalone web transport runtime)
 
-## 2) Tauri IPC Command Payloads
+## Canonical Field Coverage
 
-Current desktop command surface in `src-tauri`:
+| Domain | Field | Hex | JSON key form |
+| --- | --- | --- | --- |
+| telemetry | `FIELD_TELEMETRY` | `0x02` | `"2"` |
+| attachments | `FIELD_FILE_ATTACHMENTS` | `0x05` | `"5"` |
+| commands | `FIELD_COMMANDS` | `0x09` | `"9"` |
+| ticket | `FIELD_TICKET` | `0x0C` | `"12"` |
+| refs | `FIELD_RNR_REFS` | `0x0E` | `"14"` |
+| app extensions | extension map | `0x10` | `"16"` |
 
-- `daemon_probe(profile?, rpc?) -> LxmfProbeReport`
-- `daemon_status(profile?, rpc?) -> LxmfDaemonLocalStatus`
-- `daemon_start(profile?, rpc?, managed?, reticulumd?, transport?) -> LxmfDaemonLocalStatus`
-- `daemon_stop(profile?, rpc?) -> LxmfDaemonLocalStatus`
-- `daemon_restart(profile?, rpc?, managed?, reticulumd?, transport?) -> LxmfDaemonLocalStatus`
-- `lxmf_list_messages(profile?, rpc?) -> { messages: MessageRecord[] }`
-- `lxmf_list_peers(profile?, rpc?) -> { peers: PeerRecord[] }`
-- `lxmf_send_message(...) -> { result: { message_id: string }, resolved: { source, destination } }`
-- `lxmf_announce_now(profile?, rpc?) -> { announce_id: number }`
-- `lxmf_poll_event(profile?, rpc?) -> RpcEvent | null`
+## Schema Artifacts
 
-## 3) Domain Record Shapes
+- `/Users/tommy/Documents/TAK/Weft-Web/docs/schemas/contract-v2/payload-envelope.schema.json`
+- `/Users/tommy/Documents/TAK/Weft-Web/docs/schemas/contract-v2/event-payload.schema.json`
 
-### MessageRecord
-```json
-{
-  "id": "string",
-  "source": "hex-16-byte-hash",
-  "destination": "hex-16-byte-hash",
-  "title": "string",
-  "content": "string",
-  "timestamp": 1738981163,
-  "direction": "in|out",
-  "fields": {},
-  "receipt_status": "string|null"
-}
-```
+## Message Envelope
 
-### PeerRecord
-```json
-{
-  "peer": "hex-16-byte-hash",
-  "last_seen": 1738981163,
-  "name": "string|null",
-  "name_source": "string|null",
-  "first_seen": 1738981140,
-  "seen_count": 3
-}
-```
+Transport envelope key:
 
-### InterfaceRecord
-```json
-{
-  "type": "tcp_server|tcp_client|...",
-  "enabled": true,
-  "host": "string|null",
-  "port": 4242,
-  "name": "string|null"
-}
-```
+- `_lxmf_fields_msgpack_b64`
 
-### DeliveryPolicy
-```json
-{
-  "auth_required": false,
-  "allowed_destinations": [],
-  "denied_destinations": [],
-  "ignored_destinations": [],
-  "prioritised_destinations": []
-}
-```
+App extensions in field `16`:
 
-### PropagationState
-```json
-{
-  "enabled": true,
-  "store_root": "string|null",
-  "target_cost": 0,
-  "total_ingested": 0,
-  "last_ingest_count": 0
-}
-```
+- `reply_to`
+- `reaction_to`
+- `emoji`
+- `sender` (optional)
 
-### StampPolicy
-```json
-{
-  "target_cost": 0,
-  "flexibility": 0
-}
-```
+Telemetry location in field `2`:
 
-### TicketRecord
-```json
-{
-  "destination": "hex-16-byte-hash",
-  "ticket": "hex",
-  "expires_at": 1738984763
-}
-```
+- `{ lat, lon, alt?, speed?, accuracy? }`
 
-## 4) Event Payloads by `event_type`
+## Announce Records
 
-- `runtime_started`: `{ "profile": "string" }`
-- `runtime_stopped`: `{ "profile": "string" }`
-- `inbound`: `{ "message": MessageRecord }`
-- `outbound`: `{ "message": MessageRecord, "method": "string|null", "error?": "string" }`
-- `announce_received`: `{ "peer", "timestamp", "name", "name_source", "first_seen", "seen_count" }`
-- `announce_sent`: `{ "timestamp": number, "announce_id?": number }`
-- `interfaces_updated`: `{ "interfaces": InterfaceRecord[] }`
-- `config_reloaded`: `{ "timestamp": number }`
-- `peer_sync`: `{ "peer", "timestamp", "name", "name_source", "first_seen", "seen_count" }`
-- `peer_unpeer`: `{ "peer": "string", "removed": boolean }`
-- `receipt`: `{ "message_id": "string", "status": "string" }`
+Announces are backend-backed via `list_announces` and include:
 
-## 5) Messaging Fields (`MessageRecord.fields`) for feature domains
+- identity: `id`, `peer`, `timestamp`
+- profile metadata: `name`, `name_source`, `first_seen`, `seen_count`
+- capabilities metadata: `app_data_hex`, `capabilities`
+- optional signal metadata: `rssi`, `snr`, `q`
 
-`fields` is open JSON. Weft reserves these keys:
+## RPC Methods Required by Weft
 
-- `_lxmf`: transport options attached by daemon when sending
-  - `method`: `opportunistic|direct|propagated|paper`
-  - `stamp_cost`: number
-  - `include_ticket`: boolean
-- `attachments`: list of attachment descriptors
-  - `name`, `mime`, `size_bytes`, `sha256`, `uri`, `inline_base64`
-- `paper`: paper/document descriptor
-  - `uri`, `transient_id`, `title`, `category`, `revision`
-- `announce`: announcement descriptor
-  - `title`, `body`, `audience`, `priority`, `ttl_secs`, `posted_at`
-- `peer_snapshot`: peer summary payload for peer UI flows
-- `interface_snapshot`: interface summary payload for interface UI flows
+- `list_announces`
+- `get_outbound_propagation_node`
+- `set_outbound_propagation_node`
+- `list_propagation_nodes`
+- `message_delivery_trace`
 
-Canonical TS declarations live in:
+## Event Payload Families
 
-- `src/lib/lxmf-payloads.ts`
-- `src/lib/lxmf-contract.ts`
+- `announce_received`
+- `propagation_node_selected`
+- `receipt`
+- `outbound`
+- `runtime_started`
+- `runtime_stopped`
 
-## 6) RPC Methods (full daemon set)
+Weft’s event pump emits these as `weft://lxmf-event` to frontend listeners.
 
-Messaging:
-- `list_messages`
-- `clear_messages`
-- `announce_now`
-- `send_message_v2`
-- `send_message`
-- `receive_message`
-- `record_receipt`
+## Delivery Trace States
 
-Daemon/status:
-- `status`
-- `daemon_status_ex`
+Expected transition labels:
 
-Peers/interfaces:
-- `list_peers`
-- `peer_sync`
-- `peer_unpeer`
-- `clear_peers`
-- `list_interfaces`
-- `set_interfaces`
-- `reload_config`
-
-Policy/propagation/paper/stamp:
-- `get_delivery_policy`
-- `set_delivery_policy`
-- `propagation_status`
-- `propagation_enable`
-- `propagation_ingest`
-- `propagation_fetch`
-- `paper_ingest_uri`
-- `stamp_policy_get`
-- `stamp_policy_set`
-- `ticket_generate`
-- `clear_resources`
-- `clear_all`
+- `queued`, `sending`
+- `outbound_attempt: link`, `sent: link`
+- `retrying: opportunistic ...`, `sent: opportunistic`
+- `retrying: propagated relay ...`, `sent: propagated relay`
+- `delivered`
+- `failed:*`

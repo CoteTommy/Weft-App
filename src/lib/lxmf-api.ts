@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import {
   parseLxmfDaemonLocalStatus,
   parseLxmfProbeReport,
@@ -9,14 +10,20 @@ import {
   parseLxmfAnnounceList,
   parseLxmfInterfaceList,
   parseLxmfInterfaceMetrics,
+  parseLxmfMessageDeliveryTrace,
   parseLxmfMessageList,
+  parseLxmfOutboundPropagationNode,
   parseLxmfPeerList,
+  parseLxmfPropagationNodeList,
   parseLxmfRpcEventOrNull,
   type LxmfAnnounceListResponse,
+  type LxmfMessageDeliveryTraceResponse,
   type LxmfInterfaceListResponse,
   type LxmfInterfaceMetricsResponse,
   type LxmfMessageListResponse,
+  type LxmfOutboundPropagationNodeResponse,
   type LxmfPeerListResponse,
+  type LxmfPropagationNodeListResponse,
   type LxmfRpcEvent,
 } from './lxmf-payloads'
 import {
@@ -45,6 +52,19 @@ export type LxmfSendMessageOptions = ProbeOptions & {
   method?: string
   stampCost?: number
   includeTicket?: boolean
+  replyToId?: string
+  reaction?: {
+    to: string
+    emoji: string
+    sender?: string
+  }
+  telemetryLocation?: {
+    lat: number
+    lon: number
+    alt?: number
+    speed?: number
+    accuracy?: number
+  }
 }
 
 export type LxmfSendCommandOptions = ProbeOptions & {
@@ -77,6 +97,19 @@ export type LxmfSendRichMessageOptions = ProbeOptions & {
   method?: string
   stampCost?: number
   includeTicket?: boolean
+  replyToId?: string
+  reaction?: {
+    to: string
+    emoji: string
+    sender?: string
+  }
+  telemetryLocation?: {
+    lat: number
+    lon: number
+    alt?: number
+    speed?: number
+    accuracy?: number
+  }
 }
 
 export type LxmfSendMessageResponse = {
@@ -92,6 +125,11 @@ export type LxmfProfileInfo = {
   displayName: string | null
   rpc: string
   managed: boolean
+}
+
+export type LxmfEventPumpStatus = {
+  running: boolean
+  intervalMs?: number
 }
 
 export async function probeLxmf(options: ProbeOptions = {}): Promise<LxmfProbeReport> {
@@ -179,6 +217,54 @@ export async function lxmfInterfaceMetrics(
   return parseLxmfInterfaceMetrics(payload)
 }
 
+export async function listLxmfPropagationNodes(
+  options: ProbeOptions = {},
+): Promise<LxmfPropagationNodeListResponse> {
+  const resolved = resolveProbeOptions(options)
+  const payload = await invoke<unknown>('lxmf_list_propagation_nodes', {
+    profile: resolved.profile,
+    rpc: resolved.rpc,
+  })
+  return parseLxmfPropagationNodeList(payload)
+}
+
+export async function getLxmfOutboundPropagationNode(
+  options: ProbeOptions = {},
+): Promise<LxmfOutboundPropagationNodeResponse> {
+  const resolved = resolveProbeOptions(options)
+  const payload = await invoke<unknown>('lxmf_get_outbound_propagation_node', {
+    profile: resolved.profile,
+    rpc: resolved.rpc,
+  })
+  return parseLxmfOutboundPropagationNode(payload)
+}
+
+export async function setLxmfOutboundPropagationNode(
+  peer: string | null,
+  options: ProbeOptions = {},
+): Promise<LxmfOutboundPropagationNodeResponse> {
+  const resolved = resolveProbeOptions(options)
+  const payload = await invoke<unknown>('lxmf_set_outbound_propagation_node', {
+    profile: resolved.profile,
+    rpc: resolved.rpc,
+    peer,
+  })
+  return parseLxmfOutboundPropagationNode(payload)
+}
+
+export async function getLxmfMessageDeliveryTrace(
+  messageId: string,
+  options: ProbeOptions = {},
+): Promise<LxmfMessageDeliveryTraceResponse> {
+  const resolved = resolveProbeOptions(options)
+  const payload = await invoke<unknown>('lxmf_message_delivery_trace', {
+    profile: resolved.profile,
+    rpc: resolved.rpc,
+    message_id: messageId,
+  })
+  return parseLxmfMessageDeliveryTrace(payload)
+}
+
 export async function announceLxmfNow(options: ProbeOptions = {}): Promise<unknown> {
   const resolved = resolveProbeOptions(options)
   return await invoke<unknown>('lxmf_announce_now', {
@@ -206,6 +292,41 @@ export async function pollLxmfEvent(options: ProbeOptions = {}): Promise<LxmfRpc
     rpc: resolved.rpc,
   })
   return parseLxmfRpcEventOrNull(payload)
+}
+
+export async function startLxmfEventPump(
+  options: ProbeOptions & { intervalMs?: number } = {},
+): Promise<LxmfEventPumpStatus> {
+  const resolved = resolveProbeOptions(options)
+  const payload = await invoke<unknown>('lxmf_start_event_pump', {
+    profile: resolved.profile,
+    rpc: resolved.rpc,
+    interval_ms: options.intervalMs ?? null,
+  })
+  const record = asObject(payload, 'event_pump_status')
+  return {
+    running: asBoolean(record.running, 'event_pump_status.running'),
+    intervalMs: asOptionalNumber(record.interval_ms, 'event_pump_status.interval_ms'),
+  }
+}
+
+export async function stopLxmfEventPump(): Promise<LxmfEventPumpStatus> {
+  const payload = await invoke<unknown>('lxmf_stop_event_pump')
+  const record = asObject(payload, 'event_pump_status')
+  return {
+    running: asBoolean(record.running, 'event_pump_status.running'),
+  }
+}
+
+export async function subscribeLxmfEvents(
+  onEvent: (event: LxmfRpcEvent) => void,
+): Promise<UnlistenFn> {
+  return await listen<unknown>('weft://lxmf-event', (event) => {
+    const parsed = parseLxmfRpcEventOrNull(event.payload)
+    if (parsed) {
+      onEvent(parsed)
+    }
+  })
 }
 
 export async function getLxmfProfile(options: ProbeOptions = {}): Promise<LxmfProfileInfo> {
@@ -246,6 +367,11 @@ export async function sendLxmfMessage(
     method: options.method ?? null,
     stamp_cost: options.stampCost ?? null,
     include_ticket: options.includeTicket ?? null,
+    reply_to: options.replyToId ?? null,
+    reaction_to: options.reaction?.to ?? null,
+    reaction_emoji: options.reaction?.emoji ?? null,
+    reaction_sender: options.reaction?.sender ?? null,
+    telemetry_location: options.telemetryLocation ?? null,
   })
 
   return parseLxmfSendMessageResponse(payload)
@@ -294,6 +420,11 @@ export async function sendLxmfRichMessage(
     method: options.method ?? null,
     stamp_cost: options.stampCost ?? null,
     include_ticket: options.includeTicket ?? null,
+    reply_to: options.replyToId ?? null,
+    reaction_to: options.reaction?.to ?? null,
+    reaction_emoji: options.reaction?.emoji ?? null,
+    reaction_sender: options.reaction?.sender ?? null,
+    telemetry_location: options.telemetryLocation ?? null,
   })
   return parseLxmfSendMessageResponse(payload)
 }
@@ -374,4 +505,28 @@ function resolveProbeOptions(options: ProbeOptions): { profile: string | null; r
     profile: options.profile ?? defaults.profile ?? null,
     rpc: options.rpc ?? defaults.rpc ?? null,
   }
+}
+
+function asObject(value: unknown, path: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`${path} must be an object`)
+  }
+  return value as Record<string, unknown>
+}
+
+function asBoolean(value: unknown, path: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new Error(`${path} must be a boolean`)
+  }
+  return value
+}
+
+function asOptionalNumber(value: unknown, path: string): number | undefined {
+  if (value === null || value === undefined) {
+    return undefined
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${path} must be a finite number`)
+  }
+  return value
 }
