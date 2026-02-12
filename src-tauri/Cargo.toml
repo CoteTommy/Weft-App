@@ -23,4 +23,10 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.10.0", features = [] }
 tauri-plugin-log = "2"
-lxmf = { path = "../../LXMF-rs/crates/lxmf", features = ["cli", "embedded-runtime"] }
+lxmf = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "1ce0472", package = "lxmf", features = ["cli", "embedded-runtime"] }
+
+[patch.crates-io]
+reticulum-rs = { git = "https://github.com/FreeTAKTeam/Reticulum-rs.git", rev = "960b216", package = "reticulum-rs" }
+
+[dev-dependencies]
+tempfile = "3.17.1"

@@ -339,3 +339,96 @@ fn resolve_transport_for_status(
 fn to_json_value<T: Serialize>(value: &T) -> Result<Value, String> {
     serde_json::to_value(value).map_err(|err| format!("failed to serialize response: {err}"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{ActorCommand, RuntimeActor};
+    use crate::tauri_backend::selector::RuntimeSelector;
+    use lxmf::cli::profile::init_profile;
+    use serde_json::json;
+
+    #[test]
+    fn runtime_actor_start_status_rpc_stop_smoke() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("LXMF_CONFIG_ROOT", temp.path());
+        init_profile("tauri-smoke", false, None).expect("init profile");
+
+        let actor = RuntimeActor::spawn();
+        let selector =
+            RuntimeSelector::load(Some("tauri-smoke".to_string()), None).expect("selector load");
+
+        let started = actor
+            .request(ActorCommand::Start {
+                selector: selector.clone(),
+                transport: Some("127.0.0.1:0".to_string()),
+            })
+            .expect("start");
+        assert_eq!(started.get("running").and_then(Value::as_bool), Some(true));
+
+        let status = actor
+            .request(ActorCommand::Status {
+                selector: selector.clone(),
+            })
+            .expect("status");
+        assert_eq!(status.get("running").and_then(Value::as_bool), Some(true));
+
+        let messages = actor
+            .request(ActorCommand::Rpc {
+                selector: selector.clone(),
+                method: "list_messages".to_string(),
+                params: None,
+            })
+            .expect("list_messages");
+        assert!(messages.get("messages").is_some());
+
+        let injected = actor
+            .request(ActorCommand::Rpc {
+                selector: selector.clone(),
+                method: "receive_message".to_string(),
+                params: Some(json!({
+                    "id": "tauri-smoke-msg-1",
+                    "source": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "destination": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "title": "smoke",
+                    "content": "hello from tauri smoke",
+                    "fields": {"_lxmf": {"scope": "chat"}}
+                })),
+            })
+            .expect("receive_message");
+        assert_eq!(
+            injected.get("message_id").and_then(Value::as_str),
+            Some("tauri-smoke-msg-1")
+        );
+
+        let messages = actor
+            .request(ActorCommand::Rpc {
+                selector: selector.clone(),
+                method: "list_messages".to_string(),
+                params: None,
+            })
+            .expect("list_messages after inject");
+        let list = messages
+            .get("messages")
+            .and_then(Value::as_array)
+            .expect("messages array");
+        assert!(
+            list.iter().any(|entry| {
+                entry.get("id").and_then(Value::as_str) == Some("tauri-smoke-msg-1")
+                    && entry.get("direction").and_then(Value::as_str) == Some("in")
+            }),
+            "expected injected inbound message in list_messages"
+        );
+
+        let stopped = actor
+            .request(ActorCommand::Stop {
+                selector: selector.clone(),
+            })
+            .expect("stop");
+        assert_eq!(stopped.get("running").and_then(Value::as_bool), Some(false));
+
+        let _ = actor.request(ActorCommand::Shutdown);
+        std::env::remove_var("LXMF_CONFIG_ROOT");
+    }
+
+    use serde_json::Value;
+}
