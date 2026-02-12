@@ -1,4 +1,6 @@
-use lxmf::cli::profile::{load_profile_settings, resolve_runtime_profile_name, ProfileSettings};
+use lxmf::cli::profile::{
+    load_profile_settings, resolve_runtime_profile_name, selected_profile_name, ProfileSettings,
+};
 use std::env;
 
 const ENV_AUTO_DAEMON: &str = "WEFT_AUTO_DAEMON";
@@ -16,6 +18,7 @@ impl RuntimeSelector {
     pub(crate) fn load(profile: Option<String>, rpc: Option<String>) -> Result<Self, String> {
         let requested_profile = clean_arg(profile)
             .or_else(default_profile)
+            .or_else(selected_profile_fallback)
             .unwrap_or_else(|| "default".to_string());
         validate_profile(&requested_profile)?;
 
@@ -33,6 +36,13 @@ impl RuntimeSelector {
             profile_name,
             profile_settings,
         })
+    }
+}
+
+fn selected_profile_fallback() -> Option<String> {
+    match selected_profile_name() {
+        Ok(Some(name)) if !name.trim().is_empty() => Some(name.trim().to_string()),
+        _ => None,
     }
 }
 
