@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { useNavigate } from 'react-router-dom'
+import { NotificationToasts } from './NotificationToasts'
 import { SidebarNav } from './SidebarNav'
 import { TopBar } from './TopBar'
 
@@ -33,6 +34,7 @@ export function AppShell() {
           </div>
         </main>
       </div>
+      <NotificationToasts />
     </div>
   )
 }

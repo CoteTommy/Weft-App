@@ -101,7 +101,7 @@ function parseStoredNotification(value: unknown): AppNotification | null {
     id: normalizeOptional(record.id) ?? `notif-${Math.random().toString(36).slice(2, 10)}`,
     title,
     body,
-    kind: record.kind === 'message' ? 'message' : 'system',
+    kind: parseNotificationKind(record.kind),
     createdAtMs:
       typeof record.createdAtMs === 'number' && Number.isFinite(record.createdAtMs)
         ? Math.max(0, Math.trunc(record.createdAtMs))
@@ -117,6 +117,13 @@ function normalizeOptional(value: unknown): string | undefined {
   }
   const normalized = value.trim()
   return normalized ? normalized : undefined
+}
+
+function parseNotificationKind(value: unknown): AppNotificationKind {
+  if (value === 'message' || value === 'system' || value === 'connection') {
+    return value
+  }
+  return 'system'
 }
 
 function shouldPublishNotification(kind: AppNotificationKind): boolean {
