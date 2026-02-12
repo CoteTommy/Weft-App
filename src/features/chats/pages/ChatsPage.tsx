@@ -10,7 +10,7 @@ import { parseLxmfContactReference } from '../../../shared/utils/contactReferenc
 export function ChatsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { threads, loading, error, refresh, createThread } = useChatsState()
+  const { threads, loading, error, refresh, markAllRead, createThread } = useChatsState()
   const [query, setQuery] = useState('')
   const [destinationInput, setDestinationInput] = useState('')
   const [nameInput, setNameInput] = useState('')
@@ -51,6 +51,14 @@ export function ChatsPage() {
                 className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
               >
                 Refresh
+              </button>
+              <button
+                onClick={() => {
+                  markAllRead()
+                }}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Mark all read
               </button>
             </div>
           }

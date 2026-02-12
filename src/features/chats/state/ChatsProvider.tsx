@@ -34,6 +34,7 @@ interface ChatsState {
   refresh: () => Promise<void>
   sendMessage: (threadId: string, draft: OutboundMessageDraft) => Promise<OutboundSendOutcome>
   markThreadRead: (threadId: string) => void
+  markAllRead: () => void
   createThread: (destination: string, name?: string) => string | null
 }
 
@@ -235,6 +236,29 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     )
   }, [])
 
+  const markAllRead = useCallback(() => {
+    let hasUnread = false
+    for (const [threadId, unread] of unreadCountsRef.current.entries()) {
+      if (unread > 0) {
+        hasUnread = true
+        unreadCountsRef.current.set(threadId, 0)
+      }
+    }
+    if (!hasUnread) {
+      return
+    }
+    setThreads((previous) =>
+      previous.map((thread) =>
+        thread.unread > 0
+          ? {
+              ...thread,
+              unread: 0,
+            }
+          : thread,
+      ),
+    )
+  }, [])
+
   const sendMessage = useCallback(
     async (threadId: string, draft: OutboundMessageDraft) => {
       try {
@@ -342,9 +366,10 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       refresh,
       sendMessage,
       markThreadRead,
+      markAllRead,
       createThread,
     }),
-    [createThread, error, loading, markThreadRead, refresh, sendMessage, threads],
+    [createThread, error, loading, markAllRead, markThreadRead, refresh, sendMessage, threads],
   )
 
   return <ChatsContext.Provider value={value}>{children}</ChatsContext.Provider>
