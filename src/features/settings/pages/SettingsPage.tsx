@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { ConnectivityMode } from '../../../shared/runtime/preferences'
 import type { SettingsSnapshot } from '../../../shared/types/settings'
 import { Panel } from '../../../shared/ui/Panel'
@@ -63,8 +64,8 @@ interface BackupPayload {
 }
 
 export function SettingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { settings, loading, error, refresh } = useSettings()
-  const [activeSection, setActiveSection] = useState<SettingsSection>('profile')
   const [displayNameDraft, setDisplayNameDraft] = useState('')
   const [savingName, setSavingName] = useState(false)
   const [savingConnectivity, setSavingConnectivity] = useState(false)
@@ -118,6 +119,8 @@ export function SettingsPage() {
     setSaveFeedback(feedback)
   }
 
+  const activeSection = parseSettingsSection(searchParams.get('section'))
+
   return (
     <Panel className="flex h-full min-h-0 flex-col overflow-hidden">
       <PageHeading
@@ -146,7 +149,11 @@ export function SettingsPage() {
                   <button
                     key={section.id}
                     type="button"
-                    onClick={() => setActiveSection(section.id)}
+                    onClick={() => {
+                      const next = new URLSearchParams(searchParams)
+                      next.set('section', section.id)
+                      setSearchParams(next, { replace: true })
+                    }}
                     className={clsx(
                       'rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
                       activeSection === section.id
@@ -656,4 +663,17 @@ function mergeNotificationSettings(
     ...(patch ?? {}),
     ...(typeof legacyDesktopEnabled === 'boolean' ? { desktopEnabled: legacyDesktopEnabled } : {}),
   }
+}
+
+function parseSettingsSection(value: string | null): SettingsSection {
+  if (
+    value === 'profile' ||
+    value === 'connectivity' ||
+    value === 'notifications' ||
+    value === 'data' ||
+    value === 'advanced'
+  ) {
+    return value
+  }
+  return 'profile'
 }
