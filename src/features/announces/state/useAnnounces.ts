@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { startLxmfEventPump, subscribeLxmfEvents } from '../../../lib/lxmf-api'
 import type { AnnounceItem } from '../../../shared/types/announces'
-import { fetchAnnounces, triggerAnnounceNow } from '../services/announcesService'
+import {
+  fetchAnnounces,
+  mapAnnounceEventPayload,
+  triggerAnnounceNow,
+} from '../services/announcesService'
 
 interface UseAnnouncesState {
   announces: AnnounceItem[]
@@ -57,11 +61,20 @@ export function useAnnounces(): UseAnnouncesState {
       // Periodic fallback refresh remains active.
     })
     void subscribeLxmfEvents((event) => {
-      if (
-        event.event_type === 'announce_received' ||
-        event.event_type === 'announce_sent' ||
-        event.event_type === 'runtime_started'
-      ) {
+      if (event.event_type === 'announce_received') {
+        const mapped = mapAnnounceEventPayload(event.payload)
+        if (mapped) {
+          setAnnounces((existing) => {
+            const next = existing.filter((entry) => entry.id !== mapped.id)
+            next.unshift(mapped)
+            return next
+          })
+          return
+        }
+        void refresh()
+        return
+      }
+      if (event.event_type === 'announce_sent' || event.event_type === 'runtime_started') {
         void refresh()
       }
     })

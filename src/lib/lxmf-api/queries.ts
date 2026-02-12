@@ -34,8 +34,27 @@ export async function listLxmfInterfaces(options: ProbeOptions = {}): Promise<Lx
   return parseLxmfInterfaceList(payload)
 }
 
-export async function listLxmfAnnounces(options: ProbeOptions = {}): Promise<LxmfAnnounceListResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_list_announces', options)
+export type ListLxmfAnnouncesParams = {
+  limit?: number
+  beforeTs?: number
+  cursor?: string
+}
+
+export async function listLxmfAnnounces(
+  options: ProbeOptions = {},
+  params: ListLxmfAnnouncesParams = {},
+): Promise<LxmfAnnounceListResponse> {
+  const fields: Record<string, unknown> = {}
+  if (typeof params.limit === 'number' && Number.isFinite(params.limit)) {
+    fields.limit = Math.trunc(params.limit)
+  }
+  if (typeof params.beforeTs === 'number' && Number.isFinite(params.beforeTs)) {
+    fields.before_ts = Math.trunc(params.beforeTs)
+  }
+  if (typeof params.cursor === 'string' && params.cursor.trim().length > 0) {
+    fields.cursor = params.cursor.trim()
+  }
+  const payload = await invokeWithProbe<unknown>('lxmf_list_announces', options, fields)
   return parseLxmfAnnounceList(payload)
 }
 
@@ -87,4 +106,3 @@ export async function announceLxmfNow(options: ProbeOptions = {}): Promise<unkno
 export async function paperIngestUri(uri: string, options: ProbeOptions = {}): Promise<unknown> {
   return await invokeWithProbe<unknown>('lxmf_paper_ingest_uri', options, { uri })
 }
-

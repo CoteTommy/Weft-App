@@ -11,40 +11,36 @@ describe('lxmf payload parsers', () => {
       announces: [
         {
           id: 'announce-1',
-          source: 'a'.repeat(32),
-          destination: '',
-          title: 'Announce',
-          content: 'Peer seen',
+          peer: 'a'.repeat(32),
           timestamp: 1_770_855_315,
-          announce: {
-            title: 'Announce',
-            body: 'Peer seen',
-            audience: 'local',
-            priority: 'routine',
-            posted_at: 1_770_855_315,
-            capabilities: ['topic_broker', 'telemetry_relay'],
-            name: 'Hub',
-            name_source: 'pn_meta',
-            first_seen: 1_770_855_300,
-            seen_count: 5,
-            app_data_hex: 'deadbeef',
-            signal: {
-              rssi: -70.5,
-              snr: 11.25,
-              q: 0.92,
-            },
-          },
+          name: 'Hub',
+          name_source: 'pn_meta',
+          first_seen: 1_770_855_300,
+          seen_count: 5,
+          app_data_hex: 'deadbeef',
+          capabilities: ['topic_broker', 'telemetry_relay'],
+          rssi: -70.5,
+          snr: 11.25,
+          q: 0.92,
         },
       ],
+      next_cursor: '1770855300',
+      meta: {
+        contract_version: 'v2',
+        profile: null,
+        rpc_endpoint: null,
+      },
     })
 
     expect(parsed.announces).toHaveLength(1)
-    expect(parsed.announces[0].announce.capabilities).toEqual([
+    expect(parsed.announces[0].capabilities).toEqual([
       'topic_broker',
       'telemetry_relay',
     ])
-    expect(parsed.announces[0].announce.name).toBe('Hub')
-    expect(parsed.announces[0].announce.signal?.rssi).toBe(-70.5)
+    expect(parsed.announces[0].name).toBe('Hub')
+    expect(parsed.announces[0].rssi).toBe(-70.5)
+    expect(parsed.next_cursor).toBe('1770855300')
+    expect(parsed.meta?.contract_version).toBe('v2')
   })
 
   test('parses message delivery transitions', () => {

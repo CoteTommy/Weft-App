@@ -157,13 +157,18 @@ fn runtime_worker(rx: mpsc::Receiver<ActorRequest>) {
                 selector,
                 method,
                 params,
-            } => (rpc_with_handle(&mut handle, &selector, &method, params), false),
-            ActorCommand::SendMessage { selector, request } => {
-                (send_message_with_handle(&mut handle, &selector, request), false)
-            }
-            ActorCommand::SendCommand { selector, request } => {
-                (send_command_with_handle(&mut handle, &selector, request), false)
-            }
+            } => (
+                rpc_with_handle(&mut handle, &selector, &method, params),
+                false,
+            ),
+            ActorCommand::SendMessage { selector, request } => (
+                send_message_with_handle(&mut handle, &selector, request),
+                false,
+            ),
+            ActorCommand::SendCommand { selector, request } => (
+                send_command_with_handle(&mut handle, &selector, request),
+                false,
+            ),
             ActorCommand::PollEvent { selector } => {
                 (poll_event_with_handle(&mut handle, &selector), false)
             }

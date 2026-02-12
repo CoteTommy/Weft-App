@@ -13,6 +13,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify payload contract mirrors LXMF-rs
+        run: |
+          git clone --depth 1 https://github.com/FreeTAKTeam/LXMF-rs.git ../LXMF-rs
+          if [ -f ../LXMF-rs/docs/payload-contract.md ]; then
+            diff -u ../LXMF-rs/docs/payload-contract.md docs/payload-contract.md
+          else
+            echo "Skipping payload-contract mirror check: upstream docs/payload-contract.md not found"
+          fi
+          if [ -f ../LXMF-rs/docs/schemas/contract-v2/payload-envelope.schema.json ]; then
+            diff -u ../LXMF-rs/docs/schemas/contract-v2/payload-envelope.schema.json docs/schemas/contract-v2/payload-envelope.schema.json
+          else
+            echo "Skipping payload-envelope schema mirror check: upstream schema not found"
+          fi
+          if [ -f ../LXMF-rs/docs/schemas/contract-v2/event-payload.schema.json ]; then
+            diff -u ../LXMF-rs/docs/schemas/contract-v2/event-payload.schema.json docs/schemas/contract-v2/event-payload.schema.json
+          else
+            echo "Skipping event-payload schema mirror check: upstream schema not found"
+          fi
       - uses: oven-sh/setup-bun@v2
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile

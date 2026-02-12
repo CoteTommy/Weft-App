@@ -127,83 +127,37 @@ pub(crate) fn lxmf_list_announces(
     actor: State<'_, RuntimeActor>,
     profile: Option<String>,
     rpc: Option<String>,
+    limit: Option<usize>,
+    before_ts: Option<i64>,
+    cursor: Option<String>,
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
-    let response = rpc_actor_call(&actor, selector, "list_announces", None)?;
-    let announce_records = array_from_response(response, "announces")?;
-    let mut announces = Vec::with_capacity(announce_records.len());
-    for entry in announce_records {
-        let Some(record) = entry.as_object() else {
-            continue;
-        };
-        let peer_hash = record
-            .get("peer")
-            .or_else(|| record.get("source"))
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim()
-            .to_string();
-        if peer_hash.is_empty() {
-            continue;
-        }
-        let timestamp = record
-            .get("timestamp")
-            .and_then(Value::as_f64)
-            .unwrap_or(0.0);
-        let seen_count = record
-            .get("seen_count")
-            .and_then(Value::as_u64)
-            .unwrap_or(0);
-        let peer_name = record
-            .get("name")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .unwrap_or(peer_hash.as_str())
-            .to_string();
-
-        let mut capabilities =
-            extract_capabilities_from_json(record.get("capabilities")).unwrap_or_default();
-        if capabilities.is_empty() {
-            capabilities = extract_peer_capabilities(record);
-        }
-
-        let title = format!("Announce from {peer_name}");
-        let body = format!("Peer seen {seen_count} time(s)");
-        announces.push(json!({
-            "id": record
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .to_string(),
-            "source": peer_hash,
-            "destination": "",
-            "title": title,
-            "content": body,
-            "timestamp": timestamp,
-            "announce": {
-                "title": title,
-                "body": body,
-                "audience": "local",
-                "priority": "routine",
-                "posted_at": timestamp,
-                "capabilities": capabilities,
-                "name": record.get("name").and_then(Value::as_str),
-                "name_source": record.get("name_source").and_then(Value::as_str),
-                "first_seen": record.get("first_seen").and_then(Value::as_i64),
-                "seen_count": seen_count,
-                "app_data_hex": record.get("app_data_hex").and_then(Value::as_str),
-                "signal": {
-                    "rssi": record.get("rssi").and_then(Value::as_f64),
-                    "snr": record.get("snr").and_then(Value::as_f64),
-                    "q": record.get("q").and_then(Value::as_f64),
-                },
-            },
-        }));
+    let mut params = serde_json::Map::new();
+    if let Some(limit) = limit {
+        params.insert("limit".to_string(), json!(limit.clamp(1, 5000)));
     }
+    if let Some(before_ts) = before_ts {
+        params.insert("before_ts".to_string(), json!(before_ts));
+    }
+    if let Some(cursor) = clean_arg(cursor) {
+        params.insert("cursor".to_string(), json!(cursor));
+    }
+    let response = rpc_actor_call(
+        &actor,
+        selector,
+        "list_announces",
+        if params.is_empty() {
+            None
+        } else {
+            Some(Value::Object(params))
+        },
+    )?;
+    let announces = array_from_response(&response, "announces")?;
 
     Ok(json!({
         "announces": announces,
+        "next_cursor": response.get("next_cursor").cloned().unwrap_or(Value::Null),
+        "meta": response.get("meta").cloned().unwrap_or(Value::Null),
     }))
 }
 
@@ -215,7 +169,7 @@ pub(crate) fn lxmf_interface_metrics(
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
     let response = rpc_actor_call(&actor, selector, "list_interfaces", None)?;
-    let interfaces = array_from_response(response, "interfaces")?;
+    let interfaces = array_from_response(&response, "interfaces")?;
 
     let mut enabled = 0usize;
     let mut by_type: BTreeMap<String, usize> = BTreeMap::new();
@@ -603,7 +557,7 @@ pub(crate) fn lxmf_send_command(
     }))
 }
 
-fn array_from_response(value: Value, field: &str) -> Result<Vec<Value>, String> {
+fn array_from_response(value: &Value, field: &str) -> Result<Vec<Value>, String> {
     if let Some(array) = value.as_array() {
         return Ok(array.clone());
     }
@@ -617,6 +571,7 @@ fn array_from_response(value: Value, field: &str) -> Result<Vec<Value>, String> 
     Ok(array.clone())
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn extract_peer_capabilities(peer: &serde_json::Map<String, Value>) -> Vec<String> {
     for key in ["capabilities", "caps", "announce_capabilities"] {
         if let Some(caps) = extract_capabilities_from_json(peer.get(key)) {
@@ -644,6 +599,7 @@ fn extract_peer_capabilities(peer: &serde_json::Map<String, Value>) -> Vec<Strin
     Vec::new()
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn extract_capabilities_from_json(value: Option<&Value>) -> Option<Vec<String>> {
     let value = value?;
     if let Some(array) = value.as_array() {
@@ -665,6 +621,7 @@ fn extract_capabilities_from_json(value: Option<&Value>) -> Option<Vec<String>> 
     None
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn extract_bytes(value: &Value) -> Option<Vec<u8>> {
     if let Some(text) = value.as_str() {
         let trimmed = text.trim();
@@ -701,6 +658,7 @@ fn extract_bytes(value: &Value) -> Option<Vec<u8>> {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn decode_capabilities_from_announce_app_data(app_data: &[u8]) -> Option<Vec<String>> {
     let mut cursor = Cursor::new(app_data);
     let value = rmpv::decode::read_value(&mut cursor).ok()?;
@@ -714,6 +672,7 @@ fn decode_capabilities_from_announce_app_data(app_data: &[u8]) -> Option<Vec<Str
     decode_capabilities_from_app_data_entry(&entries[2])
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn decode_capabilities_from_app_data_entry(entry: &rmpv::Value) -> Option<Vec<String>> {
     match entry {
         rmpv::Value::Map(map) => decode_capabilities_from_map_entry(map),
@@ -738,6 +697,7 @@ fn decode_capabilities_from_app_data_entry(entry: &rmpv::Value) -> Option<Vec<St
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn decode_capabilities_from_map_entry(map: &[(rmpv::Value, rmpv::Value)]) -> Option<Vec<String>> {
     for (key, value) in map {
         let Some(key_name) = key.as_str() else {
@@ -761,6 +721,7 @@ fn decode_capabilities_from_map_entry(map: &[(rmpv::Value, rmpv::Value)]) -> Opt
     None
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn rmpv_array_to_bytes(values: &[rmpv::Value]) -> Option<Vec<u8>> {
     let mut bytes = Vec::with_capacity(values.len());
     for value in values {
@@ -773,6 +734,7 @@ fn rmpv_array_to_bytes(values: &[rmpv::Value]) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn decode_capabilities_from_payload(raw: &[u8]) -> Option<Vec<String>> {
     if raw.is_empty() {
         return None;
@@ -793,6 +755,7 @@ fn decode_capabilities_from_payload(raw: &[u8]) -> Option<Vec<String>> {
     None
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn normalize_capabilities_iter<'a>(values: impl Iterator<Item = &'a str>) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();

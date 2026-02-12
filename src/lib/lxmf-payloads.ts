@@ -130,6 +130,12 @@ export interface LxmfRpcEvent<TPayload = unknown> {
   payload: TPayload
 }
 
+export interface LxmfContractMeta {
+  contract_version?: string
+  profile?: string | null
+  rpc_endpoint?: string | null
+}
+
 export interface LxmfMessageListResponse {
   messages: LxmfMessageRecord[]
 }
@@ -144,16 +150,23 @@ export interface LxmfInterfaceListResponse {
 
 export interface LxmfAnnounceRecord {
   id: string
-  source: string
-  destination: string
-  title: string
-  content: string
+  peer: string
   timestamp: number
-  announce: LxmfAnnouncePayload
+  name: string | null
+  name_source: string | null
+  first_seen: number
+  seen_count: number
+  app_data_hex: string | null
+  capabilities: string[]
+  rssi: number | null
+  snr: number | null
+  q: number | null
 }
 
 export interface LxmfAnnounceListResponse {
   announces: LxmfAnnounceRecord[]
+  next_cursor: string | null
+  meta: LxmfContractMeta | null
 }
 
 export interface LxmfInterfaceMetricsResponse {
@@ -223,7 +236,8 @@ export function parseLxmfInterfaceList(value: unknown): LxmfInterfaceListRespons
 }
 
 export function parseLxmfAnnounceList(value: unknown): LxmfAnnounceListResponse {
-  const rawList = readArrayField(value, 'announces')
+  const root = asObject(value, 'announces')
+  const rawList = readArrayField(root, 'announces')
   if (!rawList) {
     throw new Error('announces must be an array')
   }
@@ -231,6 +245,8 @@ export function parseLxmfAnnounceList(value: unknown): LxmfAnnounceListResponse 
     announces: rawList.map((entry, index) =>
       parseAnnounceRecord(entry, `announces[${index}]`),
     ),
+    next_cursor: asNullableString(root.next_cursor, 'announces.next_cursor'),
+    meta: asNullableContractMeta(root.meta, 'announces.meta'),
   }
 }
 
@@ -342,44 +358,19 @@ function parseInterfaceRecord(value: unknown, path: string): LxmfInterfaceRecord
 
 function parseAnnounceRecord(value: unknown, path: string): LxmfAnnounceRecord {
   const record = asObject(value, path)
-  const announce = asObject(record.announce, `${path}.announce`)
   return {
     id: asString(record.id, `${path}.id`),
-    source: asString(record.source, `${path}.source`),
-    destination: asString(record.destination, `${path}.destination`),
-    title: asString(record.title, `${path}.title`),
-    content: asString(record.content, `${path}.content`),
+    peer: asString(record.peer, `${path}.peer`),
     timestamp: asNumber(record.timestamp, `${path}.timestamp`),
-    announce: {
-      title: asOptionalString(announce.title, `${path}.announce.title`),
-      body: asOptionalString(announce.body, `${path}.announce.body`),
-      audience: asOptionalString(announce.audience, `${path}.announce.audience`),
-      priority: asOptionalPriority(announce.priority, `${path}.announce.priority`),
-      ttl_secs: asOptionalNumber(announce.ttl_secs, `${path}.announce.ttl_secs`),
-      posted_at: asOptionalNumber(announce.posted_at, `${path}.announce.posted_at`),
-      capabilities: asOptionalCapabilities(announce.capabilities),
-      name: asOptionalString(announce.name, `${path}.announce.name`),
-      name_source: asOptionalString(announce.name_source, `${path}.announce.name_source`),
-      first_seen: asOptionalNumber(announce.first_seen, `${path}.announce.first_seen`),
-      seen_count: asOptionalNumber(announce.seen_count, `${path}.announce.seen_count`),
-      app_data_hex: asOptionalString(announce.app_data_hex, `${path}.announce.app_data_hex`),
-      signal: parseOptionalSignal(announce.signal, `${path}.announce.signal`),
-    },
-  }
-}
-
-function parseOptionalSignal(
-  value: unknown,
-  path: string,
-): LxmfAnnouncePayload['signal'] | undefined {
-  if (value === null || value === undefined) {
-    return undefined
-  }
-  const signal = asObject(value, path)
-  return {
-    rssi: asOptionalNumber(signal.rssi, `${path}.rssi`),
-    snr: asOptionalNumber(signal.snr, `${path}.snr`),
-    q: asOptionalNumber(signal.q, `${path}.q`),
+    name: asNullableString(record.name, `${path}.name`),
+    name_source: asNullableString(record.name_source, `${path}.name_source`),
+    first_seen: asNumber(record.first_seen, `${path}.first_seen`),
+    seen_count: asNumber(record.seen_count, `${path}.seen_count`),
+    app_data_hex: asNullableString(record.app_data_hex, `${path}.app_data_hex`),
+    capabilities: asOptionalCapabilities(record.capabilities) ?? [],
+    rssi: asNullableNumber(record.rssi, `${path}.rssi`),
+    snr: asNullableNumber(record.snr, `${path}.snr`),
+    q: asNullableNumber(record.q, `${path}.q`),
   }
 }
 
@@ -450,31 +441,11 @@ function asNullableNumber(value: unknown, path: string): number | null {
   return asNumber(value, path)
 }
 
-function asOptionalNumber(value: unknown, path: string): number | undefined {
-  if (value === null || value === undefined) {
-    return undefined
-  }
-  return asNumber(value, path)
-}
-
 function asOptionalString(value: unknown, path: string): string | undefined {
   if (value === null || value === undefined) {
     return undefined
   }
   return asString(value, path)
-}
-
-function asOptionalPriority(
-  value: unknown,
-  path: string,
-): LxmfAnnouncePayload['priority'] | undefined {
-  if (value === null || value === undefined) {
-    return undefined
-  }
-  if (value === 'routine' || value === 'urgent') {
-    return value
-  }
-  throw new Error(`${path} must be "routine" or "urgent"`)
 }
 
 function asOptionalCapabilities(value: unknown): string[] | undefined {
@@ -522,4 +493,16 @@ function asNullableObject(value: unknown, path: string): Record<string, unknown>
     return null
   }
   return asObject(value, path)
+}
+
+function asNullableContractMeta(value: unknown, path: string): LxmfContractMeta | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const record = asObject(value, path)
+  return {
+    contract_version: asOptionalString(record.contract_version, `${path}.contract_version`),
+    profile: asNullableString(record.profile, `${path}.profile`),
+    rpc_endpoint: asNullableString(record.rpc_endpoint, `${path}.rpc_endpoint`),
+  }
 }
