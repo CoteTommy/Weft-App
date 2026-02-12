@@ -25,10 +25,14 @@ export function ChatsPage() {
     }
     const parsed = parseLxmfContactReference(fromAnnounce)
     if (!parsed.ok) {
-      setComposeError(parsed.error)
+      queueMicrotask(() => {
+        setComposeError(parsed.error)
+      })
       return
     }
-    setComposeError(null)
+    queueMicrotask(() => {
+      setComposeError(null)
+    })
     const displayName = searchParams.get('new_name') ?? undefined
     const threadId = createThread(parsed.value.destinationHash, displayName)
     if (threadId) {

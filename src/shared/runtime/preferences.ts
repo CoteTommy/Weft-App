@@ -66,7 +66,7 @@ export function hasCompletedOnboarding(): boolean {
 export function getRuntimeConnectionOptions(): { profile?: string; rpc?: string } {
   const preferences = getWeftPreferences()
   return {
-    profile: normalizeOptional(preferences.profile),
+    profile: normalizeProfile(preferences.profile),
     rpc: normalizeOptional(preferences.rpc),
   }
 }
@@ -112,7 +112,7 @@ function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPrefe
     out.connectivityMode = parseConnectivityMode(value.connectivityMode)
   }
   if ('profile' in value) {
-    out.profile = normalizeOptional(value.profile)
+    out.profile = normalizeProfile(value.profile)
   }
   if ('rpc' in value) {
     out.rpc = normalizeOptional(value.rpc)
@@ -165,6 +165,17 @@ function normalizeOptional(value: unknown): string | undefined {
   }
   const normalized = value.trim()
   return normalized ? normalized : undefined
+}
+
+function normalizeProfile(value: unknown): string | undefined {
+  const normalized = normalizeOptional(value)
+  if (!normalized) {
+    return undefined
+  }
+  if (normalized.toLowerCase() === 'default') {
+    return undefined
+  }
+  return normalized
 }
 
 function parseBoolean(value: unknown, fallback: boolean): boolean {

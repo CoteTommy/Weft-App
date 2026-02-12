@@ -10,7 +10,10 @@ import {
   useState,
 } from 'react'
 import { Outlet } from 'react-router-dom'
-import { pollLxmfEvent } from '../../../lib/lxmf-api'
+import {
+  startLxmfEventPump,
+  subscribeLxmfEvents,
+} from '../../../lib/lxmf-api'
 import type {
   ChatThread,
   OutboundMessageDraft,
@@ -252,7 +255,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       setLoading(false)
       refreshingRef.current = false
     }
-  }, [emitIncomingNotifications])
+  }, [applyThreadMetadata, emitIncomingNotifications])
 
   const markThreadRead = useCallback((threadId: string) => {
     const id = threadId.trim()
@@ -432,7 +435,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     void refresh()
     const intervalId = window.setInterval(() => {
       void refresh()
-    }, 8_000)
+    }, 15_000)
 
     return () => {
       window.clearInterval(intervalId)
@@ -440,21 +443,36 @@ export function ChatsProvider({ children }: PropsWithChildren) {
   }, [refresh])
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      void (async () => {
-        try {
-          const event = await pollLxmfEvent()
-          if (event) {
-            await refresh()
-          }
-        } catch {
-          // Ignore event-probe errors; periodic refresh keeps threads current.
+    let unlisten: (() => void) | null = null
+    let disposed = false
+    void startLxmfEventPump().catch(() => {
+      // Fallback interval refresh still keeps data current.
+    })
+    void subscribeLxmfEvents((event) => {
+      if (
+        event.event_type === 'inbound' ||
+        event.event_type === 'outbound' ||
+        event.event_type === 'receipt' ||
+        event.event_type === 'runtime_started' ||
+        event.event_type === 'runtime_stopped'
+      ) {
+        void refresh()
+      }
+    })
+      .then((stop) => {
+        if (disposed) {
+          stop()
+          return
         }
-      })()
-    }, 2_500)
+        unlisten = stop
+      })
+      .catch(() => {
+        // Ignore listener errors; fallback polling refresh still runs.
+      })
 
     return () => {
-      window.clearInterval(intervalId)
+      disposed = true
+      unlisten?.()
     }
   }, [refresh])
 

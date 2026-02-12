@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { startLxmfEventPump, subscribeLxmfEvents } from '../../../lib/lxmf-api'
 import type { AnnounceItem } from '../../../shared/types/announces'
 import { fetchAnnounces, triggerAnnounceNow } from '../services/announcesService'
 
@@ -49,12 +50,39 @@ export function useAnnounces(): UseAnnouncesState {
   }, [refresh])
 
   useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let disposed = false
     void refresh()
+    void startLxmfEventPump().catch(() => {
+      // Periodic fallback refresh remains active.
+    })
+    void subscribeLxmfEvents((event) => {
+      if (
+        event.event_type === 'announce_received' ||
+        event.event_type === 'announce_sent' ||
+        event.event_type === 'runtime_started'
+      ) {
+        void refresh()
+      }
+    })
+      .then((stop) => {
+        if (disposed) {
+          stop()
+          return
+        }
+        unlisten = stop
+      })
+      .catch(() => {
+        // Ignore listener errors; fallback polling refresh still runs.
+      })
+
     const intervalId = window.setInterval(() => {
       void refresh()
-    }, 6_000)
+    }, 20_000)
 
     return () => {
+      disposed = true
+      unlisten?.()
       window.clearInterval(intervalId)
     }
   }, [refresh])

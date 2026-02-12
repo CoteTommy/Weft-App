@@ -1,8 +1,11 @@
 import {
   daemonRestart,
   daemonStatus,
+  getLxmfOutboundPropagationNode,
   getLxmfProfile,
+  listLxmfPropagationNodes,
   probeLxmf,
+  setLxmfOutboundPropagationNode,
   setLxmfDisplayName,
 } from '../../../lib/lxmf-api'
 import type { SettingsSnapshot } from '../../../shared/types/settings'
@@ -15,10 +18,12 @@ import { resolveDisplayName, setStoredDisplayName } from '../../../shared/utils/
 
 export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
   const preferences = getWeftPreferences()
-  const [status, probe, profile] = await Promise.all([
+  const [status, probe, profile, propagationNodes, outboundPropagationNode] = await Promise.all([
     daemonStatus(),
     probeLxmf(),
     getLxmfProfile().catch(() => null),
+    listLxmfPropagationNodes().catch(() => ({ nodes: [] })),
+    getLxmfOutboundPropagationNode().catch(() => ({ peer: null })),
   ])
   const displayName = resolveDisplayName(
     status.profile,
@@ -38,6 +43,8 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       rpc: preferences.rpc,
       transport: preferences.transport,
       autoStartDaemon: preferences.autoStartDaemon,
+      outboundPropagationPeer: outboundPropagationNode.peer,
+      propagationNodes: propagationNodes.nodes,
     },
     notifications: {
       desktopEnabled: preferences.notificationsEnabled,
@@ -48,6 +55,20 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       soundEnabled: preferences.notificationSoundEnabled,
     },
   }
+}
+
+export async function saveOutboundPropagationNode(input: {
+  peer: string | null
+  profile?: string
+  rpc?: string
+}): Promise<string | null> {
+  const profile = normalizeProfile(input.profile)
+  const rpc = input.rpc?.trim() || undefined
+  const response = await setLxmfOutboundPropagationNode(normalizePeer(input.peer), {
+    profile,
+    rpc,
+  })
+  return response.peer
 }
 
 export async function saveDisplayName(displayName: string): Promise<void> {
@@ -64,7 +85,7 @@ export async function saveConnectivitySettings(input: {
   autoStartDaemon: boolean
   restartDaemon?: boolean
 }): Promise<void> {
-  const normalizedProfile = input.profile?.trim() || 'default'
+  const normalizedProfile = normalizeProfile(input.profile)
   const normalizedRpc = input.rpc?.trim() || undefined
   const normalizedTransport = input.transport?.trim() || undefined
   updateWeftPreferences({
@@ -82,6 +103,22 @@ export async function saveConnectivitySettings(input: {
       transport: normalizedTransport,
     })
   }
+}
+
+function normalizeProfile(value?: string): string | undefined {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return undefined
+  }
+  if (normalized.toLowerCase() === 'default') {
+    return undefined
+  }
+  return normalized
+}
+
+function normalizePeer(value: string | null): string | null {
+  const normalized = value?.trim().toLowerCase()
+  return normalized ? normalized : null
 }
 
 export function saveNotificationSettings(input: {

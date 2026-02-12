@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { getLxmfMessageDeliveryTrace } from '../../../lib/lxmf-api'
 import type { ChatMessage } from '../../../shared/types/chat'
 
 interface MessageTimelineProps {
@@ -10,6 +11,10 @@ interface MessageTimelineProps {
 export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
+  const [fetchedDeliveryTrace, setFetchedDeliveryTrace] = useState<
+    NonNullable<ChatMessage['deliveryTrace']>
+  >([])
+  const [deliveryTraceLoading, setDeliveryTraceLoading] = useState(false)
   const holdTimeoutRef = useRef<number | null>(null)
   const holdTriggeredRef = useRef(false)
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null)
@@ -17,6 +22,19 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
     () => messages.find((message) => message.id === selectedMessageId) ?? null,
     [messages, selectedMessageId],
   )
+  const deliveryTrace = useMemo(() => {
+    if (!selectedMessage) {
+      return []
+    }
+    const fromMessage = selectedMessage.deliveryTrace ?? []
+    if (fromMessage.length > 0) {
+      return fromMessage
+    }
+    if (selectedMessage.sender !== 'self') {
+      return []
+    }
+    return fetchedDeliveryTrace
+  }, [fetchedDeliveryTrace, selectedMessage])
   const latestMessageId = messages[messages.length - 1]?.id ?? null
 
   const closeModal = useCallback(() => {
@@ -73,6 +91,46 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [closeModal, selectedMessage])
+
+  useEffect(() => {
+    if (!selectedMessage) {
+      return
+    }
+    const fromMessage = selectedMessage.deliveryTrace ?? []
+    if (fromMessage.length > 0) {
+      return
+    }
+    if (selectedMessage.sender !== 'self') {
+      return
+    }
+    let disposed = false
+    queueMicrotask(() => {
+      if (!disposed) {
+        setFetchedDeliveryTrace([])
+        setDeliveryTraceLoading(true)
+      }
+    })
+    void getLxmfMessageDeliveryTrace(selectedMessage.id)
+      .then((trace) => {
+        if (disposed) {
+          return
+        }
+        setFetchedDeliveryTrace(trace.transitions)
+      })
+      .catch(() => {
+        if (!disposed) {
+          setFetchedDeliveryTrace([])
+        }
+      })
+      .finally(() => {
+        if (!disposed) {
+          setDeliveryTraceLoading(false)
+        }
+      })
+    return () => {
+      disposed = true
+    }
+  }, [selectedMessage])
 
   useLayoutEffect(() => {
     bottomAnchorRef.current?.scrollIntoView({ block: 'end' })
@@ -158,6 +216,10 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
               <DetailRow label="Time" value={selectedMessage.sentAt} />
               <DetailRow label="Status" value={selectedMessage.status ? renderStatus(selectedMessage.status) : '—'} />
               <DetailRow label="Backend status" value={selectedMessage.statusDetail ?? '—'} />
+              <DetailRow
+                label="Delivery trace"
+                value={deliveryTraceLoading ? 'Loading...' : `${deliveryTrace.length} transition(s)`}
+              />
               <DetailRow label="Attachments" value={String(selectedMessage.attachments.length)} />
               <DetailRow label="Paper" value={selectedMessage.paper ? 'Yes' : 'No'} />
               <DetailRow label="Message ID" value={selectedMessage.id} mono />
@@ -204,6 +266,20 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
                           Save
                         </button>
                       </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {deliveryTrace.length > 0 ? (
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="mb-2 text-xs font-semibold text-slate-700">Delivery trace</p>
+                <ul className="space-y-1.5">
+                  {deliveryTrace.map((entry, index) => (
+                    <li key={`${entry.status}:${entry.timestamp}:${index}`} className="text-[11px] text-slate-600">
+                      <span className="font-semibold text-slate-700">{entry.status}</span>{' '}
+                      <span>({formatTraceTimestamp(entry.timestamp)})</span>
                     </li>
                   ))}
                 </ul>
@@ -288,6 +364,18 @@ function renderStatus(status: ChatMessage['status']): string {
     default:
       return ''
   }
+}
+
+function formatTraceTimestamp(value: number): string {
+  if (!Number.isFinite(value)) {
+    return 'unknown'
+  }
+  const timestampMs = value > 1_000_000_000_000 ? value : value * 1000
+  return new Date(timestampMs).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 }
 
 function openAttachment(attachment: ChatMessage['attachments'][number]): void {

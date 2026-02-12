@@ -50,7 +50,7 @@ export function WelcomePage() {
   const [connectivityMode, setConnectivityMode] = useState<ConnectivityMode>(
     saved.connectivityMode,
   )
-  const [profileDraft, setProfileDraft] = useState(saved.profile ?? 'default')
+  const [profileDraft, setProfileDraft] = useState(saved.profile ?? '')
   const [rpcDraft, setRpcDraft] = useState(saved.rpc ?? '')
   const [transportDraft, setTransportDraft] = useState(saved.transport ?? '')
   const [autoStart, setAutoStart] = useState(saved.autoStartDaemon)
@@ -66,7 +66,7 @@ export function WelcomePage() {
   }, [connectivityMode, transportDraft])
 
   const canContinueFromIdentity = displayName.trim().length > 0
-  const canFinish = profileDraft.trim().length > 0
+  const canFinish = true
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-8">
@@ -143,7 +143,7 @@ export function WelcomePage() {
                     value={profileDraft}
                     onChange={(event) => setProfileDraft(event.target.value)}
                     className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
-                    placeholder="default"
+                    placeholder="leave blank for active profile"
                   />
                 </label>
                 <label className="text-xs text-slate-600">
@@ -194,7 +194,7 @@ export function WelcomePage() {
               {CONNECTIVITY_PRESETS.find((entry) => entry.mode === connectivityMode)?.label}
             </p>
             <p className="mt-1">
-              <span className="font-semibold">Profile:</span> {profileDraft.trim() || 'default'}
+              <span className="font-semibold">Profile:</span> {profileDraft.trim() || 'active profile'}
             </p>
             <p className="mt-1">
               <span className="font-semibold">RPC:</span> {rpcDraft.trim() || 'profile default'}
@@ -240,7 +240,7 @@ export function WelcomePage() {
                   setSaving(true)
                   setError(null)
                   const normalizedName = displayName.trim()
-                  const profile = profileDraft.trim() || 'default'
+                  const profile = profileDraft.trim() || undefined
                   const rpc = rpcDraft.trim() || undefined
                   const transport = effectiveTransport?.trim() || undefined
                   try {

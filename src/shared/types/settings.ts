@@ -13,6 +13,14 @@ export interface SettingsSnapshot {
     rpc?: string
     transport?: string
     autoStartDaemon: boolean
+    outboundPropagationPeer: string | null
+    propagationNodes: Array<{
+      peer: string
+      name: string | null
+      last_seen: number
+      capabilities: string[]
+      selected: boolean
+    }>
   }
   notifications: {
     desktopEnabled: boolean

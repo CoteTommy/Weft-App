@@ -43,7 +43,9 @@ export function NotificationToasts() {
     if (additions.length === 0) {
       return
     }
-    setToasts((previous) => [...additions, ...previous].slice(0, MAX_TOASTS))
+    queueMicrotask(() => {
+      setToasts((previous) => [...additions, ...previous].slice(0, MAX_TOASTS))
+    })
   }, [notifications])
 
   const sortedToasts = useMemo(

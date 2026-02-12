@@ -162,6 +162,10 @@ function toChatMessage(
     author: record.direction === 'out' ? selfAuthor : shortHash(counterparty),
     sender: record.direction === 'out' ? 'self' : 'peer',
     body: record.content,
+    kind: assets.kind,
+    replyToId: assets.replyToId,
+    reaction: assets.reaction,
+    location: assets.location,
     attachments: assets.attachments,
     paper: assets.paper,
     sentAt: formatClockTime(timestampMs),
@@ -246,7 +250,14 @@ function isInternalCommandRecord(record: LxmfMessageRecord): boolean {
 
 function parseMessageAssets(
   fields: LxmfMessageRecord['fields'],
-): { attachments: ChatAttachment[]; paper?: ChatPaperMeta } {
+): {
+  attachments: ChatAttachment[]
+  paper?: ChatPaperMeta
+  kind?: ChatMessage['kind']
+  replyToId?: string
+  reaction?: ChatMessage['reaction']
+  location?: ChatMessage['location']
+} {
   const root = asObject(fields)
   if (!root) {
     return { attachments: [] }
@@ -255,10 +266,54 @@ function parseMessageAssets(
   const canonical = parseCanonicalAttachments(root['5'])
   const attachments = mergeAttachments(structured, canonical)
   const paper = parsePaperMeta(root.paper)
+  const extensions = parseAppExtensions(root)
+  const refs = parseReferenceMeta(root)
+  const location = parseLocationMeta(root)
+  const hasCommands = parseCommandEntries(root).length > 0
+  const replyToId =
+    asNonEmptyString(extensions.reply_to) ??
+    asNonEmptyString(extensions.replyTo) ??
+    asNonEmptyString(extensions.reply_id) ??
+    refs.replyToId
+  const reactionTo =
+    asNonEmptyString(extensions.reaction_to) ??
+    asNonEmptyString(extensions.reactionTo) ??
+    refs.reactionTo
+  const reactionEmoji =
+    asNonEmptyString(extensions.emoji) ??
+    asNonEmptyString(extensions.reaction_emoji) ??
+    refs.reactionEmoji
+  const reactionSender =
+    asNonEmptyString(extensions.sender) ??
+    asNonEmptyString(extensions.reaction_sender) ??
+    refs.reactionSender
+  const reaction =
+    reactionTo && reactionEmoji
+      ? {
+          to: reactionTo,
+          emoji: reactionEmoji,
+          sender: reactionSender,
+        }
+      : undefined
+
+  let kind: ChatMessage['kind'] | undefined
+  if (reaction) {
+    kind = 'reaction'
+  } else if (location) {
+    kind = 'location'
+  } else if (hasCommands) {
+    kind = 'command'
+  } else {
+    kind = 'message'
+  }
 
   return {
     attachments,
     paper,
+    kind,
+    replyToId,
+    reaction,
+    location,
   }
 }
 
@@ -353,6 +408,93 @@ function parsePaperMeta(value: unknown): ChatPaperMeta | undefined {
   }
 }
 
+function parseAppExtensions(root: Record<string, unknown>): Record<string, unknown> {
+  const field16 = asObject(root['16']) ?? asObject(root.app_extensions)
+  if (!field16) {
+    return {}
+  }
+  const nested = asObject(field16.extensions)
+  if (!nested) {
+    return field16
+  }
+  return {
+    ...field16,
+    ...nested,
+  }
+}
+
+function parseLocationMeta(root: Record<string, unknown>): ChatMessage['location'] | undefined {
+  const location = asObject(root.location)
+  const lat = asNumber(location?.lat) ?? asNumber(location?.latitude)
+  const lon = asNumber(location?.lon) ?? asNumber(location?.lng) ?? asNumber(location?.longitude)
+  if (lat !== undefined && lon !== undefined) {
+    return { lat, lon }
+  }
+  const telemetry = asObject(root['2'])
+  const telemetryNested = asObject(telemetry?.location)
+  const telemetryLat =
+    asNumber(telemetry?.lat) ??
+    asNumber(telemetry?.latitude) ??
+    asNumber(telemetryNested?.lat) ??
+    asNumber(telemetryNested?.latitude)
+  const telemetryLon =
+    asNumber(telemetry?.lon) ??
+    asNumber(telemetry?.lng) ??
+    asNumber(telemetry?.longitude) ??
+    asNumber(telemetryNested?.lon) ??
+    asNumber(telemetryNested?.lng) ??
+    asNumber(telemetryNested?.longitude)
+  if (telemetryLat !== undefined && telemetryLon !== undefined) {
+    return { lat: telemetryLat, lon: telemetryLon }
+  }
+  const telemetryArray = Array.isArray(root['2']) ? root['2'] : null
+  if (telemetryArray && telemetryArray.length >= 2) {
+    const latFromArray = asNumber(telemetryArray[0])
+    const lonFromArray = asNumber(telemetryArray[1])
+    if (latFromArray !== undefined && lonFromArray !== undefined) {
+      return { lat: latFromArray, lon: lonFromArray }
+    }
+  }
+  return undefined
+}
+
+function parseCommandEntries(root: Record<string, unknown>): unknown[] {
+  const value = root['9']
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value
+}
+
+function parseReferenceMeta(root: Record<string, unknown>): {
+  replyToId?: string
+  reactionTo?: string
+  reactionEmoji?: string
+  reactionSender?: string
+} {
+  const refs = asObject(root['14'])
+  if (!refs) {
+    return {}
+  }
+  const reaction = asObject(refs.reaction)
+  return {
+    replyToId:
+      asNonEmptyString(refs.reply_to) ??
+      asNonEmptyString(refs.reply) ??
+      asNonEmptyString(refs.reply_id) ??
+      asNonEmptyString(asObject(refs.reply_ref)?.id),
+    reactionTo:
+      asNonEmptyString(reaction?.to) ??
+      asNonEmptyString(refs.reaction_to),
+    reactionEmoji:
+      asNonEmptyString(reaction?.emoji) ??
+      asNonEmptyString(refs.reaction_emoji),
+    reactionSender:
+      asNonEmptyString(reaction?.sender) ??
+      asNonEmptyString(refs.reaction_sender),
+  }
+}
+
 function asObject(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return null
@@ -366,6 +508,13 @@ function asNonEmptyString(value: unknown): string | undefined {
   }
   const normalized = value.trim()
   return normalized.length > 0 ? normalized : undefined
+}
+
+function asNumber(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+  return value
 }
 
 function decodeWireText(value: unknown): string | null {

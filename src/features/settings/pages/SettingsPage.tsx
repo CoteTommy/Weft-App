@@ -10,6 +10,7 @@ import {
   saveConnectivitySettings,
   saveDisplayName,
   saveNotificationSettings,
+  saveOutboundPropagationNode,
 } from '../services/settingsService'
 import { useSettings } from '../state/useSettings'
 
@@ -70,11 +71,13 @@ export function SettingsPage() {
   const [savingName, setSavingName] = useState(false)
   const [savingConnectivity, setSavingConnectivity] = useState(false)
   const [connectivityMode, setConnectivityMode] = useState<ConnectivityMode>('automatic')
-  const [profileDraft, setProfileDraft] = useState('default')
+  const [profileDraft, setProfileDraft] = useState('')
   const [rpcDraft, setRpcDraft] = useState('')
   const [transportDraft, setTransportDraft] = useState('')
   const [autoStartDaemon, setAutoStartDaemon] = useState(true)
   const [restartAfterSave, setRestartAfterSave] = useState(false)
+  const [propagationPeerDraft, setPropagationPeerDraft] = useState('')
+  const [savingPropagationPeer, setSavingPropagationPeer] = useState(false)
   const [notificationSettings, setNotificationSettings] = useState<SettingsSnapshot['notifications']>(
     DEFAULT_NOTIFICATION_SETTINGS,
   )
@@ -88,16 +91,17 @@ export function SettingsPage() {
     }
     setDisplayNameDraft(settings.displayName)
     setConnectivityMode(settings.connectivity.mode)
-    setProfileDraft(settings.connectivity.profile ?? 'default')
+    setProfileDraft(settings.connectivity.profile ?? '')
     setRpcDraft(settings.connectivity.rpc ?? '')
     setTransportDraft(settings.connectivity.transport ?? '')
     setAutoStartDaemon(settings.connectivity.autoStartDaemon)
+    setPropagationPeerDraft(settings.connectivity.outboundPropagationPeer ?? '')
     setNotificationSettings(settings.notifications)
     setConfigPayload(
       JSON.stringify(
         buildConfigPayload({
           mode: settings.connectivity.mode,
-          profile: settings.connectivity.profile ?? 'default',
+          profile: settings.connectivity.profile ?? '',
           rpc: settings.connectivity.rpc ?? '',
           transport: settings.connectivity.transport ?? '',
           autoStartDaemon: settings.connectivity.autoStartDaemon,
@@ -337,6 +341,144 @@ export function SettingsPage() {
                       </button>
                     </div>
                   </form>
+
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-slate-700">Outbound propagation relay</p>
+                      <p className="text-xs text-slate-500">
+                        Current:{' '}
+                        {settings.connectivity.outboundPropagationPeer
+                          ? shortHash(settings.connectivity.outboundPropagationPeer, 8)
+                          : 'None'}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Required when delivery falls back to propagated routing.
+                    </p>
+                    <label className="mt-3 block text-xs text-slate-600">
+                      Relay peer hash
+                      <input
+                        value={propagationPeerDraft}
+                        onChange={(event) => setPropagationPeerDraft(event.target.value)}
+                        className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                        placeholder="2331bf796ca1a72451dbaedb05286cb8"
+                      />
+                    </label>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={savingPropagationPeer}
+                        onClick={() => {
+                          void (async () => {
+                            setSavingPropagationPeer(true)
+                            setSaveFeedback(null)
+                            try {
+                              const peer = await saveOutboundPropagationNode({
+                                peer: propagationPeerDraft || null,
+                                profile: profileDraft,
+                                rpc: rpcDraft,
+                              })
+                              await refresh()
+                              setSaveFeedback(
+                                peer
+                                  ? `Propagation relay set to ${shortHash(peer, 8)}.`
+                                  : 'Propagation relay cleared.',
+                              )
+                            } catch (saveError) {
+                              setSaveFeedback(
+                                saveError instanceof Error ? saveError.message : String(saveError),
+                              )
+                            } finally {
+                              setSavingPropagationPeer(false)
+                            }
+                          })()
+                        }}
+                        className="h-9 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {savingPropagationPeer ? 'Saving...' : 'Save relay'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingPropagationPeer}
+                        onClick={() => {
+                          void (async () => {
+                            setSavingPropagationPeer(true)
+                            setSaveFeedback(null)
+                            try {
+                              await saveOutboundPropagationNode({
+                                peer: null,
+                                profile: profileDraft,
+                                rpc: rpcDraft,
+                              })
+                              setPropagationPeerDraft('')
+                              await refresh()
+                              setSaveFeedback('Propagation relay cleared.')
+                            } catch (saveError) {
+                              setSaveFeedback(
+                                saveError instanceof Error ? saveError.message : String(saveError),
+                              )
+                            } finally {
+                              setSavingPropagationPeer(false)
+                            }
+                          })()
+                        }}
+                        className="h-9 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                      >
+                        Clear relay
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void refresh()
+                        }}
+                        className="h-9 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Refresh nodes
+                      </button>
+                    </div>
+
+                    <div className="mt-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Known propagation nodes
+                      </p>
+                      {settings.connectivity.propagationNodes.length ? (
+                        <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-slate-200">
+                          {settings.connectivity.propagationNodes.map((node) => {
+                            const isSelected = propagationPeerDraft.trim().toLowerCase() === node.peer
+                            return (
+                              <button
+                                key={node.peer}
+                                type="button"
+                                onClick={() => setPropagationPeerDraft(node.peer)}
+                                className={clsx(
+                                  'flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left text-xs transition last:border-b-0',
+                                  isSelected
+                                    ? 'bg-blue-50 text-blue-900'
+                                    : 'bg-white text-slate-700 hover:bg-slate-50',
+                                )}
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate font-semibold">
+                                    {node.name?.trim() || shortHash(node.peer, 8)}
+                                  </span>
+                                  <span className="block truncate text-[11px] text-slate-500">
+                                    {node.peer}
+                                  </span>
+                                </span>
+                                <span className="shrink-0 text-[11px] text-slate-500">
+                                  {node.selected ? 'Selected' : ''}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-slate-500">
+                          No propagation nodes discovered yet. Refresh after announces are received.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </>
               ) : null}
 
@@ -492,7 +634,7 @@ export function SettingsPage() {
                             displayName: displayNameDraft.trim(),
                             connectivity: {
                               mode: connectivityMode,
-                              profile: profileDraft.trim() || 'default',
+                              profile: profileDraft.trim() || undefined,
                               rpc: rpcDraft.trim() || '',
                               transport: transportDraft.trim() || '',
                               autoStartDaemon,
@@ -637,7 +779,7 @@ function SettingsRow({ label, value }: SettingsRowProps) {
 
 function buildConfigPayload(input: {
   mode: ConnectivityMode
-  profile: string
+  profile?: string
   rpc: string
   transport: string
   autoStartDaemon: boolean
