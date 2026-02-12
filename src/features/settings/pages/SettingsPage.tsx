@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import type { ConnectivityMode } from '../../../shared/runtime/preferences'
 import type { SettingsSnapshot } from '../../../shared/types/settings'
@@ -27,6 +28,16 @@ const DEFAULT_NOTIFICATION_SETTINGS: SettingsSnapshot['notifications'] = {
   soundEnabled: false,
 }
 
+type SettingsSection = 'profile' | 'connectivity' | 'notifications' | 'data' | 'advanced'
+
+const SETTINGS_SECTIONS: Array<{ id: SettingsSection; label: string }> = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'connectivity', label: 'Connectivity' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'data', label: 'Data' },
+  { id: 'advanced', label: 'Advanced' },
+]
+
 interface SettingsConfigPayload {
   mode?: ConnectivityMode
   profile?: string
@@ -53,6 +64,7 @@ interface BackupPayload {
 
 export function SettingsPage() {
   const { settings, loading, error, refresh } = useSettings()
+  const [activeSection, setActiveSection] = useState<SettingsSection>('profile')
   const [displayNameDraft, setDisplayNameDraft] = useState('')
   const [savingName, setSavingName] = useState(false)
   const [savingConnectivity, setSavingConnectivity] = useState(false)
@@ -128,407 +140,447 @@ export function SettingsPage() {
 
         {settings ? (
           <>
-            <div className="space-y-3 pb-1">
-            <form
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void (async () => {
-                  setSavingName(true)
-                  setSaveFeedback(null)
-                  try {
-                    await saveDisplayName(displayNameDraft)
-                    await refresh()
-                    setSaveFeedback('Display name updated.')
-                  } catch (saveError) {
-                    setSaveFeedback(saveError instanceof Error ? saveError.message : String(saveError))
-                  } finally {
-                    setSavingName(false)
-                  }
-                })()
-              }}
-            >
-              <p className="text-sm font-medium text-slate-700">Display name</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <input
-                  value={displayNameDraft}
-                  onChange={(event) => setDisplayNameDraft(event.target.value)}
-                  className="h-10 min-w-[220px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
-                  placeholder="Set your LXMF display name"
-                />
-                <button
-                  type="submit"
-                  disabled={savingName}
-                  className="h-10 rounded-xl bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-                >
-                  {savingName ? 'Saving...' : 'Save'}
-                </button>
+            <div className="sticky top-0 z-20 mb-3 rounded-xl border border-slate-200 bg-white/95 p-2 backdrop-blur">
+              <div className="flex flex-wrap gap-2">
+                {SETTINGS_SECTIONS.map((section) => (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setActiveSection(section.id)}
+                    className={clsx(
+                      'rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
+                      activeSection === section.id
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100',
+                    )}
+                  >
+                    {section.label}
+                  </button>
+                ))}
               </div>
-              {saveFeedback ? <p className="mt-2 text-xs text-slate-600">{saveFeedback}</p> : null}
-            </form>
+            </div>
 
-            <SettingsRow label="Connection" value={settings.connection} />
-            <SettingsRow label="Export backup" value={settings.backupStatus} />
-            <SettingsRow
-              label="Identity"
-              value={settings.identityHash ? shortHash(settings.identityHash, 8) : 'Unavailable'}
-            />
-
-            {settings.identityHash ? (
-              <button
-                type="button"
-                onClick={() => {
-                  void navigator.clipboard.writeText(settings.identityHash ?? '')
-                  setSaveFeedback('Identity hash copied.')
-                }}
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Copy identity hash
-              </button>
+            {saveFeedback ? (
+              <p className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                {saveFeedback}
+              </p>
             ) : null}
 
-            <form
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void (async () => {
-                  setSavingConnectivity(true)
-                  setSaveFeedback(null)
-                  try {
-                    await saveConnectivitySettings({
-                      mode: connectivityMode,
-                      profile: profileDraft,
-                      rpc: rpcDraft,
-                      transport: transportDraft,
-                      autoStartDaemon,
-                      restartDaemon: restartAfterSave,
-                    })
-                    await refresh()
-                    setSaveFeedback(
-                      restartAfterSave
-                        ? 'Connectivity settings saved and daemon restarted.'
-                        : 'Connectivity settings saved.',
-                    )
-                  } catch (saveError) {
-                    setSaveFeedback(saveError instanceof Error ? saveError.message : String(saveError))
-                  } finally {
-                    setSavingConnectivity(false)
-                  }
-                })()
-              }}
-            >
-              <p className="text-sm font-medium text-slate-700">Connectivity profile</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <label className="text-xs text-slate-600">
-                  Mode
-                  <select
-                    value={connectivityMode}
-                    onChange={(event) => setConnectivityMode(event.target.value as ConnectivityMode)}
-                    className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
-                  >
-                    {CONNECTIVITY_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-xs text-slate-600">
-                  Profile
-                  <input
-                    value={profileDraft}
-                    onChange={(event) => setProfileDraft(event.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
-                  />
-                </label>
-              </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <label className="text-xs text-slate-600">
-                  RPC endpoint
-                  <input
-                    value={rpcDraft}
-                    onChange={(event) => setRpcDraft(event.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
-                    placeholder="127.0.0.1:4242"
-                  />
-                </label>
-                <label className="text-xs text-slate-600">
-                  Transport bind
-                  <input
-                    value={transportDraft}
-                    onChange={(event) => setTransportDraft(event.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
-                    placeholder="127.0.0.1:0"
-                  />
-                </label>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-xs text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={autoStartDaemon}
-                    onChange={(event) => setAutoStartDaemon(event.target.checked)}
-                  />
-                  Auto-start daemon
-                </label>
-                <label className="flex items-center gap-2 text-xs text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={restartAfterSave}
-                    onChange={(event) => setRestartAfterSave(event.target.checked)}
-                  />
-                  Restart daemon after save
-                </label>
-                <button
-                  type="submit"
-                  disabled={savingConnectivity}
-                  className="h-9 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                >
-                  {savingConnectivity ? 'Saving...' : 'Save connectivity'}
-                </button>
-              </div>
-            </form>
-
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-sm font-medium text-slate-700">Notifications</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <NotificationToggle
-                  label="Desktop alerts"
-                  description="Show native desktop alerts for incoming messages."
-                  checked={notificationSettings.desktopEnabled}
-                  onChange={(next) => {
-                    updateNotifications(
-                      { desktopEnabled: next },
-                      next ? 'Desktop alerts enabled.' : 'Desktop alerts disabled.',
-                    )
-                  }}
-                />
-                <NotificationToggle
-                  label="In-app inbox"
-                  description="Store notifications in the top-right notification center."
-                  checked={notificationSettings.inAppEnabled}
-                  onChange={(next) => {
-                    updateNotifications(
-                      { inAppEnabled: next },
-                      next ? 'In-app notifications enabled.' : 'In-app notifications disabled.',
-                    )
-                  }}
-                />
-                <NotificationToggle
-                  label="Message notifications"
-                  description="Notify on new incoming messages."
-                  checked={notificationSettings.messageEnabled}
-                  onChange={(next) => {
-                    updateNotifications(
-                      { messageEnabled: next },
-                      next ? 'Message notifications enabled.' : 'Message notifications disabled.',
-                    )
-                  }}
-                />
-                <NotificationToggle
-                  label="System notifications"
-                  description="Notify on internal errors and send failures."
-                  checked={notificationSettings.systemEnabled}
-                  onChange={(next) => {
-                    updateNotifications(
-                      { systemEnabled: next },
-                      next ? 'System notifications enabled.' : 'System notifications disabled.',
-                    )
-                  }}
-                />
-                <NotificationToggle
-                  label="Connection notifications"
-                  description="Notify when daemon/RPC connection changes."
-                  checked={notificationSettings.connectionEnabled}
-                  onChange={(next) => {
-                    updateNotifications(
-                      { connectionEnabled: next },
-                      next ? 'Connection notifications enabled.' : 'Connection notifications disabled.',
-                    )
-                  }}
-                />
-                <NotificationToggle
-                  label="Sound cues"
-                  description="Play a subtle sound for each new in-app notification."
-                  checked={notificationSettings.soundEnabled}
-                  onChange={(next) => {
-                    updateNotifications(
-                      { soundEnabled: next },
-                      next ? 'Notification sound enabled.' : 'Notification sound disabled.',
-                    )
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-sm font-medium text-slate-700">Config import/export</p>
-              <textarea
-                value={configPayload}
-                onChange={(event) => setConfigPayload(event.target.value)}
-                rows={8}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 outline-none transition focus:border-blue-300"
-              />
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    void navigator.clipboard.writeText(configPayload)
-                    setSaveFeedback('Configuration JSON copied.')
-                  }}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Copy JSON
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void (async () => {
-                      try {
-                        const parsed = JSON.parse(configPayload) as SettingsConfigPayload
-                        if (!parsed.mode) {
-                          throw new Error('mode is required in config JSON')
-                        }
-                        await saveConnectivitySettings({
-                          mode: parsed.mode,
-                          profile: parsed.profile,
-                          rpc: parsed.rpc,
-                          transport: parsed.transport,
-                          autoStartDaemon: parsed.autoStartDaemon ?? true,
-                          restartDaemon: false,
-                        })
-                        const mergedNotifications = mergeNotificationSettings(
-                          notificationSettings,
-                          parsed.notifications,
-                          parsed.notificationsEnabled,
-                        )
-                        saveNotificationSettings(mergedNotifications)
-                        setNotificationSettings(mergedNotifications)
-                        await refresh()
-                        setSaveFeedback('Configuration imported.')
-                      } catch (importError) {
-                        setSaveFeedback(
-                          importError instanceof Error ? importError.message : String(importError),
-                        )
-                      }
-                    })()
-                  }}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Import JSON
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-sm font-medium text-slate-700">Backup and Restore</p>
-              <p className="mt-1 text-xs text-slate-600">
-                Export your Weft app identity settings and connectivity profile, then restore on
-                another machine.
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={backupWorking}
-                  onClick={() => {
-                    const payload: BackupPayload = {
-                      schema: 'weft-backup-v1',
-                      displayName: displayNameDraft.trim(),
-                      connectivity: {
-                        mode: connectivityMode,
-                        profile: profileDraft.trim() || 'default',
-                        rpc: rpcDraft.trim() || '',
-                        transport: transportDraft.trim() || '',
-                        autoStartDaemon,
-                      },
-                      notifications: notificationSettings,
-                    }
-                    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-                      type: 'application/json',
-                    })
-                    const url = URL.createObjectURL(blob)
-                    const anchor = document.createElement('a')
-                    anchor.href = url
-                    anchor.download = `weft-backup-${Date.now()}.json`
-                    anchor.click()
-                    URL.revokeObjectURL(url)
-                    setSaveFeedback('Backup exported.')
-                  }}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                >
-                  Export backup
-                </button>
-                <label className="cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
-                  Import backup
-                  <input
-                    type="file"
-                    accept="application/json,.json"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      if (!file) {
-                        return
-                      }
+            <div className="space-y-3 pb-2">
+              {activeSection === 'profile' ? (
+                <>
+                  <form
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3"
+                    onSubmit={(event) => {
+                      event.preventDefault()
                       void (async () => {
+                        setSavingName(true)
+                        setSaveFeedback(null)
                         try {
-                          setBackupWorking(true)
-                          const text = await file.text()
-                          const parsed = JSON.parse(text) as BackupPayload
-                          if (parsed.schema !== 'weft-backup-v1') {
-                            throw new Error('Unsupported backup schema.')
-                          }
-                          if (parsed.displayName !== undefined) {
-                            setDisplayNameDraft(parsed.displayName)
-                            await saveDisplayName(parsed.displayName)
-                          }
-                          const connectivity = parsed.connectivity
-                          if (connectivity?.mode) {
-                            await saveConnectivitySettings({
-                              mode: connectivity.mode,
-                              profile: connectivity.profile,
-                              rpc: connectivity.rpc,
-                              transport: connectivity.transport,
-                              autoStartDaemon: connectivity.autoStartDaemon ?? true,
-                              restartDaemon: false,
-                            })
-                          }
-                          const mergedNotifications = mergeNotificationSettings(
-                            notificationSettings,
-                            parsed.notifications,
-                            parsed.connectivity?.notificationsEnabled,
-                          )
-                          saveNotificationSettings(mergedNotifications)
-                          setNotificationSettings(mergedNotifications)
+                          await saveDisplayName(displayNameDraft)
                           await refresh()
-                          setSaveFeedback('Backup imported.')
-                        } catch (importError) {
-                          setSaveFeedback(
-                            importError instanceof Error ? importError.message : String(importError),
-                          )
+                          setSaveFeedback('Display name updated.')
+                        } catch (saveError) {
+                          setSaveFeedback(saveError instanceof Error ? saveError.message : String(saveError))
                         } finally {
-                          setBackupWorking(false)
-                          event.target.value = ''
+                          setSavingName(false)
                         }
                       })()
                     }}
-                  />
-                </label>
-              </div>
-            </div>
-            </div>
+                  >
+                    <p className="text-sm font-medium text-slate-700">Display name</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <input
+                        value={displayNameDraft}
+                        onChange={(event) => setDisplayNameDraft(event.target.value)}
+                        className="h-10 min-w-[220px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                        placeholder="Set your LXMF display name"
+                      />
+                      <button
+                        type="submit"
+                        disabled={savingName}
+                        className="h-10 rounded-xl bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                      >
+                        {savingName ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
+                  </form>
 
-            <details className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-800">Advanced</summary>
-              <div className="mt-3 space-y-2 text-sm text-slate-600">
-                <p>RPC Endpoint: {settings.rpcEndpoint}</p>
-                <p>Profile Path: {settings.profile}</p>
-                <p>Identity Hash: {settings.identityHash ?? 'n/a'}</p>
-                <p>Peers</p>
-                <p>Interfaces</p>
-                <p>Announces</p>
-                <p>Diagnostics</p>
-              </div>
-            </details>
+                  <SettingsRow
+                    label="Identity"
+                    value={settings.identityHash ? shortHash(settings.identityHash, 8) : 'Unavailable'}
+                  />
+
+                  {settings.identityHash ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(settings.identityHash ?? '')
+                        setSaveFeedback('Identity hash copied.')
+                      }}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Copy identity hash
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+
+              {activeSection === 'connectivity' ? (
+                <>
+                  <SettingsRow label="Connection" value={settings.connection} />
+                  <form
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      void (async () => {
+                        setSavingConnectivity(true)
+                        setSaveFeedback(null)
+                        try {
+                          await saveConnectivitySettings({
+                            mode: connectivityMode,
+                            profile: profileDraft,
+                            rpc: rpcDraft,
+                            transport: transportDraft,
+                            autoStartDaemon,
+                            restartDaemon: restartAfterSave,
+                          })
+                          await refresh()
+                          setSaveFeedback(
+                            restartAfterSave
+                              ? 'Connectivity settings saved and daemon restarted.'
+                              : 'Connectivity settings saved.',
+                          )
+                        } catch (saveError) {
+                          setSaveFeedback(saveError instanceof Error ? saveError.message : String(saveError))
+                        } finally {
+                          setSavingConnectivity(false)
+                        }
+                      })()
+                    }}
+                  >
+                    <p className="text-sm font-medium text-slate-700">Connectivity profile</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <label className="text-xs text-slate-600">
+                        Mode
+                        <select
+                          value={connectivityMode}
+                          onChange={(event) => setConnectivityMode(event.target.value as ConnectivityMode)}
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                        >
+                          {CONNECTIVITY_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="text-xs text-slate-600">
+                        Profile
+                        <input
+                          value={profileDraft}
+                          onChange={(event) => setProfileDraft(event.target.value)}
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <label className="text-xs text-slate-600">
+                        RPC endpoint
+                        <input
+                          value={rpcDraft}
+                          onChange={(event) => setRpcDraft(event.target.value)}
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                          placeholder="127.0.0.1:4242"
+                        />
+                      </label>
+                      <label className="text-xs text-slate-600">
+                        Transport bind
+                        <input
+                          value={transportDraft}
+                          onChange={(event) => setTransportDraft(event.target.value)}
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                          placeholder="127.0.0.1:0"
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-2 text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={autoStartDaemon}
+                          onChange={(event) => setAutoStartDaemon(event.target.checked)}
+                        />
+                        Auto-start daemon
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={restartAfterSave}
+                          onChange={(event) => setRestartAfterSave(event.target.checked)}
+                        />
+                        Restart daemon after save
+                      </label>
+                      <button
+                        type="submit"
+                        disabled={savingConnectivity}
+                        className="h-9 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {savingConnectivity ? 'Saving...' : 'Save connectivity'}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              ) : null}
+
+              {activeSection === 'notifications' ? (
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-sm font-medium text-slate-700">Notifications</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <NotificationToggle
+                      label="Desktop alerts"
+                      description="Show native desktop alerts for incoming messages."
+                      checked={notificationSettings.desktopEnabled}
+                      onChange={(next) => {
+                        updateNotifications(
+                          { desktopEnabled: next },
+                          next ? 'Desktop alerts enabled.' : 'Desktop alerts disabled.',
+                        )
+                      }}
+                    />
+                    <NotificationToggle
+                      label="In-app inbox"
+                      description="Store notifications in the top-right notification center."
+                      checked={notificationSettings.inAppEnabled}
+                      onChange={(next) => {
+                        updateNotifications(
+                          { inAppEnabled: next },
+                          next ? 'In-app notifications enabled.' : 'In-app notifications disabled.',
+                        )
+                      }}
+                    />
+                    <NotificationToggle
+                      label="Message notifications"
+                      description="Notify on new incoming messages."
+                      checked={notificationSettings.messageEnabled}
+                      onChange={(next) => {
+                        updateNotifications(
+                          { messageEnabled: next },
+                          next ? 'Message notifications enabled.' : 'Message notifications disabled.',
+                        )
+                      }}
+                    />
+                    <NotificationToggle
+                      label="System notifications"
+                      description="Notify on internal errors and send failures."
+                      checked={notificationSettings.systemEnabled}
+                      onChange={(next) => {
+                        updateNotifications(
+                          { systemEnabled: next },
+                          next ? 'System notifications enabled.' : 'System notifications disabled.',
+                        )
+                      }}
+                    />
+                    <NotificationToggle
+                      label="Connection notifications"
+                      description="Notify when daemon/RPC connection changes."
+                      checked={notificationSettings.connectionEnabled}
+                      onChange={(next) => {
+                        updateNotifications(
+                          { connectionEnabled: next },
+                          next ? 'Connection notifications enabled.' : 'Connection notifications disabled.',
+                        )
+                      }}
+                    />
+                    <NotificationToggle
+                      label="Sound cues"
+                      description="Play a subtle sound for each new in-app notification."
+                      checked={notificationSettings.soundEnabled}
+                      onChange={(next) => {
+                        updateNotifications(
+                          { soundEnabled: next },
+                          next ? 'Notification sound enabled.' : 'Notification sound disabled.',
+                        )
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {activeSection === 'data' ? (
+                <>
+                  <SettingsRow label="Export backup" value={settings.backupStatus} />
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-sm font-medium text-slate-700">Config import/export</p>
+                    <textarea
+                      value={configPayload}
+                      onChange={(event) => setConfigPayload(event.target.value)}
+                      rows={8}
+                      className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 outline-none transition focus:border-blue-300"
+                    />
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(configPayload)
+                          setSaveFeedback('Configuration JSON copied.')
+                        }}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Copy JSON
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              const parsed = JSON.parse(configPayload) as SettingsConfigPayload
+                              if (!parsed.mode) {
+                                throw new Error('mode is required in config JSON')
+                              }
+                              await saveConnectivitySettings({
+                                mode: parsed.mode,
+                                profile: parsed.profile,
+                                rpc: parsed.rpc,
+                                transport: parsed.transport,
+                                autoStartDaemon: parsed.autoStartDaemon ?? true,
+                                restartDaemon: false,
+                              })
+                              const mergedNotifications = mergeNotificationSettings(
+                                notificationSettings,
+                                parsed.notifications,
+                                parsed.notificationsEnabled,
+                              )
+                              saveNotificationSettings(mergedNotifications)
+                              setNotificationSettings(mergedNotifications)
+                              await refresh()
+                              setSaveFeedback('Configuration imported.')
+                            } catch (importError) {
+                              setSaveFeedback(
+                                importError instanceof Error ? importError.message : String(importError),
+                              )
+                            }
+                          })()
+                        }}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Import JSON
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-sm font-medium text-slate-700">Backup and Restore</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Export your Weft app identity settings and connectivity profile, then restore on
+                      another machine.
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={backupWorking}
+                        onClick={() => {
+                          const payload: BackupPayload = {
+                            schema: 'weft-backup-v1',
+                            displayName: displayNameDraft.trim(),
+                            connectivity: {
+                              mode: connectivityMode,
+                              profile: profileDraft.trim() || 'default',
+                              rpc: rpcDraft.trim() || '',
+                              transport: transportDraft.trim() || '',
+                              autoStartDaemon,
+                            },
+                            notifications: notificationSettings,
+                          }
+                          const blob = new Blob([JSON.stringify(payload, null, 2)], {
+                            type: 'application/json',
+                          })
+                          const url = URL.createObjectURL(blob)
+                          const anchor = document.createElement('a')
+                          anchor.href = url
+                          anchor.download = `weft-backup-${Date.now()}.json`
+                          anchor.click()
+                          URL.revokeObjectURL(url)
+                          setSaveFeedback('Backup exported.')
+                        }}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                      >
+                        Export backup
+                      </button>
+                      <label className="cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                        Import backup
+                        <input
+                          type="file"
+                          accept="application/json,.json"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0]
+                            if (!file) {
+                              return
+                            }
+                            void (async () => {
+                              try {
+                                setBackupWorking(true)
+                                const text = await file.text()
+                                const parsed = JSON.parse(text) as BackupPayload
+                                if (parsed.schema !== 'weft-backup-v1') {
+                                  throw new Error('Unsupported backup schema.')
+                                }
+                                if (parsed.displayName !== undefined) {
+                                  setDisplayNameDraft(parsed.displayName)
+                                  await saveDisplayName(parsed.displayName)
+                                }
+                                const connectivity = parsed.connectivity
+                                if (connectivity?.mode) {
+                                  await saveConnectivitySettings({
+                                    mode: connectivity.mode,
+                                    profile: connectivity.profile,
+                                    rpc: connectivity.rpc,
+                                    transport: connectivity.transport,
+                                    autoStartDaemon: connectivity.autoStartDaemon ?? true,
+                                    restartDaemon: false,
+                                  })
+                                }
+                                const mergedNotifications = mergeNotificationSettings(
+                                  notificationSettings,
+                                  parsed.notifications,
+                                  parsed.connectivity?.notificationsEnabled,
+                                )
+                                saveNotificationSettings(mergedNotifications)
+                                setNotificationSettings(mergedNotifications)
+                                await refresh()
+                                setSaveFeedback('Backup imported.')
+                              } catch (importError) {
+                                setSaveFeedback(
+                                  importError instanceof Error ? importError.message : String(importError),
+                                )
+                              } finally {
+                                setBackupWorking(false)
+                                event.target.value = ''
+                              }
+                            })()
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+
+              {activeSection === 'advanced' ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-sm font-semibold text-slate-800">Diagnostics</p>
+                  <div className="mt-3 space-y-2 text-sm text-slate-600">
+                    <p>RPC Endpoint: {settings.rpcEndpoint}</p>
+                    <p>Profile Path: {settings.profile}</p>
+                    <p>Identity Hash: {settings.identityHash ?? 'n/a'}</p>
+                    <p>Peers</p>
+                    <p>Interfaces</p>
+                    <p>Announces</p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </>
         ) : null}
       </div>
