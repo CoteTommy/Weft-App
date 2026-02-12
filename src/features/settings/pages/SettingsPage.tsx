@@ -13,56 +13,12 @@ import {
   saveOutboundPropagationNode,
 } from '../services/settingsService'
 import { useSettings } from '../state/useSettings'
-
-const CONNECTIVITY_OPTIONS: Array<{ value: ConnectivityMode; label: string }> = [
-  { value: 'automatic', label: 'Automatic' },
-  { value: 'local_only', label: 'Local only' },
-  { value: 'lan_shared', label: 'LAN shared' },
-  { value: 'custom', label: 'Custom' },
-]
-
-const DEFAULT_NOTIFICATION_SETTINGS: SettingsSnapshot['notifications'] = {
-  desktopEnabled: true,
-  inAppEnabled: true,
-  messageEnabled: true,
-  systemEnabled: true,
-  connectionEnabled: true,
-  soundEnabled: false,
-}
-
-type SettingsSection = 'profile' | 'connectivity' | 'notifications' | 'data' | 'advanced'
-
-const SETTINGS_SECTIONS: Array<{ id: SettingsSection; label: string }> = [
-  { id: 'profile', label: 'Profile' },
-  { id: 'connectivity', label: 'Connectivity' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'data', label: 'Data' },
-  { id: 'advanced', label: 'Advanced' },
-]
-
-interface SettingsConfigPayload {
-  mode?: ConnectivityMode
-  profile?: string
-  rpc?: string
-  transport?: string
-  autoStartDaemon?: boolean
-  notificationsEnabled?: boolean
-  notifications?: Partial<SettingsSnapshot['notifications']>
-}
-
-interface BackupPayload {
-  schema?: string
-  displayName?: string
-  connectivity?: {
-    mode?: ConnectivityMode
-    profile?: string
-    rpc?: string
-    transport?: string
-    autoStartDaemon?: boolean
-    notificationsEnabled?: boolean
-  }
-  notifications?: Partial<SettingsSnapshot['notifications']>
-}
+import { DEFAULT_NOTIFICATION_SETTINGS, CONNECTIVITY_OPTIONS, SETTINGS_SECTIONS } from '../constants'
+import { NotificationToggle } from '../components/NotificationToggle'
+import { OutboundPropagationRelayCard } from '../components/OutboundPropagationRelayCard'
+import { SettingsRow } from '../components/SettingsRow'
+import type { BackupPayload, SettingsConfigPayload } from '../types'
+import { buildConfigPayload, mergeNotificationSettings, parseSettingsSection } from '../utils'
 
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -342,143 +298,58 @@ export function SettingsPage() {
                     </div>
                   </form>
 
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-slate-700">Outbound propagation relay</p>
-                      <p className="text-xs text-slate-500">
-                        Current:{' '}
-                        {settings.connectivity.outboundPropagationPeer
-                          ? shortHash(settings.connectivity.outboundPropagationPeer, 8)
-                          : 'None'}
-                      </p>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Required when delivery falls back to propagated routing.
-                    </p>
-                    <label className="mt-3 block text-xs text-slate-600">
-                      Relay peer hash
-                      <input
-                        value={propagationPeerDraft}
-                        onChange={(event) => setPropagationPeerDraft(event.target.value)}
-                        className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
-                        placeholder="2331bf796ca1a72451dbaedb05286cb8"
-                      />
-                    </label>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={savingPropagationPeer}
-                        onClick={() => {
-                          void (async () => {
-                            setSavingPropagationPeer(true)
-                            setSaveFeedback(null)
-                            try {
-                              const peer = await saveOutboundPropagationNode({
-                                peer: propagationPeerDraft || null,
-                                profile: profileDraft,
-                                rpc: rpcDraft,
-                              })
-                              await refresh()
-                              setSaveFeedback(
-                                peer
-                                  ? `Propagation relay set to ${shortHash(peer, 8)}.`
-                                  : 'Propagation relay cleared.',
-                              )
-                            } catch (saveError) {
-                              setSaveFeedback(
-                                saveError instanceof Error ? saveError.message : String(saveError),
-                              )
-                            } finally {
-                              setSavingPropagationPeer(false)
-                            }
-                          })()
-                        }}
-                        className="h-9 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                      >
-                        {savingPropagationPeer ? 'Saving...' : 'Save relay'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={savingPropagationPeer}
-                        onClick={() => {
-                          void (async () => {
-                            setSavingPropagationPeer(true)
-                            setSaveFeedback(null)
-                            try {
-                              await saveOutboundPropagationNode({
-                                peer: null,
-                                profile: profileDraft,
-                                rpc: rpcDraft,
-                              })
-                              setPropagationPeerDraft('')
-                              await refresh()
-                              setSaveFeedback('Propagation relay cleared.')
-                            } catch (saveError) {
-                              setSaveFeedback(
-                                saveError instanceof Error ? saveError.message : String(saveError),
-                              )
-                            } finally {
-                              setSavingPropagationPeer(false)
-                            }
-                          })()
-                        }}
-                        className="h-9 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                      >
-                        Clear relay
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void refresh()
-                        }}
-                        className="h-9 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                      >
-                        Refresh nodes
-                      </button>
-                    </div>
-
-                    <div className="mt-3">
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                        Known propagation nodes
-                      </p>
-                      {settings.connectivity.propagationNodes.length ? (
-                        <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-slate-200">
-                          {settings.connectivity.propagationNodes.map((node) => {
-                            const isSelected = propagationPeerDraft.trim().toLowerCase() === node.peer
-                            return (
-                              <button
-                                key={node.peer}
-                                type="button"
-                                onClick={() => setPropagationPeerDraft(node.peer)}
-                                className={clsx(
-                                  'flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left text-xs transition last:border-b-0',
-                                  isSelected
-                                    ? 'bg-blue-50 text-blue-900'
-                                    : 'bg-white text-slate-700 hover:bg-slate-50',
-                                )}
-                              >
-                                <span className="min-w-0">
-                                  <span className="block truncate font-semibold">
-                                    {node.name?.trim() || shortHash(node.peer, 8)}
-                                  </span>
-                                  <span className="block truncate text-[11px] text-slate-500">
-                                    {node.peer}
-                                  </span>
-                                </span>
-                                <span className="shrink-0 text-[11px] text-slate-500">
-                                  {node.selected ? 'Selected' : ''}
-                                </span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-xs text-slate-500">
-                          No propagation nodes discovered yet. Refresh after announces are received.
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  <OutboundPropagationRelayCard
+                    settings={settings}
+                    propagationPeerDraft={propagationPeerDraft}
+                    savingPropagationPeer={savingPropagationPeer}
+                    onPropagationPeerDraftChange={setPropagationPeerDraft}
+                    onSaveRelay={() => {
+                      void (async () => {
+                        setSavingPropagationPeer(true)
+                        setSaveFeedback(null)
+                        try {
+                          const peer = await saveOutboundPropagationNode({
+                            peer: propagationPeerDraft || null,
+                            profile: profileDraft,
+                            rpc: rpcDraft,
+                          })
+                          await refresh()
+                          setSaveFeedback(
+                            peer
+                              ? `Propagation relay set to ${shortHash(peer, 8)}.`
+                              : 'Propagation relay cleared.',
+                          )
+                        } catch (saveError) {
+                          setSaveFeedback(saveError instanceof Error ? saveError.message : String(saveError))
+                        } finally {
+                          setSavingPropagationPeer(false)
+                        }
+                      })()
+                    }}
+                    onClearRelay={() => {
+                      void (async () => {
+                        setSavingPropagationPeer(true)
+                        setSaveFeedback(null)
+                        try {
+                          await saveOutboundPropagationNode({
+                            peer: null,
+                            profile: profileDraft,
+                            rpc: rpcDraft,
+                          })
+                          setPropagationPeerDraft('')
+                          await refresh()
+                          setSaveFeedback('Propagation relay cleared.')
+                        } catch (saveError) {
+                          setSaveFeedback(saveError instanceof Error ? saveError.message : String(saveError))
+                        } finally {
+                          setSavingPropagationPeer(false)
+                        }
+                      })()
+                    }}
+                    onRefreshNodes={() => {
+                      void refresh()
+                    }}
+                  />
                 </>
               ) : null}
 
@@ -735,87 +606,4 @@ export function SettingsPage() {
       </div>
     </Panel>
   )
-}
-
-interface NotificationToggleProps {
-  label: string
-  description: string
-  checked: boolean
-  onChange: (next: boolean) => void
-}
-
-function NotificationToggle({ label, description, checked, onChange }: NotificationToggleProps) {
-  return (
-    <label className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => {
-          onChange(event.target.checked)
-        }}
-        className="mt-0.5"
-      />
-      <span>
-        <span className="block font-medium text-slate-800">{label}</span>
-        <span className="mt-0.5 block text-xs text-slate-500">{description}</span>
-      </span>
-    </label>
-  )
-}
-
-interface SettingsRowProps {
-  label: string
-  value: string
-}
-
-function SettingsRow({ label, value }: SettingsRowProps) {
-  return (
-    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
-      <p className="text-sm font-medium text-slate-700">{label}</p>
-      <p className="text-sm font-semibold text-slate-900">{value}</p>
-    </div>
-  )
-}
-
-function buildConfigPayload(input: {
-  mode: ConnectivityMode
-  profile?: string
-  rpc: string
-  transport: string
-  autoStartDaemon: boolean
-  notifications: SettingsSnapshot['notifications']
-}): SettingsConfigPayload {
-  return {
-    mode: input.mode,
-    profile: input.profile,
-    rpc: input.rpc,
-    transport: input.transport,
-    autoStartDaemon: input.autoStartDaemon,
-    notifications: input.notifications,
-  }
-}
-
-function mergeNotificationSettings(
-  current: SettingsSnapshot['notifications'],
-  patch?: Partial<SettingsSnapshot['notifications']>,
-  legacyDesktopEnabled?: boolean,
-): SettingsSnapshot['notifications'] {
-  return {
-    ...current,
-    ...(patch ?? {}),
-    ...(typeof legacyDesktopEnabled === 'boolean' ? { desktopEnabled: legacyDesktopEnabled } : {}),
-  }
-}
-
-function parseSettingsSection(value: string | null): SettingsSection {
-  if (
-    value === 'profile' ||
-    value === 'connectivity' ||
-    value === 'notifications' ||
-    value === 'data' ||
-    value === 'advanced'
-  ) {
-    return value
-  }
-  return 'profile'
 }
