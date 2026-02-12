@@ -40,20 +40,20 @@ export default function App() {
           element={onboardingCompleted ? <Navigate to="/chats" replace /> : <WelcomePage />}
         />
         <Route
-          element={onboardingCompleted ? <AppShell /> : <Navigate to="/welcome" replace />}
+          element={onboardingCompleted ? <ChatsStateLayout /> : <Navigate to="/welcome" replace />}
         >
-          <Route index element={<Navigate to="/chats" replace />} />
-          <Route element={<ChatsStateLayout />}>
+          <Route element={<AppShell />}>
+            <Route index element={<Navigate to="/chats" replace />} />
             <Route path="/chats" element={<ChatsPage />} />
             <Route path="/chats/:chatId" element={<ChatThreadPage />} />
+            <Route path="/people" element={<PeoplePage />} />
+            <Route path="/map" element={<MapPage />} />
+            <Route path="/network" element={<NetworkPage />} />
+            <Route path="/interfaces" element={<InterfacesPage />} />
+            <Route path="/announces" element={<AnnouncesPage />} />
+            <Route path="/files" element={<FilesPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
-          <Route path="/people" element={<PeoplePage />} />
-          <Route path="/map" element={<MapPage />} />
-          <Route path="/network" element={<NetworkPage />} />
-          <Route path="/interfaces" element={<InterfacesPage />} />
-          <Route path="/announces" element={<AnnouncesPage />} />
-          <Route path="/files" element={<FilesPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
         </Route>
         <Route
           path="*"

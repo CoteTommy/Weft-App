@@ -4,9 +4,10 @@ import type { ChatMessage } from '../../../shared/types/chat'
 
 interface MessageTimelineProps {
   messages: ChatMessage[]
+  onRetry?: (message: ChatMessage) => Promise<void> | void
 }
 
-export function MessageTimeline({ messages }: MessageTimelineProps) {
+export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   const holdTimeoutRef = useRef<number | null>(null)
@@ -210,6 +211,26 @@ export function MessageTimeline({ messages }: MessageTimelineProps) {
             ) : null}
 
             <div className="mt-3 flex items-center gap-2">
+              {selectedMessage.sender === 'self' && selectedMessage.status === 'failed' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        await onRetry?.(selectedMessage)
+                        setCopyFeedback('Retry queued.')
+                      } catch (retryError) {
+                        setCopyFeedback(
+                          retryError instanceof Error ? retryError.message : String(retryError),
+                        )
+                      }
+                    })()
+                  }}
+                  className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                >
+                  Retry send
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => {

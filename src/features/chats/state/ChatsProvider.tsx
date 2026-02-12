@@ -45,6 +45,46 @@ export function ChatsProvider({ children }: PropsWithChildren) {
   const hasLoadedRef = useRef(false)
   const refreshingRef = useRef(false)
 
+  const emitIncomingNotifications = useCallback(
+    async (items: Array<{ threadId: string; threadName: string; latestBody: string; count: number }>) => {
+      if (typeof window === 'undefined' || !('Notification' in window) || items.length === 0) {
+        return
+      }
+      if (document.visibilityState === 'visible' && document.hasFocus()) {
+        return
+      }
+
+      let permission = Notification.permission
+      if (permission === 'default') {
+        permission = await Notification.requestPermission()
+      }
+      if (permission !== 'granted') {
+        return
+      }
+
+      for (const item of items) {
+        const body =
+          item.count > 1
+            ? `${item.count} new messages in ${item.threadName}`
+            : item.latestBody || `New message in ${item.threadName}`
+        const notification = new Notification(item.threadName, {
+          body,
+          tag: `thread:${item.threadId}`,
+        })
+        notification.onclick = () => {
+          window.focus()
+          window.dispatchEvent(
+            new CustomEvent('weft:open-thread', {
+              detail: { threadId: item.threadId },
+            }),
+          )
+          notification.close()
+        }
+      }
+    },
+    [],
+  )
+
   const rewriteSelfAuthors = useCallback((nextAuthor: string) => {
     const normalizedAuthor = nextAuthor.trim() || 'You'
     setThreads((previous) => {
@@ -81,6 +121,12 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     try {
       setError(null)
       const loaded = await fetchChatThreads()
+      const pendingNotifications: Array<{
+        threadId: string
+        threadName: string
+        latestBody: string
+        count: number
+      }> = []
       const activeIds = new Set([
         ...loaded.map((thread) => thread.id),
         ...draftThreadsRef.current.keys(),
@@ -108,6 +154,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         }
 
         let incomingCount = 0
+        let latestIncoming = ''
         for (const message of thread.messages) {
           if (knownIds.has(message.id)) {
             continue
@@ -115,6 +162,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
           knownIds.add(message.id)
           if (message.sender === 'peer') {
             incomingCount += 1
+            latestIncoming = message.body
           }
         }
         if (incomingCount > 0) {
@@ -122,6 +170,14 @@ export function ChatsProvider({ children }: PropsWithChildren) {
             thread.id,
             (unreadCountsRef.current.get(thread.id) ?? 0) + incomingCount,
           )
+          if (hasLoadedRef.current) {
+            pendingNotifications.push({
+              threadId: thread.id,
+              threadName: thread.name,
+              latestBody: latestIncoming,
+              count: incomingCount,
+            })
+          }
         } else if (!unreadCountsRef.current.has(thread.id)) {
           unreadCountsRef.current.set(thread.id, 0)
         }
@@ -139,13 +195,16 @@ export function ChatsProvider({ children }: PropsWithChildren) {
 
       const draftThreads = [...draftThreadsRef.current.values()]
       setThreads([...draftThreads, ...hydratedThreads])
+      if (pendingNotifications.length > 0) {
+        void emitIncomingNotifications(pendingNotifications)
+      }
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : String(refreshError))
     } finally {
       setLoading(false)
       refreshingRef.current = false
     }
-  }, [])
+  }, [emitIncomingNotifications])
 
   const markThreadRead = useCallback((threadId: string) => {
     const id = threadId.trim()

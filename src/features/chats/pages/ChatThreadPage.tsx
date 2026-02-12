@@ -82,7 +82,29 @@ export function ChatThreadPage() {
               {thread.messages.length > 0 && filteredMessages.length === 0 ? (
                 <p className="text-sm text-slate-500">No messages match your search.</p>
               ) : (
-                <MessageTimeline messages={filteredMessages} />
+                <MessageTimeline
+                  messages={filteredMessages}
+                  onRetry={(message) => {
+                    const attachments = message.attachments
+                      .filter((attachment) => Boolean(attachment.dataBase64))
+                      .map((attachment) => ({
+                        name: attachment.name,
+                        mime: attachment.mime,
+                        sizeBytes: attachment.sizeBytes,
+                        dataBase64: attachment.dataBase64 as string,
+                      }))
+                    return sendMessage(thread.id, {
+                      text: message.body,
+                      attachments: attachments.length > 0 ? attachments : undefined,
+                      paper: message.paper
+                        ? {
+                            title: message.paper.title,
+                            category: message.paper.category,
+                          }
+                        : undefined,
+                    }).then(() => undefined)
+                  }}
+                />
               )}
             </div>
             <MessageComposer

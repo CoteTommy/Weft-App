@@ -11,6 +11,7 @@ import {
   Users,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useChatsState } from '../../features/chats/state/ChatsProvider'
 import { getLxmfProfile, probeLxmf } from '../../lib/lxmf-api'
 import {
   DISPLAY_NAME_UPDATED_EVENT,
@@ -31,8 +32,10 @@ const navItems = [
 ]
 
 export function SidebarNav() {
+  const { threads } = useChatsState()
   const [displayName, setDisplayName] = useState(() => getStoredDisplayName() ?? 'Loading...')
   const [identityHint, setIdentityHint] = useState<string | null>(null)
+  const totalUnread = threads.reduce((sum, thread) => sum + thread.unread, 0)
 
   const refreshIdentity = useCallback(async () => {
     try {
@@ -93,6 +96,11 @@ export function SidebarNav() {
           >
             <item.icon className="h-4 w-4" />
             <span>{item.label}</span>
+            {item.to === '/chats' && totalUnread > 0 ? (
+              <span className="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold text-current">
+                {totalUnread}
+              </span>
+            ) : null}
           </NavLink>
         ))}
       </nav>
