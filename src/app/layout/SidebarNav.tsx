@@ -35,7 +35,10 @@ export function SidebarNav() {
   const { threads } = useChatsState()
   const [displayName, setDisplayName] = useState(() => getStoredDisplayName() ?? 'Loading...')
   const [identityHint, setIdentityHint] = useState<string | null>(null)
-  const totalUnread = threads.reduce((sum, thread) => sum + thread.unread, 0)
+  const totalUnread = threads.reduce(
+    (sum, thread) => sum + (thread.muted ? 0 : thread.unread),
+    0,
+  )
 
   const refreshIdentity = useCallback(async () => {
     try {

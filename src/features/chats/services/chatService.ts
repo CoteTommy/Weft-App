@@ -114,6 +114,8 @@ export function buildThreads(
         destination: shortHash(counterparty, 8),
         preview: latestPreview(last),
         unread: 0,
+        pinned: false,
+        muted: false,
         lastActivity: formatRelativeFromNow(lastTimestampMs),
         messages,
       } satisfies ChatThread,

@@ -28,6 +28,8 @@ export interface ChatThread {
   destination: string
   preview: string
   unread: number
+  pinned: boolean
+  muted: boolean
   lastActivity: string
   messages: ChatMessage[]
 }

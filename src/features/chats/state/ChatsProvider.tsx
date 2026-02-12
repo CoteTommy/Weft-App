@@ -26,6 +26,11 @@ import {
   PREFERENCES_UPDATED_EVENT,
 } from '../../../shared/runtime/preferences'
 import { fetchChatThreads, postChatMessage } from '../services/chatService'
+import {
+  getStoredThreadPreferences,
+  persistThreadPreferences,
+  resolveThreadPreference,
+} from './threadPreferences'
 
 interface ChatsState {
   threads: ChatThread[]
@@ -36,6 +41,8 @@ interface ChatsState {
   markThreadRead: (threadId: string) => void
   markAllRead: () => void
   createThread: (destination: string, name?: string) => string | null
+  setThreadPinned: (threadId: string, pinned?: boolean) => void
+  setThreadMuted: (threadId: string, muted?: boolean) => void
 }
 
 const ChatsContext = createContext<ChatsState | undefined>(undefined)
@@ -50,6 +57,19 @@ export function ChatsProvider({ children }: PropsWithChildren) {
   const hasLoadedRef = useRef(false)
   const refreshingRef = useRef(false)
   const notificationsEnabledRef = useRef(getWeftPreferences().notificationsEnabled)
+  const threadPreferencesRef = useRef(getStoredThreadPreferences())
+
+  const applyThreadMetadata = useCallback((thread: ChatThread): ChatThread => {
+    const preference = resolveThreadPreference(threadPreferencesRef.current, thread.id)
+    if (thread.pinned === preference.pinned && thread.muted === preference.muted) {
+      return thread
+    }
+    return {
+      ...thread,
+      pinned: preference.pinned,
+      muted: preference.muted,
+    }
+  }, [])
 
   const emitIncomingNotifications = useCallback(
     async (items: Array<{ threadId: string; threadName: string; latestBody: string; count: number }>) => {
@@ -179,7 +199,8 @@ export function ChatsProvider({ children }: PropsWithChildren) {
             thread.id,
             (unreadCountsRef.current.get(thread.id) ?? 0) + incomingCount,
           )
-          if (hasLoadedRef.current) {
+          const preference = resolveThreadPreference(threadPreferencesRef.current, thread.id)
+          if (hasLoadedRef.current && !preference.muted) {
             pendingNotifications.push({
               threadId: thread.id,
               threadName: thread.name,
@@ -193,17 +214,19 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       }
 
       hasLoadedRef.current = true
-      const hydratedThreads = loaded.map((thread) => ({
-        ...thread,
-        unread: unreadCountsRef.current.get(thread.id) ?? 0,
-      }))
+      const hydratedThreads = loaded
+        .map((thread) => ({
+          ...thread,
+          unread: unreadCountsRef.current.get(thread.id) ?? 0,
+        }))
+        .map(applyThreadMetadata)
 
       for (const thread of hydratedThreads) {
         draftThreadsRef.current.delete(thread.id)
       }
 
-      const draftThreads = [...draftThreadsRef.current.values()]
-      setThreads([...draftThreads, ...hydratedThreads])
+      const draftThreads = [...draftThreadsRef.current.values()].map(applyThreadMetadata)
+      setThreads(orderThreads([...draftThreads, ...hydratedThreads]))
       if (pendingNotifications.length > 0) {
         void emitIncomingNotifications(pendingNotifications)
       }
@@ -296,17 +319,91 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       destination: shortHash(threadId, 8),
       preview: 'No messages yet',
       unread: 0,
+      pinned: false,
+      muted: false,
       lastActivity: 'new',
       messages: [],
     }
     draftThreadsRef.current.set(threadId, draft)
     knownMessageIdsRef.current.set(threadId, new Set())
     unreadCountsRef.current.set(threadId, 0)
-    setThreads((previous) =>
-      previous.some((thread) => thread.id === threadId) ? previous : [draft, ...previous],
-    )
+    setThreads((previous) => {
+      if (previous.some((thread) => thread.id === threadId)) {
+        return previous
+      }
+      return orderThreads([applyThreadMetadata(draft), ...previous])
+    })
     return threadId
-  }, [threads])
+  }, [applyThreadMetadata, threads])
+
+  const setThreadPinned = useCallback(
+    (threadId: string, pinned?: boolean) => {
+      const id = threadId.trim()
+      if (!id) {
+        return
+      }
+      const current = resolveThreadPreference(threadPreferencesRef.current, id)
+      const nextPinned = typeof pinned === 'boolean' ? pinned : !current.pinned
+      if (nextPinned === current.pinned) {
+        return
+      }
+      const next = {
+        ...current,
+        pinned: nextPinned,
+      }
+      if (!next.pinned && !next.muted) {
+        threadPreferencesRef.current.delete(id)
+      } else {
+        threadPreferencesRef.current.set(id, next)
+      }
+      persistThreadPreferences(threadPreferencesRef.current)
+      setThreads((previous) =>
+        orderThreads(
+          previous.map((thread) =>
+            thread.id === id
+              ? {
+                  ...thread,
+                  pinned: nextPinned,
+                }
+              : thread,
+          ),
+        ),
+      )
+    },
+    [],
+  )
+
+  const setThreadMuted = useCallback((threadId: string, muted?: boolean) => {
+    const id = threadId.trim()
+    if (!id) {
+      return
+    }
+    const current = resolveThreadPreference(threadPreferencesRef.current, id)
+    const nextMuted = typeof muted === 'boolean' ? muted : !current.muted
+    if (nextMuted === current.muted) {
+      return
+    }
+    const next = {
+      ...current,
+      muted: nextMuted,
+    }
+    if (!next.pinned && !next.muted) {
+      threadPreferencesRef.current.delete(id)
+    } else {
+      threadPreferencesRef.current.set(id, next)
+    }
+    persistThreadPreferences(threadPreferencesRef.current)
+    setThreads((previous) =>
+      previous.map((thread) =>
+        thread.id === id
+          ? {
+              ...thread,
+              muted: nextMuted,
+            }
+          : thread,
+      ),
+    )
+  }, [])
 
   useEffect(() => {
     void refresh()
@@ -368,8 +465,21 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       markThreadRead,
       markAllRead,
       createThread,
+      setThreadPinned,
+      setThreadMuted,
     }),
-    [createThread, error, loading, markAllRead, markThreadRead, refresh, sendMessage, threads],
+    [
+      createThread,
+      error,
+      loading,
+      markAllRead,
+      markThreadRead,
+      refresh,
+      sendMessage,
+      setThreadMuted,
+      setThreadPinned,
+      threads,
+    ],
   )
 
   return <ChatsContext.Provider value={value}>{children}</ChatsContext.Provider>
@@ -389,4 +499,8 @@ export function ChatsStateLayout() {
       <Outlet />
     </ChatsProvider>
   )
+}
+
+function orderThreads(threads: ChatThread[]): ChatThread[] {
+  return [...threads].sort((left, right) => Number(right.pinned) - Number(left.pinned))
 }

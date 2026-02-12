@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { BellOff, Pin } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import type { ChatThread } from '../../../shared/types/chat'
 
@@ -28,10 +29,22 @@ export function ThreadList({ threads, compact = false }: ThreadListProps) {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-sm font-semibold text-slate-900">{thread.name}</p>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <p className="truncate text-sm font-semibold text-slate-900">{thread.name}</p>
+                  {thread.pinned ? <Pin className="h-3.5 w-3.5 shrink-0 text-amber-500" /> : null}
+                  {thread.muted ? <BellOff className="h-3.5 w-3.5 shrink-0 text-slate-400" /> : null}
+                </div>
                 <span className="text-xs text-slate-400">{thread.lastActivity}</span>
               </div>
-              {!compact ? <p className="mt-0.5 truncate text-xs text-slate-500">{thread.preview}</p> : null}
+              <p className="mt-0.5 truncate text-[11px] text-slate-400">{thread.destination}</p>
+              <p
+                className={clsx(
+                  'mt-0.5 truncate text-slate-500',
+                  compact ? 'text-[11px]' : 'text-xs',
+                )}
+              >
+                {thread.preview}
+              </p>
             </div>
             {thread.unread > 0 ? (
               <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">

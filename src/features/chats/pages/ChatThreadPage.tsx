@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Bell, BellOff, Pin, PinOff } from 'lucide-react'
 import { Navigate, useParams } from 'react-router-dom'
 import { MessageComposer } from '../components/MessageComposer'
 import { MessageTimeline } from '../components/MessageTimeline'
@@ -11,7 +12,8 @@ import { matchesQuery } from '../../../shared/utils/search'
 
 export function ChatThreadPage() {
   const { chatId } = useParams()
-  const { threads, loading, error, sendMessage, markThreadRead } = useChatsState()
+  const { threads, loading, error, sendMessage, markThreadRead, setThreadMuted, setThreadPinned } =
+    useChatsState()
   const [threadQuery, setThreadQuery] = useState('')
   const [messageQuery, setMessageQuery] = useState('')
   const filteredThreads = useMemo(
@@ -70,6 +72,24 @@ export function ChatThreadPage() {
             <PageHeading
               title={thread.name}
               subtitle={`Destination ${thread.destination} • Messages auto-queue when offline`}
+              action={
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setThreadPinned(thread.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                  >
+                    {thread.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                    {thread.pinned ? 'Unpin' : 'Pin'}
+                  </button>
+                  <button
+                    onClick={() => setThreadMuted(thread.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                  >
+                    {thread.muted ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
+                    {thread.muted ? 'Unmute' : 'Mute'}
+                  </button>
+                </div>
+              }
             />
             <input
               value={messageQuery}
