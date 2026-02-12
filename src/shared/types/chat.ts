@@ -49,3 +49,8 @@ export interface OutboundMessageDraft {
   attachments?: OutboundAttachmentDraft[]
   paper?: OutboundPaperDraft
 }
+
+export interface OutboundSendOutcome {
+  paperUri?: string
+  backendStatus?: string
+}

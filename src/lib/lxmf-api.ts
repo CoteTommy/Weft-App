@@ -187,6 +187,18 @@ export async function announceLxmfNow(options: ProbeOptions = {}): Promise<unkno
   })
 }
 
+export async function paperIngestUri(
+  uri: string,
+  options: ProbeOptions = {},
+): Promise<unknown> {
+  const resolved = resolveProbeOptions(options)
+  return await invoke<unknown>('lxmf_paper_ingest_uri', {
+    profile: resolved.profile,
+    rpc: resolved.rpc,
+    uri,
+  })
+}
+
 export async function pollLxmfEvent(options: ProbeOptions = {}): Promise<LxmfRpcEvent | null> {
   const resolved = resolveProbeOptions(options)
   const payload = await invoke<unknown>('lxmf_poll_event', {

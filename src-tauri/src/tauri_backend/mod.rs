@@ -71,6 +71,7 @@ pub fn run() {
             commands::lxmf_list_announces,
             commands::lxmf_interface_metrics,
             commands::lxmf_announce_now,
+            commands::lxmf_paper_ingest_uri,
             commands::lxmf_poll_event,
             commands::lxmf_get_profile,
             commands::lxmf_set_display_name,

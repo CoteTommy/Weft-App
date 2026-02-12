@@ -250,6 +250,25 @@ pub(crate) fn lxmf_announce_now(
 }
 
 #[tauri::command]
+pub(crate) fn lxmf_paper_ingest_uri(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    uri: String,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    let uri = clean_required_arg(uri, "uri")?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "paper_ingest_uri",
+        Some(json!({
+            "uri": uri
+        })),
+    )
+}
+
+#[tauri::command]
 pub(crate) fn lxmf_poll_event(
     actor: State<'_, RuntimeActor>,
     profile: Option<String>,

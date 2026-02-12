@@ -87,7 +87,7 @@ export function ChatThreadPage() {
             </div>
             <MessageComposer
               onSend={(draft) => {
-                void sendMessage(thread.id, draft)
+                return sendMessage(thread.id, draft)
               }}
             />
           </>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { paperIngestUri } from '../../../lib/lxmf-api'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 import { matchesQuery } from '../../../shared/utils/search'
@@ -8,6 +9,9 @@ import type { FileItem } from '../../../shared/types/files'
 export function FilesPage() {
   const { files, loading, error, refresh } = useFiles()
   const [query, setQuery] = useState('')
+  const [paperUriInput, setPaperUriInput] = useState('')
+  const [paperWorking, setPaperWorking] = useState(false)
+  const [paperFeedback, setPaperFeedback] = useState<string | null>(null)
   const filteredFiles = useMemo(
     () => files.filter((file) => matchesQuery(query, [file.name, file.kind, file.owner, file.sizeLabel])),
     [files, query],
@@ -35,6 +39,75 @@ export function FilesPage() {
         className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
         placeholder="Search files, notes, owner, or type"
       />
+      <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Paper Message</p>
+        <p className="mt-1 text-xs text-amber-800">
+          Paste an <span className="font-mono">lxm://...</span> URI to ingest a paper message.
+        </p>
+        <textarea
+          value={paperUriInput}
+          onChange={(event) => {
+            setPaperUriInput(event.target.value)
+            setPaperFeedback(null)
+          }}
+          rows={2}
+          className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none transition focus:border-amber-300"
+          placeholder="lxm://..."
+        />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              void (async () => {
+                try {
+                  const text = await navigator.clipboard.readText()
+                  if (text.trim()) {
+                    setPaperUriInput(text.trim())
+                    setPaperFeedback(null)
+                  }
+                } catch (clipboardError) {
+                  setPaperFeedback(
+                    clipboardError instanceof Error ? clipboardError.message : String(clipboardError),
+                  )
+                }
+              })()
+            }}
+            className="rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+          >
+            Paste
+          </button>
+          <button
+            type="button"
+            disabled={paperWorking}
+            onClick={() => {
+              void (async () => {
+                const uri = paperUriInput.trim()
+                if (!uri) {
+                  setPaperFeedback('Paste an lxm:// URI first.')
+                  return
+                }
+                try {
+                  setPaperWorking(true)
+                  await paperIngestUri(uri)
+                  setPaperFeedback('Paper message ingested.')
+                  setPaperUriInput('')
+                  await refresh()
+                } catch (ingestError) {
+                  setPaperFeedback(
+                    ingestError instanceof Error ? ingestError.message : String(ingestError),
+                  )
+                } finally {
+                  setPaperWorking(false)
+                }
+              })()
+            }}
+            className="rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-amber-300"
+          >
+            {paperWorking ? 'Importing...' : 'Import'}
+          </button>
+        </div>
+        {paperFeedback ? <p className="mt-2 text-xs text-slate-700">{paperFeedback}</p> : null}
+      </div>
       {loading ? <p className="text-sm text-slate-500">Loading files...</p> : null}
       {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
       {!loading && files.length === 0 ? (

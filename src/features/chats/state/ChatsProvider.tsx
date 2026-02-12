@@ -11,7 +11,11 @@ import {
 } from 'react'
 import { Outlet } from 'react-router-dom'
 import { pollLxmfEvent } from '../../../lib/lxmf-api'
-import type { ChatThread, OutboundMessageDraft } from '../../../shared/types/chat'
+import type {
+  ChatThread,
+  OutboundMessageDraft,
+  OutboundSendOutcome,
+} from '../../../shared/types/chat'
 import {
   DISPLAY_NAME_UPDATED_EVENT,
   getStoredDisplayName,
@@ -24,7 +28,7 @@ interface ChatsState {
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
-  sendMessage: (threadId: string, draft: OutboundMessageDraft) => Promise<void>
+  sendMessage: (threadId: string, draft: OutboundMessageDraft) => Promise<OutboundSendOutcome>
   markThreadRead: (threadId: string) => void
   createThread: (destination: string, name?: string) => string | null
 }
@@ -168,10 +172,12 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     async (threadId: string, draft: OutboundMessageDraft) => {
       try {
         setError(null)
-        await postChatMessage(threadId, draft)
+        const outcome = await postChatMessage(threadId, draft)
         await refresh()
+        return outcome
       } catch (sendError) {
         setError(sendError instanceof Error ? sendError.message : String(sendError))
+        return {}
       }
     },
     [refresh],
