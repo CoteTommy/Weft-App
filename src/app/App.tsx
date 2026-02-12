@@ -11,6 +11,7 @@ import { SettingsPage } from '../features/settings/pages/SettingsPage'
 import { AnnouncesPage } from '../features/announces/pages/AnnouncesPage'
 import { InterfacesPage } from '../features/interfaces/pages/InterfacesPage'
 import { NetworkPage } from '../features/network/pages/NetworkPage'
+import { MapPage } from '../features/map/pages/MapPage'
 import { DeepLinkBridge } from './runtime/DeepLinkBridge'
 import {
   hasCompletedOnboarding,
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="/chats/:chatId" element={<ChatThreadPage />} />
           </Route>
           <Route path="/people" element={<PeoplePage />} />
+          <Route path="/map" element={<MapPage />} />
           <Route path="/network" element={<NetworkPage />} />
           <Route path="/interfaces" element={<InterfacesPage />} />
           <Route path="/announces" element={<AnnouncesPage />} />

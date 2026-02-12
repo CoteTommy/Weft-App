@@ -1,15 +1,75 @@
+import { useCallback, useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { MessageSquare, Users, Folder, Settings } from 'lucide-react'
+import {
+  Activity,
+  Bell,
+  Folder,
+  MapPin,
+  MessageSquare,
+  Route,
+  Settings,
+  Users,
+} from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { getLxmfProfile, probeLxmf } from '../../lib/lxmf-api'
+import {
+  DISPLAY_NAME_UPDATED_EVENT,
+  getStoredDisplayName,
+  resolveDisplayName,
+  shortHash,
+} from '../../shared/utils/identity'
 
 const navItems = [
   { to: '/chats', label: 'Chats', icon: MessageSquare },
   { to: '/people', label: 'People', icon: Users },
+  { to: '/map', label: 'Map', icon: MapPin },
+  { to: '/network', label: 'Network', icon: Activity },
+  { to: '/interfaces', label: 'Interfaces', icon: Route },
+  { to: '/announces', label: 'Announces', icon: Bell },
   { to: '/files', label: 'Files', icon: Folder },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export function SidebarNav() {
+  const [displayName, setDisplayName] = useState(() => getStoredDisplayName() ?? 'Loading...')
+  const [identityHint, setIdentityHint] = useState<string | null>(null)
+
+  const refreshIdentity = useCallback(async () => {
+    try {
+      const [probe, profile] = await Promise.all([
+        probeLxmf(),
+        getLxmfProfile().catch(() => null),
+      ])
+      setDisplayName(
+        resolveDisplayName(probe.profile, probe.rpc.identity_hash, profile?.displayName ?? null),
+      )
+      const identityHash = probe.rpc.identity_hash?.trim()
+      setIdentityHint(identityHash ? shortHash(identityHash, 8) : probe.profile)
+    } catch {
+      setDisplayName((current) => (current === 'Loading...' ? 'Unknown' : current))
+      setIdentityHint(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    const onDisplayNameUpdate = () => {
+      void refreshIdentity()
+    }
+    const timeoutId = window.setTimeout(() => {
+      void refreshIdentity()
+    }, 0)
+    const intervalId = window.setInterval(() => {
+      void refreshIdentity()
+    }, 20_000)
+    window.addEventListener(DISPLAY_NAME_UPDATED_EVENT, onDisplayNameUpdate)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      window.clearInterval(intervalId)
+      window.removeEventListener(DISPLAY_NAME_UPDATED_EVENT, onDisplayNameUpdate)
+    }
+  }, [refreshIdentity])
+
   return (
     <aside className="hidden w-64 shrink-0 rounded-3xl border border-slate-200/80 bg-white/80 p-4 shadow-[0_16px_50px_-35px_rgba(29,58,113,0.5)] backdrop-blur lg:flex lg:flex-col">
       <div className="mb-6">
@@ -39,7 +99,8 @@ export function SidebarNav() {
 
       <div className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 p-3">
         <p className="text-xs font-semibold text-slate-600">Connected as</p>
-        <p className="mt-1 text-sm font-semibold text-slate-900">You</p>
+        <p className="mt-1 truncate text-sm font-semibold text-slate-900">{displayName}</p>
+        {identityHint ? <p className="mt-0.5 truncate text-[11px] text-slate-500">{identityHint}</p> : null}
       </div>
     </aside>
   )

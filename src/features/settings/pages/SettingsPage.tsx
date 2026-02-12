@@ -25,6 +25,7 @@ export function SettingsPage() {
   const [autoStartDaemon, setAutoStartDaemon] = useState(true)
   const [restartAfterSave, setRestartAfterSave] = useState(false)
   const [configPayload, setConfigPayload] = useState('')
+  const [backupWorking, setBackupWorking] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
 
   useEffect(() => {
@@ -285,6 +286,104 @@ export function SettingsPage() {
                 >
                   Import JSON
                 </button>
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <p className="text-sm font-medium text-slate-700">Backup and Restore</p>
+              <p className="mt-1 text-xs text-slate-600">
+                Export your Weft app identity settings and connectivity profile, then restore on
+                another machine.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={backupWorking}
+                  onClick={() => {
+                    const payload = {
+                      schema: 'weft-backup-v1',
+                      createdAt: new Date().toISOString(),
+                      displayName: displayNameDraft.trim(),
+                      connectivity: {
+                        mode: connectivityMode,
+                        profile: profileDraft.trim() || 'default',
+                        rpc: rpcDraft.trim() || '',
+                        transport: transportDraft.trim() || '',
+                        autoStartDaemon,
+                      },
+                    }
+                    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+                      type: 'application/json',
+                    })
+                    const url = URL.createObjectURL(blob)
+                    const anchor = document.createElement('a')
+                    anchor.href = url
+                    anchor.download = `weft-backup-${Date.now()}.json`
+                    anchor.click()
+                    URL.revokeObjectURL(url)
+                    setSaveFeedback('Backup exported.')
+                  }}
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                >
+                  Export backup
+                </button>
+                <label className="cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                  Import backup
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      if (!file) {
+                        return
+                      }
+                      void (async () => {
+                        try {
+                          setBackupWorking(true)
+                          const text = await file.text()
+                          const parsed = JSON.parse(text) as {
+                            schema?: string
+                            displayName?: string
+                            connectivity?: {
+                              mode?: ConnectivityMode
+                              profile?: string
+                              rpc?: string
+                              transport?: string
+                              autoStartDaemon?: boolean
+                            }
+                          }
+                          if (parsed.schema !== 'weft-backup-v1') {
+                            throw new Error('Unsupported backup schema.')
+                          }
+                          if (parsed.displayName !== undefined) {
+                            setDisplayNameDraft(parsed.displayName)
+                            await saveDisplayName(parsed.displayName)
+                          }
+                          const connectivity = parsed.connectivity
+                          if (connectivity?.mode) {
+                            await saveConnectivitySettings({
+                              mode: connectivity.mode,
+                              profile: connectivity.profile,
+                              rpc: connectivity.rpc,
+                              transport: connectivity.transport,
+                              autoStartDaemon: connectivity.autoStartDaemon ?? true,
+                              restartDaemon: false,
+                            })
+                          }
+                          await refresh()
+                          setSaveFeedback('Backup imported.')
+                        } catch (importError) {
+                          setSaveFeedback(
+                            importError instanceof Error ? importError.message : String(importError),
+                          )
+                        } finally {
+                          setBackupWorking(false)
+                          event.target.value = ''
+                        }
+                      })()
+                    }}
+                  />
+                </label>
               </div>
             </div>
           </div>

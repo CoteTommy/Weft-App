@@ -29,13 +29,13 @@ Last updated: 2026-02-12
 | Attachment receive/open/save UX | Yes | Yes | Yes (message detail + files page actions) | Low |
 | Paper/QR workflow | Yes | Partial | Partial (paper compose metadata + method, no QR ingest UI yet) | Medium |
 | Message reactions/reply gestures | No/limited | Yes | Missing | Medium |
-| Map + location sharing | Yes | Yes | Missing | High |
+| Map + location sharing | Yes | Yes | Partial (message-derived map + location share action) | Medium |
 | Offline maps | Yes | Yes | Missing | High |
 | Voice calls / audio messages | Yes | Partial | Missing | High |
 | Plugin/command ecosystem UI | Yes | Partial | Missing | Medium |
 | Onboarding/setup wizard | Yes (guide-centric) | Yes | Yes (identity + connectivity + daemon bootstrap) | Low |
 | Deep app integrations (notifications/deep-link intents) | Yes | Yes | Yes (`lxma://` app deep-link routing) | Low |
-| Interface configuration wizards (TCP/RNode/BLE) | Yes | Yes | Missing | High |
+| Interface configuration wizards (TCP/RNode/BLE) | Yes | Yes | Partial (desktop quick profile wizard) | Medium |
 
 ## High-Impact Missing Features
 
@@ -59,5 +59,7 @@ Last updated: 2026-02-12
    - attachment/paper composer + details actions.
 3. Setup/onboarding:
    - first-run wizard for identity + connectivity profile + announce policy.
+4. Backup ergonomics:
+   - identity/profile backup import-export path with schema versioning.
 4. Advanced feature tranche:
    - map/location first, then commands/plugins UI.
