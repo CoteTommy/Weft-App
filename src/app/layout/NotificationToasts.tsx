@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BellRing, CircleAlert, MessageSquare, X } from 'lucide-react'
 import type { AppNotification } from '../../shared/runtime/notifications'
 import { formatRelativeFromNow } from '../../shared/utils/time'
+import { useChatsState } from '../../features/chats/state/ChatsProvider'
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
 
 const MAX_TOASTS = 4
@@ -13,6 +14,7 @@ interface ToastView extends AppNotification {
 
 export function NotificationToasts() {
   const { notifications, markRead } = useNotificationCenter()
+  const { setThreadMuted } = useChatsState()
   const [toasts, setToasts] = useState<ToastView[]>([])
   const seenIdsRef = useRef<Set<string>>(new Set())
   const initializedRef = useRef(false)
@@ -57,6 +59,18 @@ export function NotificationToasts() {
     return null
   }
 
+  const openThread = (threadId?: string) => {
+    const id = threadId?.trim()
+    if (!id) {
+      return
+    }
+    window.dispatchEvent(
+      new CustomEvent('weft:open-thread', {
+        detail: { threadId: id },
+      }),
+    )
+  }
+
   return (
     <div className="pointer-events-none absolute bottom-4 right-4 z-40 w-[min(340px,calc(100vw-2rem))] space-y-2">
       {sortedToasts.map((toast) => (
@@ -69,13 +83,21 @@ export function NotificationToasts() {
           }}
           onOpen={() => {
             markRead(toast.id)
-            if (toast.threadId) {
-              window.dispatchEvent(
-                new CustomEvent('weft:open-thread', {
-                  detail: { threadId: toast.threadId },
-                }),
-              )
+            openThread(toast.threadId)
+            dismiss(toast.id)
+          }}
+          onReply={() => {
+            markRead(toast.id)
+            openThread(toast.threadId)
+            dismiss(toast.id)
+          }}
+          onMuteThread={() => {
+            const threadId = toast.threadId?.trim()
+            if (!threadId) {
+              return
             }
+            setThreadMuted(threadId, true)
+            markRead(toast.id)
             dismiss(toast.id)
           }}
         />
@@ -88,9 +110,11 @@ interface ToastCardProps {
   toast: ToastView
   onClose: () => void
   onOpen: () => void
+  onReply: () => void
+  onMuteThread: () => void
 }
 
-function ToastCard({ toast, onClose, onOpen }: ToastCardProps) {
+function ToastCard({ toast, onClose, onOpen, onReply, onMuteThread }: ToastCardProps) {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       onClose()
@@ -135,6 +159,24 @@ function ToastCard({ toast, onClose, onOpen }: ToastCardProps) {
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
+      {toast.kind === 'message' && toast.threadId ? (
+        <div className="mt-2 flex items-center gap-2 pl-9">
+          <button
+            type="button"
+            onClick={onReply}
+            className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100"
+          >
+            Reply
+          </button>
+          <button
+            type="button"
+            onClick={onMuteThread}
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Mute thread
+          </button>
+        </div>
+      ) : null}
     </article>
   )
 }
