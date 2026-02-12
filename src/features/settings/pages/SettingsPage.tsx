@@ -107,7 +107,7 @@ export function SettingsPage() {
   }
 
   return (
-    <Panel>
+    <Panel className="flex h-full min-h-0 flex-col overflow-hidden">
       <PageHeading
         title="Settings"
         subtitle="Profile, notifications, and connection"
@@ -122,13 +122,13 @@ export function SettingsPage() {
           </button>
         }
       />
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        {loading ? <p className="text-sm text-slate-500">Loading settings...</p> : null}
+        {error ? <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
 
-      {loading ? <p className="text-sm text-slate-500">Loading settings...</p> : null}
-      {error ? <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
-
-      {settings ? (
-        <>
-          <div className="space-y-3">
+        {settings ? (
+          <>
+            <div className="space-y-3 pb-1">
             <form
               className="rounded-xl border border-slate-200 bg-white px-4 py-3"
               onSubmit={(event) => {
@@ -515,22 +515,23 @@ export function SettingsPage() {
                 </label>
               </div>
             </div>
-          </div>
-
-          <details className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-800">Advanced</summary>
-            <div className="mt-3 space-y-2 text-sm text-slate-600">
-              <p>RPC Endpoint: {settings.rpcEndpoint}</p>
-              <p>Profile Path: {settings.profile}</p>
-              <p>Identity Hash: {settings.identityHash ?? 'n/a'}</p>
-              <p>Peers</p>
-              <p>Interfaces</p>
-              <p>Announces</p>
-              <p>Diagnostics</p>
             </div>
-          </details>
-        </>
-      ) : null}
+
+            <details className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-800">Advanced</summary>
+              <div className="mt-3 space-y-2 text-sm text-slate-600">
+                <p>RPC Endpoint: {settings.rpcEndpoint}</p>
+                <p>Profile Path: {settings.profile}</p>
+                <p>Identity Hash: {settings.identityHash ?? 'n/a'}</p>
+                <p>Peers</p>
+                <p>Interfaces</p>
+                <p>Announces</p>
+                <p>Diagnostics</p>
+              </div>
+            </details>
+          </>
+        ) : null}
+      </div>
     </Panel>
   )
 }
