@@ -39,7 +39,14 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       transport: preferences.transport,
       autoStartDaemon: preferences.autoStartDaemon,
     },
-    notificationsEnabled: preferences.notificationsEnabled,
+    notifications: {
+      desktopEnabled: preferences.notificationsEnabled,
+      inAppEnabled: preferences.inAppNotificationsEnabled,
+      messageEnabled: preferences.messageNotificationsEnabled,
+      systemEnabled: preferences.systemNotificationsEnabled,
+      connectionEnabled: preferences.connectionNotificationsEnabled,
+      soundEnabled: preferences.notificationSoundEnabled,
+    },
   }
 }
 
@@ -77,8 +84,20 @@ export async function saveConnectivitySettings(input: {
   }
 }
 
-export function saveNotificationSettings(enabled: boolean): void {
+export function saveNotificationSettings(input: {
+  desktopEnabled?: boolean
+  inAppEnabled?: boolean
+  messageEnabled?: boolean
+  systemEnabled?: boolean
+  connectionEnabled?: boolean
+  soundEnabled?: boolean
+}): void {
   updateWeftPreferences({
-    notificationsEnabled: enabled,
+    notificationsEnabled: input.desktopEnabled,
+    inAppNotificationsEnabled: input.inAppEnabled,
+    messageNotificationsEnabled: input.messageEnabled,
+    systemNotificationsEnabled: input.systemEnabled,
+    connectionNotificationsEnabled: input.connectionEnabled,
+    notificationSoundEnabled: input.soundEnabled,
   })
 }

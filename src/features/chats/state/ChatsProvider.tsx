@@ -58,6 +58,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
   const hasLoadedRef = useRef(false)
   const refreshingRef = useRef(false)
   const notificationsEnabledRef = useRef(getWeftPreferences().notificationsEnabled)
+  const messageNotificationsEnabledRef = useRef(getWeftPreferences().messageNotificationsEnabled)
   const threadPreferencesRef = useRef(getStoredThreadPreferences())
 
   const applyThreadMetadata = useCallback((thread: ChatThread): ChatThread => {
@@ -78,6 +79,9 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         return
       }
       if (!notificationsEnabledRef.current) {
+        return
+      }
+      if (!messageNotificationsEnabledRef.current) {
         return
       }
       if (document.visibilityState === 'visible' && document.hasFocus()) {
@@ -466,7 +470,9 @@ export function ChatsProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const handlePreferencesUpdate = () => {
-      notificationsEnabledRef.current = getWeftPreferences().notificationsEnabled
+      const preferences = getWeftPreferences()
+      notificationsEnabledRef.current = preferences.notificationsEnabled
+      messageNotificationsEnabledRef.current = preferences.messageNotificationsEnabled
     }
     window.addEventListener(PREFERENCES_UPDATED_EVENT, handlePreferencesUpdate)
     return () => {

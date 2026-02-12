@@ -1,4 +1,6 @@
-export type AppNotificationKind = 'message' | 'system'
+import { getWeftPreferences } from './preferences'
+
+export type AppNotificationKind = 'message' | 'system' | 'connection'
 
 export interface AppNotification {
   id: string
@@ -27,7 +29,13 @@ export function publishAppNotification(input: AppNotificationInput): void {
   if (typeof window === 'undefined') {
     return
   }
+  if (!shouldPublishNotification(input.kind ?? 'system')) {
+    return
+  }
   window.dispatchEvent(new CustomEvent<AppNotificationInput>(APP_NOTIFICATION_EVENT, { detail: input }))
+  if (shouldPlayNotificationSound()) {
+    playNotificationSound()
+  }
 }
 
 export function getStoredAppNotifications(): AppNotification[] {
@@ -109,4 +117,80 @@ function normalizeOptional(value: unknown): string | undefined {
   }
   const normalized = value.trim()
   return normalized ? normalized : undefined
+}
+
+function shouldPublishNotification(kind: AppNotificationKind): boolean {
+  const preferences = getWeftPreferences()
+  if (!preferences.inAppNotificationsEnabled) {
+    return false
+  }
+  if (kind === 'message' && !preferences.messageNotificationsEnabled) {
+    return false
+  }
+  if (kind === 'system' && !preferences.systemNotificationsEnabled) {
+    return false
+  }
+  if (kind === 'connection' && !preferences.connectionNotificationsEnabled) {
+    return false
+  }
+  return true
+}
+
+let lastSoundAtMs = 0
+
+function shouldPlayNotificationSound(): boolean {
+  const preferences = getWeftPreferences()
+  if (!preferences.notificationSoundEnabled) {
+    return false
+  }
+  const now = Date.now()
+  if (now - lastSoundAtMs < 1_200) {
+    return false
+  }
+  lastSoundAtMs = now
+  return true
+}
+
+function playNotificationSound(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+  const AudioContextImpl =
+    window.AudioContext ||
+    ((window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext ?? null)
+  if (!AudioContextImpl) {
+    return
+  }
+  try {
+    const context = new AudioContextImpl()
+    const gain = context.createGain()
+    gain.gain.value = 0.0001
+    gain.connect(context.destination)
+
+    const first = context.createOscillator()
+    first.type = 'sine'
+    first.frequency.value = 880
+    first.connect(gain)
+
+    const second = context.createOscillator()
+    second.type = 'triangle'
+    second.frequency.value = 660
+    second.connect(gain)
+
+    const now = context.currentTime
+    gain.gain.exponentialRampToValueAtTime(0.06, now + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.025, now + 0.08)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24)
+
+    first.start(now)
+    first.stop(now + 0.18)
+    second.start(now + 0.05)
+    second.stop(now + 0.24)
+
+    window.setTimeout(() => {
+      void context.close().catch(() => {})
+    }, 400)
+  } catch {
+    // Ignore sound errors; notification delivery should still succeed.
+  }
 }

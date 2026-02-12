@@ -8,6 +8,11 @@ export interface WeftPreferences {
   transport?: string
   autoStartDaemon: boolean
   notificationsEnabled: boolean
+  inAppNotificationsEnabled: boolean
+  messageNotificationsEnabled: boolean
+  systemNotificationsEnabled: boolean
+  connectionNotificationsEnabled: boolean
+  notificationSoundEnabled: boolean
   pendingRoute?: string
 }
 
@@ -19,6 +24,11 @@ const DEFAULT_PREFERENCES: WeftPreferences = {
   connectivityMode: 'automatic',
   autoStartDaemon: true,
   notificationsEnabled: true,
+  inAppNotificationsEnabled: true,
+  messageNotificationsEnabled: true,
+  systemNotificationsEnabled: true,
+  connectionNotificationsEnabled: true,
+  notificationSoundEnabled: false,
 }
 
 export function getWeftPreferences(): WeftPreferences {
@@ -94,17 +104,47 @@ function persist(value: WeftPreferences): void {
 }
 
 function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPreferences> {
-  const connectivityMode = parseConnectivityMode(value.connectivityMode)
-  return {
-    onboardingCompleted: Boolean(value.onboardingCompleted),
-    connectivityMode,
-    profile: normalizeOptional(value.profile),
-    rpc: normalizeOptional(value.rpc),
-    transport: normalizeOptional(value.transport),
-    autoStartDaemon: value.autoStartDaemon ?? true,
-    notificationsEnabled: value.notificationsEnabled ?? true,
-    pendingRoute: normalizeOptional(value.pendingRoute),
+  const out: Partial<WeftPreferences> = {}
+  if ('onboardingCompleted' in value) {
+    out.onboardingCompleted = parseBoolean(value.onboardingCompleted, false)
   }
+  if ('connectivityMode' in value) {
+    out.connectivityMode = parseConnectivityMode(value.connectivityMode)
+  }
+  if ('profile' in value) {
+    out.profile = normalizeOptional(value.profile)
+  }
+  if ('rpc' in value) {
+    out.rpc = normalizeOptional(value.rpc)
+  }
+  if ('transport' in value) {
+    out.transport = normalizeOptional(value.transport)
+  }
+  if ('autoStartDaemon' in value) {
+    out.autoStartDaemon = parseBoolean(value.autoStartDaemon, true)
+  }
+  if ('notificationsEnabled' in value) {
+    out.notificationsEnabled = parseBoolean(value.notificationsEnabled, true)
+  }
+  if ('inAppNotificationsEnabled' in value) {
+    out.inAppNotificationsEnabled = parseBoolean(value.inAppNotificationsEnabled, true)
+  }
+  if ('messageNotificationsEnabled' in value) {
+    out.messageNotificationsEnabled = parseBoolean(value.messageNotificationsEnabled, true)
+  }
+  if ('systemNotificationsEnabled' in value) {
+    out.systemNotificationsEnabled = parseBoolean(value.systemNotificationsEnabled, true)
+  }
+  if ('connectionNotificationsEnabled' in value) {
+    out.connectionNotificationsEnabled = parseBoolean(value.connectionNotificationsEnabled, true)
+  }
+  if ('notificationSoundEnabled' in value) {
+    out.notificationSoundEnabled = parseBoolean(value.notificationSoundEnabled, false)
+  }
+  if ('pendingRoute' in value) {
+    out.pendingRoute = normalizeOptional(value.pendingRoute)
+  }
+  return out
 }
 
 function parseConnectivityMode(value: unknown): ConnectivityMode {
@@ -125,4 +165,8 @@ function normalizeOptional(value: unknown): string | undefined {
   }
   const normalized = value.trim()
   return normalized ? normalized : undefined
+}
+
+function parseBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
 }

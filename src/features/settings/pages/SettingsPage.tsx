@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { shortHash } from '../../../shared/utils/identity'
-import { PageHeading } from '../../../shared/ui/PageHeading'
-import { Panel } from '../../../shared/ui/Panel'
 import type { ConnectivityMode } from '../../../shared/runtime/preferences'
+import type { SettingsSnapshot } from '../../../shared/types/settings'
+import { Panel } from '../../../shared/ui/Panel'
+import { PageHeading } from '../../../shared/ui/PageHeading'
+import { shortHash } from '../../../shared/utils/identity'
 import {
   saveConnectivitySettings,
   saveDisplayName,
@@ -17,6 +18,39 @@ const CONNECTIVITY_OPTIONS: Array<{ value: ConnectivityMode; label: string }> = 
   { value: 'custom', label: 'Custom' },
 ]
 
+const DEFAULT_NOTIFICATION_SETTINGS: SettingsSnapshot['notifications'] = {
+  desktopEnabled: true,
+  inAppEnabled: true,
+  messageEnabled: true,
+  systemEnabled: true,
+  connectionEnabled: true,
+  soundEnabled: false,
+}
+
+interface SettingsConfigPayload {
+  mode?: ConnectivityMode
+  profile?: string
+  rpc?: string
+  transport?: string
+  autoStartDaemon?: boolean
+  notificationsEnabled?: boolean
+  notifications?: Partial<SettingsSnapshot['notifications']>
+}
+
+interface BackupPayload {
+  schema?: string
+  displayName?: string
+  connectivity?: {
+    mode?: ConnectivityMode
+    profile?: string
+    rpc?: string
+    transport?: string
+    autoStartDaemon?: boolean
+    notificationsEnabled?: boolean
+  }
+  notifications?: Partial<SettingsSnapshot['notifications']>
+}
+
 export function SettingsPage() {
   const { settings, loading, error, refresh } = useSettings()
   const [displayNameDraft, setDisplayNameDraft] = useState('')
@@ -28,36 +62,49 @@ export function SettingsPage() {
   const [transportDraft, setTransportDraft] = useState('')
   const [autoStartDaemon, setAutoStartDaemon] = useState(true)
   const [restartAfterSave, setRestartAfterSave] = useState(false)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
+  const [notificationSettings, setNotificationSettings] = useState<SettingsSnapshot['notifications']>(
+    DEFAULT_NOTIFICATION_SETTINGS,
+  )
   const [configPayload, setConfigPayload] = useState('')
   const [backupWorking, setBackupWorking] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
 
   useEffect(() => {
-    if (settings) {
-      setDisplayNameDraft(settings.displayName)
-      setConnectivityMode(settings.connectivity.mode)
-      setProfileDraft(settings.connectivity.profile ?? 'default')
-      setRpcDraft(settings.connectivity.rpc ?? '')
-      setTransportDraft(settings.connectivity.transport ?? '')
-      setAutoStartDaemon(settings.connectivity.autoStartDaemon)
-      setNotificationsEnabled(settings.notificationsEnabled)
-      setConfigPayload(
-        JSON.stringify(
-          {
-            mode: settings.connectivity.mode,
-            profile: settings.connectivity.profile ?? 'default',
-            rpc: settings.connectivity.rpc ?? '',
-            transport: settings.connectivity.transport ?? '',
-                        autoStartDaemon: settings.connectivity.autoStartDaemon,
-                        notificationsEnabled: settings.notificationsEnabled,
-                      },
-                      null,
-                      2,
-        ),
-      )
+    if (!settings) {
+      return
     }
+    setDisplayNameDraft(settings.displayName)
+    setConnectivityMode(settings.connectivity.mode)
+    setProfileDraft(settings.connectivity.profile ?? 'default')
+    setRpcDraft(settings.connectivity.rpc ?? '')
+    setTransportDraft(settings.connectivity.transport ?? '')
+    setAutoStartDaemon(settings.connectivity.autoStartDaemon)
+    setNotificationSettings(settings.notifications)
+    setConfigPayload(
+      JSON.stringify(
+        buildConfigPayload({
+          mode: settings.connectivity.mode,
+          profile: settings.connectivity.profile ?? 'default',
+          rpc: settings.connectivity.rpc ?? '',
+          transport: settings.connectivity.transport ?? '',
+          autoStartDaemon: settings.connectivity.autoStartDaemon,
+          notifications: settings.notifications,
+        }),
+        null,
+        2,
+      ),
+    )
   }, [settings])
+
+  const updateNotifications = (
+    patch: Partial<SettingsSnapshot['notifications']>,
+    feedback = 'Notification settings updated.',
+  ) => {
+    const next = { ...notificationSettings, ...patch }
+    setNotificationSettings(next)
+    saveNotificationSettings(next)
+    setSaveFeedback(feedback)
+  }
 
   return (
     <Panel>
@@ -119,12 +166,14 @@ export function SettingsPage() {
               </div>
               {saveFeedback ? <p className="mt-2 text-xs text-slate-600">{saveFeedback}</p> : null}
             </form>
+
             <SettingsRow label="Connection" value={settings.connection} />
             <SettingsRow label="Export backup" value={settings.backupStatus} />
             <SettingsRow
               label="Identity"
               value={settings.identityHash ? shortHash(settings.identityHash, 8) : 'Unavailable'}
             />
+
             {settings.identityHash ? (
               <button
                 type="button"
@@ -137,6 +186,7 @@ export function SettingsPage() {
                 Copy identity hash
               </button>
             ) : null}
+
             <form
               className="rounded-xl border border-slate-200 bg-white px-4 py-3"
               onSubmit={(event) => {
@@ -238,12 +288,85 @@ export function SettingsPage() {
                 </button>
               </div>
             </form>
+
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <p className="text-sm font-medium text-slate-700">Notifications</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <NotificationToggle
+                  label="Desktop alerts"
+                  description="Show native desktop alerts for incoming messages."
+                  checked={notificationSettings.desktopEnabled}
+                  onChange={(next) => {
+                    updateNotifications(
+                      { desktopEnabled: next },
+                      next ? 'Desktop alerts enabled.' : 'Desktop alerts disabled.',
+                    )
+                  }}
+                />
+                <NotificationToggle
+                  label="In-app inbox"
+                  description="Store notifications in the top-right notification center."
+                  checked={notificationSettings.inAppEnabled}
+                  onChange={(next) => {
+                    updateNotifications(
+                      { inAppEnabled: next },
+                      next ? 'In-app notifications enabled.' : 'In-app notifications disabled.',
+                    )
+                  }}
+                />
+                <NotificationToggle
+                  label="Message notifications"
+                  description="Notify on new incoming messages."
+                  checked={notificationSettings.messageEnabled}
+                  onChange={(next) => {
+                    updateNotifications(
+                      { messageEnabled: next },
+                      next ? 'Message notifications enabled.' : 'Message notifications disabled.',
+                    )
+                  }}
+                />
+                <NotificationToggle
+                  label="System notifications"
+                  description="Notify on internal errors and send failures."
+                  checked={notificationSettings.systemEnabled}
+                  onChange={(next) => {
+                    updateNotifications(
+                      { systemEnabled: next },
+                      next ? 'System notifications enabled.' : 'System notifications disabled.',
+                    )
+                  }}
+                />
+                <NotificationToggle
+                  label="Connection notifications"
+                  description="Notify when daemon/RPC connection changes."
+                  checked={notificationSettings.connectionEnabled}
+                  onChange={(next) => {
+                    updateNotifications(
+                      { connectionEnabled: next },
+                      next ? 'Connection notifications enabled.' : 'Connection notifications disabled.',
+                    )
+                  }}
+                />
+                <NotificationToggle
+                  label="Sound cues"
+                  description="Play a subtle sound for each new in-app notification."
+                  checked={notificationSettings.soundEnabled}
+                  onChange={(next) => {
+                    updateNotifications(
+                      { soundEnabled: next },
+                      next ? 'Notification sound enabled.' : 'Notification sound disabled.',
+                    )
+                  }}
+                />
+              </div>
+            </div>
+
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
               <p className="text-sm font-medium text-slate-700">Config import/export</p>
               <textarea
                 value={configPayload}
                 onChange={(event) => setConfigPayload(event.target.value)}
-                rows={7}
+                rows={8}
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 outline-none transition focus:border-blue-300"
               />
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -262,14 +385,7 @@ export function SettingsPage() {
                   onClick={() => {
                     void (async () => {
                       try {
-                        const parsed = JSON.parse(configPayload) as {
-                          mode?: ConnectivityMode
-                          profile?: string
-                          rpc?: string
-                          transport?: string
-                          autoStartDaemon?: boolean
-                          notificationsEnabled?: boolean
-                        }
+                        const parsed = JSON.parse(configPayload) as SettingsConfigPayload
                         if (!parsed.mode) {
                           throw new Error('mode is required in config JSON')
                         }
@@ -281,10 +397,13 @@ export function SettingsPage() {
                           autoStartDaemon: parsed.autoStartDaemon ?? true,
                           restartDaemon: false,
                         })
-                        if (typeof parsed.notificationsEnabled === 'boolean') {
-                          saveNotificationSettings(parsed.notificationsEnabled)
-                          setNotificationsEnabled(parsed.notificationsEnabled)
-                        }
+                        const mergedNotifications = mergeNotificationSettings(
+                          notificationSettings,
+                          parsed.notifications,
+                          parsed.notificationsEnabled,
+                        )
+                        saveNotificationSettings(mergedNotifications)
+                        setNotificationSettings(mergedNotifications)
                         await refresh()
                         setSaveFeedback('Configuration imported.')
                       } catch (importError) {
@@ -300,22 +419,7 @@ export function SettingsPage() {
                 </button>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-sm font-medium text-slate-700">Notifications</p>
-              <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={notificationsEnabled}
-                  onChange={(event) => {
-                    const next = event.target.checked
-                    setNotificationsEnabled(next)
-                    saveNotificationSettings(next)
-                    setSaveFeedback(next ? 'Notifications enabled.' : 'Notifications disabled.')
-                  }}
-                />
-                Show desktop alerts for incoming messages
-              </label>
-            </div>
+
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
               <p className="text-sm font-medium text-slate-700">Backup and Restore</p>
               <p className="mt-1 text-xs text-slate-600">
@@ -327,9 +431,8 @@ export function SettingsPage() {
                   type="button"
                   disabled={backupWorking}
                   onClick={() => {
-                    const payload = {
+                    const payload: BackupPayload = {
                       schema: 'weft-backup-v1',
-                      createdAt: new Date().toISOString(),
                       displayName: displayNameDraft.trim(),
                       connectivity: {
                         mode: connectivityMode,
@@ -337,8 +440,8 @@ export function SettingsPage() {
                         rpc: rpcDraft.trim() || '',
                         transport: transportDraft.trim() || '',
                         autoStartDaemon,
-                        notificationsEnabled,
                       },
+                      notifications: notificationSettings,
                     }
                     const blob = new Blob([JSON.stringify(payload, null, 2)], {
                       type: 'application/json',
@@ -370,18 +473,7 @@ export function SettingsPage() {
                         try {
                           setBackupWorking(true)
                           const text = await file.text()
-                          const parsed = JSON.parse(text) as {
-                            schema?: string
-                            displayName?: string
-                            connectivity?: {
-                              mode?: ConnectivityMode
-                              profile?: string
-                              rpc?: string
-                              transport?: string
-                              autoStartDaemon?: boolean
-                              notificationsEnabled?: boolean
-                            }
-                          }
+                          const parsed = JSON.parse(text) as BackupPayload
                           if (parsed.schema !== 'weft-backup-v1') {
                             throw new Error('Unsupported backup schema.')
                           }
@@ -400,10 +492,13 @@ export function SettingsPage() {
                               restartDaemon: false,
                             })
                           }
-                          if (typeof connectivity?.notificationsEnabled === 'boolean') {
-                            saveNotificationSettings(connectivity.notificationsEnabled)
-                            setNotificationsEnabled(connectivity.notificationsEnabled)
-                          }
+                          const mergedNotifications = mergeNotificationSettings(
+                            notificationSettings,
+                            parsed.notifications,
+                            parsed.connectivity?.notificationsEnabled,
+                          )
+                          saveNotificationSettings(mergedNotifications)
+                          setNotificationSettings(mergedNotifications)
                           await refresh()
                           setSaveFeedback('Backup imported.')
                         } catch (importError) {
@@ -440,6 +535,32 @@ export function SettingsPage() {
   )
 }
 
+interface NotificationToggleProps {
+  label: string
+  description: string
+  checked: boolean
+  onChange: (next: boolean) => void
+}
+
+function NotificationToggle({ label, description, checked, onChange }: NotificationToggleProps) {
+  return (
+    <label className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => {
+          onChange(event.target.checked)
+        }}
+        className="mt-0.5"
+      />
+      <span>
+        <span className="block font-medium text-slate-800">{label}</span>
+        <span className="mt-0.5 block text-xs text-slate-500">{description}</span>
+      </span>
+    </label>
+  )
+}
+
 interface SettingsRowProps {
   label: string
   value: string
@@ -452,4 +573,34 @@ function SettingsRow({ label, value }: SettingsRowProps) {
       <p className="text-sm font-semibold text-slate-900">{value}</p>
     </div>
   )
+}
+
+function buildConfigPayload(input: {
+  mode: ConnectivityMode
+  profile: string
+  rpc: string
+  transport: string
+  autoStartDaemon: boolean
+  notifications: SettingsSnapshot['notifications']
+}): SettingsConfigPayload {
+  return {
+    mode: input.mode,
+    profile: input.profile,
+    rpc: input.rpc,
+    transport: input.transport,
+    autoStartDaemon: input.autoStartDaemon,
+    notifications: input.notifications,
+  }
+}
+
+function mergeNotificationSettings(
+  current: SettingsSnapshot['notifications'],
+  patch?: Partial<SettingsSnapshot['notifications']>,
+  legacyDesktopEnabled?: boolean,
+): SettingsSnapshot['notifications'] {
+  return {
+    ...current,
+    ...(patch ?? {}),
+    ...(typeof legacyDesktopEnabled === 'boolean' ? { desktopEnabled: legacyDesktopEnabled } : {}),
+  }
 }

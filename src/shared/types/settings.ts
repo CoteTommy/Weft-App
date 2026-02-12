@@ -14,5 +14,12 @@ export interface SettingsSnapshot {
     transport?: string
     autoStartDaemon: boolean
   }
-  notificationsEnabled: boolean
+  notifications: {
+    desktopEnabled: boolean
+    inAppEnabled: boolean
+    messageEnabled: boolean
+    systemEnabled: boolean
+    connectionEnabled: boolean
+    soundEnabled: boolean
+  }
 }

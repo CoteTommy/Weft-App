@@ -37,7 +37,7 @@ export function TopBar() {
       return
     }
     publishAppNotification({
-      kind: 'system',
+      kind: 'connection',
       title: connected ? 'Connection restored' : 'Connection lost',
       body: connected
         ? 'Daemon and RPC are reachable again.'
