@@ -21,6 +21,10 @@ import {
   getStoredDisplayName,
   shortHash,
 } from '../../../shared/utils/identity'
+import {
+  getWeftPreferences,
+  PREFERENCES_UPDATED_EVENT,
+} from '../../../shared/runtime/preferences'
 import { fetchChatThreads, postChatMessage } from '../services/chatService'
 
 interface ChatsState {
@@ -44,10 +48,14 @@ export function ChatsProvider({ children }: PropsWithChildren) {
   const draftThreadsRef = useRef<Map<string, ChatThread>>(new Map())
   const hasLoadedRef = useRef(false)
   const refreshingRef = useRef(false)
+  const notificationsEnabledRef = useRef(getWeftPreferences().notificationsEnabled)
 
   const emitIncomingNotifications = useCallback(
     async (items: Array<{ threadId: string; threadName: string; latestBody: string; count: number }>) => {
       if (typeof window === 'undefined' || !('Notification' in window) || items.length === 0) {
+        return
+      }
+      if (!notificationsEnabledRef.current) {
         return
       }
       if (document.visibilityState === 'visible' && document.hasFocus()) {
@@ -315,6 +323,16 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       window.removeEventListener(DISPLAY_NAME_UPDATED_EVENT, handleDisplayNameUpdate)
     }
   }, [rewriteSelfAuthors])
+
+  useEffect(() => {
+    const handlePreferencesUpdate = () => {
+      notificationsEnabledRef.current = getWeftPreferences().notificationsEnabled
+    }
+    window.addEventListener(PREFERENCES_UPDATED_EVENT, handlePreferencesUpdate)
+    return () => {
+      window.removeEventListener(PREFERENCES_UPDATED_EVENT, handlePreferencesUpdate)
+    }
+  }, [])
 
   const value = useMemo(
     () => ({

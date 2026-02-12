@@ -3,7 +3,11 @@ import { shortHash } from '../../../shared/utils/identity'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 import type { ConnectivityMode } from '../../../shared/runtime/preferences'
-import { saveConnectivitySettings, saveDisplayName } from '../services/settingsService'
+import {
+  saveConnectivitySettings,
+  saveDisplayName,
+  saveNotificationSettings,
+} from '../services/settingsService'
 import { useSettings } from '../state/useSettings'
 
 const CONNECTIVITY_OPTIONS: Array<{ value: ConnectivityMode; label: string }> = [
@@ -24,6 +28,7 @@ export function SettingsPage() {
   const [transportDraft, setTransportDraft] = useState('')
   const [autoStartDaemon, setAutoStartDaemon] = useState(true)
   const [restartAfterSave, setRestartAfterSave] = useState(false)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [configPayload, setConfigPayload] = useState('')
   const [backupWorking, setBackupWorking] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
@@ -36,6 +41,7 @@ export function SettingsPage() {
       setRpcDraft(settings.connectivity.rpc ?? '')
       setTransportDraft(settings.connectivity.transport ?? '')
       setAutoStartDaemon(settings.connectivity.autoStartDaemon)
+      setNotificationsEnabled(settings.notificationsEnabled)
       setConfigPayload(
         JSON.stringify(
           {
@@ -43,10 +49,11 @@ export function SettingsPage() {
             profile: settings.connectivity.profile ?? 'default',
             rpc: settings.connectivity.rpc ?? '',
             transport: settings.connectivity.transport ?? '',
-            autoStartDaemon: settings.connectivity.autoStartDaemon,
-          },
-          null,
-          2,
+                        autoStartDaemon: settings.connectivity.autoStartDaemon,
+                        notificationsEnabled: settings.notificationsEnabled,
+                      },
+                      null,
+                      2,
         ),
       )
     }
@@ -261,6 +268,7 @@ export function SettingsPage() {
                           rpc?: string
                           transport?: string
                           autoStartDaemon?: boolean
+                          notificationsEnabled?: boolean
                         }
                         if (!parsed.mode) {
                           throw new Error('mode is required in config JSON')
@@ -273,6 +281,10 @@ export function SettingsPage() {
                           autoStartDaemon: parsed.autoStartDaemon ?? true,
                           restartDaemon: false,
                         })
+                        if (typeof parsed.notificationsEnabled === 'boolean') {
+                          saveNotificationSettings(parsed.notificationsEnabled)
+                          setNotificationsEnabled(parsed.notificationsEnabled)
+                        }
                         await refresh()
                         setSaveFeedback('Configuration imported.')
                       } catch (importError) {
@@ -287,6 +299,22 @@ export function SettingsPage() {
                   Import JSON
                 </button>
               </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <p className="text-sm font-medium text-slate-700">Notifications</p>
+              <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={notificationsEnabled}
+                  onChange={(event) => {
+                    const next = event.target.checked
+                    setNotificationsEnabled(next)
+                    saveNotificationSettings(next)
+                    setSaveFeedback(next ? 'Notifications enabled.' : 'Notifications disabled.')
+                  }}
+                />
+                Show desktop alerts for incoming messages
+              </label>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
               <p className="text-sm font-medium text-slate-700">Backup and Restore</p>
@@ -309,6 +337,7 @@ export function SettingsPage() {
                         rpc: rpcDraft.trim() || '',
                         transport: transportDraft.trim() || '',
                         autoStartDaemon,
+                        notificationsEnabled,
                       },
                     }
                     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -350,6 +379,7 @@ export function SettingsPage() {
                               rpc?: string
                               transport?: string
                               autoStartDaemon?: boolean
+                              notificationsEnabled?: boolean
                             }
                           }
                           if (parsed.schema !== 'weft-backup-v1') {
@@ -369,6 +399,10 @@ export function SettingsPage() {
                               autoStartDaemon: connectivity.autoStartDaemon ?? true,
                               restartDaemon: false,
                             })
+                          }
+                          if (typeof connectivity?.notificationsEnabled === 'boolean') {
+                            saveNotificationSettings(connectivity.notificationsEnabled)
+                            setNotificationsEnabled(connectivity.notificationsEnabled)
                           }
                           await refresh()
                           setSaveFeedback('Backup imported.')

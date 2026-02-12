@@ -39,6 +39,7 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       transport: preferences.transport,
       autoStartDaemon: preferences.autoStartDaemon,
     },
+    notificationsEnabled: preferences.notificationsEnabled,
   }
 }
 
@@ -74,4 +75,10 @@ export async function saveConnectivitySettings(input: {
       transport: normalizedTransport,
     })
   }
+}
+
+export function saveNotificationSettings(enabled: boolean): void {
+  updateWeftPreferences({
+    notificationsEnabled: enabled,
+  })
 }

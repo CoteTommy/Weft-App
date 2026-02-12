@@ -7,6 +7,7 @@ export interface WeftPreferences {
   rpc?: string
   transport?: string
   autoStartDaemon: boolean
+  notificationsEnabled: boolean
   pendingRoute?: string
 }
 
@@ -17,6 +18,7 @@ const DEFAULT_PREFERENCES: WeftPreferences = {
   onboardingCompleted: false,
   connectivityMode: 'automatic',
   autoStartDaemon: true,
+  notificationsEnabled: true,
 }
 
 export function getWeftPreferences(): WeftPreferences {
@@ -100,6 +102,7 @@ function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPrefe
     rpc: normalizeOptional(value.rpc),
     transport: normalizeOptional(value.transport),
     autoStartDaemon: value.autoStartDaemon ?? true,
+    notificationsEnabled: value.notificationsEnabled ?? true,
     pendingRoute: normalizeOptional(value.pendingRoute),
   }
 }

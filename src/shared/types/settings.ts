@@ -14,4 +14,5 @@ export interface SettingsSnapshot {
     transport?: string
     autoStartDaemon: boolean
   }
+  notificationsEnabled: boolean
 }
