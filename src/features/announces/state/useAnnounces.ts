@@ -7,6 +7,11 @@ import {
   triggerAnnounceNow,
 } from '../services/announcesService'
 
+const ANNOUNCE_EVENT_BATCH_MS = 90
+const ANNOUNCE_REFRESH_DEBOUNCE_MS = 140
+const ANNOUNCE_WATCHDOG_INTERVAL_MS = 10_000
+const ANNOUNCE_WATCHDOG_STALE_MS = 45_000
+
 interface UseAnnouncesState {
   announces: AnnounceItem[]
   loading: boolean
@@ -28,12 +33,19 @@ export function useAnnounces(): UseAnnouncesState {
   const [error, setError] = useState<string | null>(null)
   const refreshingRef = useRef(false)
   const nextCursorRef = useRef<string | null>(null)
+  const lastEventAtRef = useRef(0)
+  const lastRefreshAtRef = useRef(0)
+  const listenerHealthyRef = useRef(false)
+  const refreshTimerRef = useRef<number | null>(null)
+  const announceBatchTimerRef = useRef<number | null>(null)
+  const pendingAnnouncesRef = useRef<AnnounceItem[]>([])
 
   const refresh = useCallback(async () => {
     if (refreshingRef.current) {
       return
     }
     refreshingRef.current = true
+    lastRefreshAtRef.current = Date.now()
     try {
       setError(null)
       const page = await fetchAnnouncesPage()
@@ -46,6 +58,35 @@ export function useAnnounces(): UseAnnouncesState {
       setLoading(false)
       refreshingRef.current = false
     }
+  }, [])
+
+  const scheduleRefresh = useCallback(
+    (delayMs = ANNOUNCE_REFRESH_DEBOUNCE_MS) => {
+      if (refreshTimerRef.current !== null) {
+        return
+      }
+      refreshTimerRef.current = window.setTimeout(() => {
+        refreshTimerRef.current = null
+        void refresh()
+      }, delayMs)
+    },
+    [refresh],
+  )
+
+  const enqueueAnnounce = useCallback((announce: AnnounceItem) => {
+    pendingAnnouncesRef.current.push(announce)
+    if (announceBatchTimerRef.current !== null) {
+      return
+    }
+    announceBatchTimerRef.current = window.setTimeout(() => {
+      announceBatchTimerRef.current = null
+      const pending = pendingAnnouncesRef.current
+      pendingAnnouncesRef.current = []
+      if (pending.length === 0) {
+        return
+      }
+      setAnnounces((existing) => mergeAnnounces(existing, pending))
+    }, ANNOUNCE_EVENT_BATCH_MS)
   }, [])
 
   const loadMore = useCallback(async () => {
@@ -99,24 +140,21 @@ export function useAnnounces(): UseAnnouncesState {
     let disposed = false
     void refresh()
     void startLxmfEventPump().catch(() => {
-      // Periodic fallback refresh remains active.
+      listenerHealthyRef.current = false
     })
     void subscribeLxmfEvents((event) => {
+      lastEventAtRef.current = Date.now()
       if (event.event_type === 'announce_received') {
         const mapped = mapAnnounceEventPayload(event.payload)
         if (mapped) {
-          setAnnounces((existing) => {
-            const next = existing.filter((entry) => entry.id !== mapped.id)
-            next.unshift(mapped)
-            return next
-          })
+          enqueueAnnounce(mapped)
           return
         }
-        void refresh()
+        scheduleRefresh()
         return
       }
       if (event.event_type === 'announce_sent' || event.event_type === 'runtime_started') {
-        void refresh()
+        scheduleRefresh()
       }
     })
       .then((stop) => {
@@ -124,22 +162,38 @@ export function useAnnounces(): UseAnnouncesState {
           stop()
           return
         }
+        listenerHealthyRef.current = true
         unlisten = stop
       })
       .catch(() => {
-        // Ignore listener errors; fallback polling refresh still runs.
+        listenerHealthyRef.current = false
       })
 
     const intervalId = window.setInterval(() => {
-      void refresh()
-    }, 20_000)
+      const now = Date.now()
+      const freshestAt = Math.max(lastEventAtRef.current, lastRefreshAtRef.current)
+      const staleMs = freshestAt === 0 ? Number.POSITIVE_INFINITY : now - freshestAt
+      if (!listenerHealthyRef.current || staleMs >= ANNOUNCE_WATCHDOG_STALE_MS) {
+        scheduleRefresh()
+      }
+    }, ANNOUNCE_WATCHDOG_INTERVAL_MS)
 
     return () => {
       disposed = true
+      listenerHealthyRef.current = false
       unlisten?.()
       window.clearInterval(intervalId)
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
+      if (announceBatchTimerRef.current !== null) {
+        window.clearTimeout(announceBatchTimerRef.current)
+        announceBatchTimerRef.current = null
+      }
+      pendingAnnouncesRef.current = []
     }
-  }, [refresh])
+  }, [enqueueAnnounce, refresh, scheduleRefresh])
 
   return {
     announces,
@@ -152,4 +206,15 @@ export function useAnnounces(): UseAnnouncesState {
     loadMore,
     announceNow,
   }
+}
+
+function mergeAnnounces(existing: AnnounceItem[], incoming: AnnounceItem[]): AnnounceItem[] {
+  if (incoming.length === 0) {
+    return existing
+  }
+  let merged = existing
+  for (const item of incoming) {
+    merged = [item, ...merged.filter((entry) => entry.id !== item.id)]
+  }
+  return merged
 }

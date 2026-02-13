@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { unstable_batchedUpdates } from 'react-dom'
 import { Outlet } from 'react-router-dom'
 import {
   startLxmfEventPump,
@@ -78,6 +79,10 @@ interface ChatsState {
 }
 
 const ChatsContext = createContext<ChatsState | undefined>(undefined)
+const CHAT_EVENT_BATCH_MS = 80
+const CHAT_REFRESH_DEBOUNCE_MS = 120
+const CHAT_WATCHDOG_INTERVAL_MS = 10_000
+const CHAT_WATCHDOG_STALE_MS = 45_000
 
 export function ChatsProvider({ children }: PropsWithChildren) {
   const [threads, setThreads] = useState<ChatThread[]>([])
@@ -94,6 +99,12 @@ export function ChatsProvider({ children }: PropsWithChildren) {
   const queueInFlightRef = useRef<Set<string>>(new Set())
   const hasLoadedRef = useRef(false)
   const refreshingRef = useRef(false)
+  const lastEventAtRef = useRef(0)
+  const lastRefreshAtRef = useRef(0)
+  const listenerHealthyRef = useRef(false)
+  const refreshTimerRef = useRef<number | null>(null)
+  const eventBatchTimerRef = useRef<number | null>(null)
+  const pendingEventsRef = useRef<LxmfRpcEvent[]>([])
   const notificationsEnabledRef = useRef(getWeftPreferences().notificationsEnabled)
   const messageNotificationsEnabledRef = useRef(getWeftPreferences().messageNotificationsEnabled)
   const threadPreferencesRef = useRef(getStoredThreadPreferences())
@@ -189,6 +200,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       return
     }
     refreshingRef.current = true
+    lastRefreshAtRef.current = Date.now()
     try {
       setError(null)
       const loaded = await fetchChatThreads()
@@ -290,6 +302,19 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       refreshingRef.current = false
     }
   }, [applyThreadMetadata, emitIncomingNotifications])
+
+  const scheduleRefresh = useCallback(
+    (delayMs = CHAT_REFRESH_DEBOUNCE_MS) => {
+      if (refreshTimerRef.current !== null) {
+        return
+      }
+      refreshTimerRef.current = window.setTimeout(() => {
+        refreshTimerRef.current = null
+        void refresh()
+      }, delayMs)
+    },
+    [refresh],
+  )
 
   const markFailedMessagesIgnored = useCallback((messageIds: string[]) => {
     const next = extendIgnoredFailedMessageIds(
@@ -574,7 +599,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     (event: LxmfRpcEvent) => {
       const record = extractEventMessageRecord(event)
       if (!record) {
-        void refresh()
+        scheduleRefresh()
         return
       }
 
@@ -673,14 +698,14 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         ])
       }
     },
-    [applyThreadMetadata, emitIncomingNotifications, refresh],
+    [applyThreadMetadata, emitIncomingNotifications, scheduleRefresh],
   )
 
   const applyReceiptEvent = useCallback(
     (event: LxmfRpcEvent) => {
       const receipt = extractReceiptUpdate(event)
       if (!receipt) {
-        void refresh()
+        scheduleRefresh()
         return
       }
 
@@ -722,58 +747,109 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       })
 
       if (!found) {
-        void refresh()
+        scheduleRefresh()
       }
     },
-    [refresh],
+    [scheduleRefresh],
+  )
+
+  const flushEventBatch = useCallback(() => {
+    eventBatchTimerRef.current = null
+    const pending = pendingEventsRef.current
+    pendingEventsRef.current = []
+    if (pending.length === 0) {
+      return
+    }
+    unstable_batchedUpdates(() => {
+      for (const event of pending) {
+        if (event.event_type === 'inbound' || event.event_type === 'outbound') {
+          applyMessageEvent(event)
+          continue
+        }
+        if (event.event_type === 'receipt') {
+          applyReceiptEvent(event)
+          continue
+        }
+        if (event.event_type === 'runtime_started' || event.event_type === 'runtime_stopped') {
+          scheduleRefresh()
+        }
+      }
+    })
+  }, [applyMessageEvent, applyReceiptEvent, scheduleRefresh])
+
+  const enqueueRuntimeEvent = useCallback(
+    (event: LxmfRpcEvent) => {
+      lastEventAtRef.current = Date.now()
+      pendingEventsRef.current.push(event)
+      if (eventBatchTimerRef.current !== null) {
+        return
+      }
+      eventBatchTimerRef.current = window.setTimeout(() => {
+        flushEventBatch()
+      }, CHAT_EVENT_BATCH_MS)
+    },
+    [flushEventBatch],
   )
 
   useEffect(() => {
     void refresh()
-    const intervalId = window.setInterval(() => {
-      void refresh()
-    }, 15_000)
-
-    return () => {
-      window.clearInterval(intervalId)
-    }
   }, [refresh])
 
   useEffect(() => {
     let unlisten: (() => void) | null = null
     let disposed = false
     void startLxmfEventPump().catch(() => {
-      // Fallback interval refresh still keeps data current.
+      listenerHealthyRef.current = false
     })
     void subscribeLxmfEvents((event) => {
-      if (event.event_type === 'inbound' || event.event_type === 'outbound') {
-        applyMessageEvent(event)
-        return
-      }
-      if (event.event_type === 'receipt') {
-        applyReceiptEvent(event)
-        return
-      }
-      if (event.event_type === 'runtime_started' || event.event_type === 'runtime_stopped') {
-        void refresh()
-      }
+      enqueueRuntimeEvent(event)
     })
       .then((stop) => {
         if (disposed) {
           stop()
           return
         }
+        listenerHealthyRef.current = true
         unlisten = stop
       })
       .catch(() => {
-        // Ignore listener errors; fallback polling refresh still runs.
+        listenerHealthyRef.current = false
       })
 
     return () => {
       disposed = true
+      listenerHealthyRef.current = false
       unlisten?.()
     }
-  }, [applyMessageEvent, applyReceiptEvent, refresh])
+  }, [enqueueRuntimeEvent])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      const now = Date.now()
+      const freshestAt = Math.max(lastEventAtRef.current, lastRefreshAtRef.current)
+      const staleMs = freshestAt === 0 ? Number.POSITIVE_INFINITY : now - freshestAt
+      if (!listenerHealthyRef.current || staleMs >= CHAT_WATCHDOG_STALE_MS) {
+        scheduleRefresh()
+      }
+    }, CHAT_WATCHDOG_INTERVAL_MS)
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [scheduleRefresh])
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
+      if (eventBatchTimerRef.current !== null) {
+        window.clearTimeout(eventBatchTimerRef.current)
+        eventBatchTimerRef.current = null
+      }
+      pendingEventsRef.current = []
+    }
+  }, [])
 
   useEffect(() => {
     const handleDisplayNameUpdate = () => {
