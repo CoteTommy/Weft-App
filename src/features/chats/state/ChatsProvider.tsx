@@ -323,7 +323,17 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       queueInFlightRef.current.add(entry.id)
       setOfflineQueue((previous) => markQueueEntrySending(previous, entry.id))
       try {
-        await postChatMessage(entry.threadId, entry.draft)
+        const outcome = await postChatMessage(entry.threadId, entry.draft)
+        if (isFailedOutboundOutcome(outcome)) {
+          const backendStatus = outcome.backendStatus?.trim() || 'failed: backend rejected send'
+          if (outcome.messageId) {
+            markFailedMessagesIgnored([outcome.messageId])
+          }
+          setOfflineQueue((previous) =>
+            markQueueEntryAttemptFailed(previous, entry.id, backendStatus),
+          )
+          return
+        }
         setOfflineQueue((previous) => markQueueEntryDelivered(previous, entry.id))
         if (entry.sourceMessageId) {
           markFailedMessagesIgnored([entry.sourceMessageId])
@@ -432,6 +442,12 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       try {
         setError(null)
         const outcome = await postChatMessage(threadId, draft)
+        if (isFailedOutboundOutcome(outcome)) {
+          if (outcome.messageId) {
+            markFailedMessagesIgnored([outcome.messageId])
+          }
+          throw new Error(outcome.backendStatus?.trim() || 'failed: backend rejected send')
+        }
         await refresh()
         return outcome
       } catch (sendError) {
@@ -456,7 +472,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         return {}
       }
     },
-    [refresh],
+    [markFailedMessagesIgnored, refresh],
   )
 
   const createThread = useCallback((destination: string, name?: string): string | null => {
@@ -896,6 +912,10 @@ function extractEventMessageRecord(event: LxmfRpcEvent): LxmfMessageRecord | nul
           ? null
           : null,
   }
+}
+
+function isFailedOutboundOutcome(outcome: OutboundSendOutcome): boolean {
+  return deriveReceiptStatus('out', outcome.backendStatus ?? null) === 'failed'
 }
 
 function extractReceiptUpdate(

@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import type { ChatThread } from '../../../shared/types/chat'
 import {
   extendIgnoredFailedMessageIds,
+  markQueueEntryAttemptFailed,
+  MAX_AUTO_RETRY_ATTEMPTS,
   syncQueueFromThreads,
   retryDelayMs,
 } from './offlineQueue'
@@ -59,5 +61,16 @@ describe('offline queue state helpers', () => {
     expect(next.has('a')).toBe(true)
     expect(next.has('b')).toBe(true)
     expect(next.has('c')).toBe(true)
+  })
+
+  test('auto-pauses entries once retry budget is exhausted', () => {
+    const seed = syncQueueFromThreads([], [makeThread('msg-3')], new Set(), 1000)
+    let queue = seed
+    for (let attempt = 0; attempt < MAX_AUTO_RETRY_ATTEMPTS; attempt += 1) {
+      queue = markQueueEntryAttemptFailed(queue, queue[0].id, 'failed: timeout', 1000 + attempt)
+    }
+    expect(queue[0].attempts).toBe(MAX_AUTO_RETRY_ATTEMPTS)
+    expect(queue[0].status).toBe('paused')
+    expect(queue[0].lastError?.toLowerCase().includes('auto-paused')).toBe(true)
   })
 })

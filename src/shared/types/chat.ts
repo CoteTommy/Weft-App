@@ -72,4 +72,5 @@ export interface OutboundMessageDraft {
 export interface OutboundSendOutcome {
   paperUri?: string
   backendStatus?: string
+  messageId?: string
 }

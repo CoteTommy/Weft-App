@@ -24,6 +24,7 @@ const OFFLINE_QUEUE_KEY = 'weft.chat.offline-queue.v1'
 const OFFLINE_QUEUE_IGNORED_KEY = 'weft.chat.offline-queue-ignored.v1'
 const MAX_QUEUE_ENTRIES = 160
 const MAX_IGNORED_FAILED_IDS = 512
+export const MAX_AUTO_RETRY_ATTEMPTS = 4
 const RETRY_BACKOFF_MS = [15_000, 30_000, 60_000, 120_000, 300_000, 600_000]
 
 export function getStoredOfflineQueue(): OfflineQueueEntry[] {
@@ -207,13 +208,17 @@ export function markQueueEntryAttemptFailed(
 ): OfflineQueueEntry[] {
   return updateEntry(entries, queueId, (entry) => {
     const attempts = entry.attempts + 1
+    const shouldPause = attempts >= MAX_AUTO_RETRY_ATTEMPTS
+    const normalizedError = errorMessage.trim() || entry.lastError
     return {
       ...entry,
       attempts,
-      status: 'queued',
+      status: shouldPause ? 'paused' : 'queued',
       nextRetryAtMs: nowMs + retryDelayMs(attempts),
       updatedAtMs: nowMs,
-      lastError: errorMessage.trim() || entry.lastError,
+      lastError: shouldPause
+        ? `Auto-paused after ${MAX_AUTO_RETRY_ATTEMPTS} retries: ${normalizedError ?? 'retry budget exhausted'}`
+        : normalizedError,
     }
   })
 }

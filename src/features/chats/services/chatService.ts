@@ -40,7 +40,7 @@ export async function postChatMessage(
     if (draft.paper) {
       throw new Error('paper messages cannot include attachments')
     }
-    await sendLxmfRichMessage({
+    const response = await sendLxmfRichMessage({
       destination,
       content,
       attachments: attachments.map((attachment) => ({
@@ -50,7 +50,7 @@ export async function postChatMessage(
         sizeBytes: attachment.sizeBytes,
       })),
     })
-    return {}
+    return parseSendOutcome(response.result)
   }
 
   const response = await sendLxmfMessage({
@@ -74,9 +74,11 @@ export { buildThreads } from './chatThreadBuilders'
 function parseSendOutcome(result: unknown): OutboundSendOutcome {
   const paperUri = findPaperUri(result)
   const backendStatus = findStatus(result)
+  const messageId = findMessageId(result)
   return {
     paperUri: paperUri ?? undefined,
     backendStatus: backendStatus ?? undefined,
+    messageId: messageId ?? undefined,
   }
 }
 
@@ -120,9 +122,21 @@ function findPaperUri(value: unknown, depth = 0): string | null {
 }
 
 function findStatus(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null
+  }
   if (typeof value === 'string') {
     const normalized = value.trim()
     return normalized.length > 0 ? normalized : null
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const nested = findStatus(entry)
+      if (nested) {
+        return nested
+      }
+    }
+    return null
   }
   if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
     const record = value as Record<string, unknown>
@@ -132,7 +146,42 @@ function findStatus(value: unknown): string | null {
         return candidate.trim()
       }
     }
+    for (const entry of Object.values(record)) {
+      const nested = findStatus(entry)
+      if (nested) {
+        return nested
+      }
+    }
   }
   return null
 }
 
+function findMessageId(value: unknown, depth = 0): string | null {
+  if (depth > 5 || value === null || value === undefined) {
+    return null
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>
+    for (const key of ['message_id', 'messageId', 'id', 'lxmf_id']) {
+      const candidate = record[key]
+      if (typeof candidate === 'string' && candidate.trim().length > 0) {
+        return candidate.trim()
+      }
+    }
+    for (const entry of Object.values(record)) {
+      const nested = findMessageId(entry, depth + 1)
+      if (nested) {
+        return nested
+      }
+    }
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const nested = findMessageId(entry, depth + 1)
+      if (nested) {
+        return nested
+      }
+    }
+  }
+  return null
+}
