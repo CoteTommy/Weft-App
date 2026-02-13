@@ -30,7 +30,11 @@ import type {
   LxmfPropagationNodeListResponse,
 } from '../../lib/lxmf-payloads'
 import { publishAppNotification } from '../../shared/runtime/notifications'
-import { getRuntimeConnectionOptions, PREFERENCES_UPDATED_EVENT } from '../../shared/runtime/preferences'
+import {
+  getRuntimeConnectionOptions,
+  PREFERENCES_UPDATED_EVENT,
+  updateWeftPreferences,
+} from '../../shared/runtime/preferences'
 import { formatRelativeFromNow } from '../../shared/utils/time'
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
 
@@ -61,6 +65,7 @@ export function TopBar() {
   const hasProbedRef = useRef(false)
   const previousConnectedRef = useRef<boolean | null>(null)
   const previousMismatchRef = useRef<string | null>(null)
+  const previousAutoSyncRef = useRef<string | null>(null)
   const { notifications, unreadCount, markRead, markAllRead, clearAll } = useNotificationCenter()
 
   const rememberConnectivity = useCallback((connected: boolean) => {
@@ -90,8 +95,34 @@ export function TopBar() {
       const nextConnected = probe.rpc.reachable && probe.local.running
       const mismatch = buildRuntimeMismatch(runtimeTarget, probe)
       setIsConnected(nextConnected)
-      setRuntimeMismatch(mismatch)
       rememberConnectivity(nextConnected)
+
+      if (mismatch && nextConnected) {
+        const syncedTarget = buildSyncedTarget(probe)
+        if (!isSameRuntimeTarget(runtimeTarget, syncedTarget)) {
+          const signature = [
+            normalizeProfile(syncedTarget.profile),
+            normalizeRpcEndpoint(syncedTarget.rpc) ?? '',
+          ].join('|')
+          if (previousAutoSyncRef.current !== signature) {
+            previousAutoSyncRef.current = signature
+            updateWeftPreferences(syncedTarget)
+            setRuntimeTarget(syncedTarget)
+            setRuntimeMismatch(null)
+            previousMismatchRef.current = null
+            publishAppNotification({
+              kind: 'system',
+              title: 'Runtime target auto-synced',
+              body: `Now using profile ${normalizeProfile(syncedTarget.profile)} at ${
+                syncedTarget.rpc ?? 'auto RPC'
+              }.`,
+            })
+            return
+          }
+        }
+      }
+
+      setRuntimeMismatch(mismatch)
       if (mismatch && mismatch !== previousMismatchRef.current) {
         publishAppNotification({
           kind: 'system',
@@ -545,4 +576,34 @@ function normalizeRpcEndpoint(value: string | undefined | null): string | null {
   }
   normalized = normalized.replace(/\/+$/, '')
   return normalized || null
+}
+
+function buildSyncedTarget(probe: LxmfProbeReport): RuntimeConnectionTarget {
+  return {
+    profile: toPreferenceProfile(probe.local.profile),
+    rpc: toPreferenceRpc(probe.local.rpc),
+  }
+}
+
+function toPreferenceProfile(value: string): string | undefined {
+  const normalized = value.trim()
+  if (!normalized || normalized.toLowerCase() === 'default') {
+    return undefined
+  }
+  return normalized
+}
+
+function toPreferenceRpc(value: string): string | undefined {
+  const normalized = value.trim()
+  return normalized ? normalized : undefined
+}
+
+function isSameRuntimeTarget(
+  left: RuntimeConnectionTarget,
+  right: RuntimeConnectionTarget,
+): boolean {
+  return (
+    normalizeProfile(left.profile) === normalizeProfile(right.profile) &&
+    normalizeRpcEndpoint(left.rpc) === normalizeRpcEndpoint(right.rpc)
+  )
 }
