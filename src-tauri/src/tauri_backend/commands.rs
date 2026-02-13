@@ -4,7 +4,7 @@ use super::actor::{
 use super::selector::{clean_arg, default_transport, RuntimeSelector};
 use super::{
     current_system_appearance, DesktopShellPreferencePatch, DesktopShellState, EventPumpControl,
-    TRAY_ACTION_CHANNEL, DEFAULT_EVENT_PUMP_INTERVAL_MS,
+    DEFAULT_EVENT_PUMP_INTERVAL_MS, TRAY_ACTION_CHANNEL,
 };
 use base64::Engine as _;
 use lxmf::cli::profile::{load_profile_settings, save_profile_settings};

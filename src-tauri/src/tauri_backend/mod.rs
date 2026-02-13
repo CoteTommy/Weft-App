@@ -3,10 +3,10 @@ mod commands;
 mod selector;
 
 use actor::{ActorCommand, RuntimeActor};
-use serde::{Deserialize, Serialize};
 use selector::{
     auto_daemon_enabled, default_profile, default_rpc, default_transport, RuntimeSelector,
 };
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{mpsc, Mutex};
@@ -69,7 +69,10 @@ pub(crate) struct DesktopShellState {
 
 impl DesktopShellState {
     pub(crate) fn snapshot(&self) -> DesktopShellPreferences {
-        self.prefs.lock().map(|value| value.clone()).unwrap_or_default()
+        self.prefs
+            .lock()
+            .map(|value| value.clone())
+            .unwrap_or_default()
     }
 
     pub(crate) fn load_from_disk(&self, app: &tauri::AppHandle) -> Result<(), String> {
