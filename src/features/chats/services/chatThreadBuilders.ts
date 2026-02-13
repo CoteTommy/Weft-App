@@ -94,9 +94,9 @@ function toChatMessage(record: LxmfMessageRecord, counterparty: string, selfAuth
     attachments: assets.attachments,
     paper: assets.paper,
     sentAt: formatClockTime(timestampMs),
-    status: mapReceiptStatus(record.direction, record.receipt_status),
+    status: deriveReceiptStatus(record.direction, record.receipt_status),
     statusDetail,
-    statusReasonCode: inferReasonCode(statusDetail),
+    statusReasonCode: deriveReasonCode(statusDetail),
   }
 }
 
@@ -110,7 +110,7 @@ function normalizeTimestampMs(value: number): number {
   return value
 }
 
-function mapReceiptStatus(
+export function deriveReceiptStatus(
   direction: string,
   receiptStatus: string | null,
 ): ChatMessage['status'] | undefined {
@@ -167,7 +167,7 @@ function normalizeStatusDetail(value: string | null): string | undefined {
   return normalized.length > 0 ? normalized : undefined
 }
 
-function inferReasonCode(statusDetail: string | undefined): string | undefined {
+export function deriveReasonCode(statusDetail: string | undefined): string | undefined {
   if (!statusDetail) {
     return undefined
   }
