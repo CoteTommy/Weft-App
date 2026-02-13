@@ -5,7 +5,7 @@ import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 import {
   extractFilesFromMessages,
   extractMapPointsFromMessages,
-} from './payloadParseCore'
+} from '../services/payloadParseCore'
 
 function message(overrides: Partial<LxmfMessageRecord>): LxmfMessageRecord {
   return {

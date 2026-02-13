@@ -7,7 +7,7 @@ import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
 import { matchesQuery } from '@shared/utils/search'
 
-import { useNetwork } from '../state/useNetwork'
+import { useNetwork } from '../hooks/useNetwork'
 
 export function NetworkPage() {
   const { peers, loading, error, refresh } = useNetwork()

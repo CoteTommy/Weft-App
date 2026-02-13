@@ -7,7 +7,7 @@ import { Panel } from '@shared/ui/Panel'
 import { matchesQuery } from '@shared/utils/search'
 import { paperIngestUri } from '@lib/lxmf-api'
 
-import { useFiles } from '../state/useFiles'
+import { useFiles } from '../hooks/useFiles'
 
 export function FilesPage() {
   const { files, loading, error, refresh } = useFiles()

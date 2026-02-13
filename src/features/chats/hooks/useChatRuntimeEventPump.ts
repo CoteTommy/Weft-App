@@ -8,7 +8,7 @@ import {
   CHAT_EVENT_BATCH_MS,
   CHAT_WATCHDOG_INTERVAL_MS,
   CHAT_WATCHDOG_STALE_MS,
-} from './types'
+} from '../types'
 
 export type UseChatRuntimeEventPumpParams = {
   applyMessageEvent: (event: LxmfRpcEvent) => void

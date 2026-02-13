@@ -9,7 +9,7 @@ import { Panel } from '@shared/ui/Panel'
 import { matchesQuery } from '@shared/utils/search'
 import { daemonRestart } from '@lib/lxmf-api'
 
-import { useInterfaces } from '../state/useInterfaces'
+import { useInterfaces } from '../hooks/useInterfaces'
 
 export function InterfacesPage() {
   const { interfaces, metrics, loading, error, refresh } = useInterfaces()

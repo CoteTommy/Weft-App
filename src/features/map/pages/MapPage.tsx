@@ -7,7 +7,7 @@ import { parseLxmfContactReference } from '@shared/utils/contactReference'
 import { matchesQuery } from '@shared/utils/search'
 
 import { sendLocationToDestination } from '../services/mapService'
-import { useMapPoints } from '../state/useMapPoints'
+import { useMapPoints } from '../hooks/useMapPoints'
 
 export function MapPage() {
   const { points, loading, error, refresh } = useMapPoints()

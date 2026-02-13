@@ -2,7 +2,7 @@ import { type Dispatch, type MutableRefObject, type RefObject, type SetStateActi
 
 import type { ChatThread } from '@shared/types/chat'
 
-import { getStoredOfflineQueue, type OfflineQueueEntry,persistOfflineQueue, syncQueueFromThreads } from './offlineQueue'
+import { getStoredOfflineQueue, type OfflineQueueEntry,persistOfflineQueue, syncQueueFromThreads } from '../state/offlineQueue'
 
 export type UseChatOfflineQueueParams = {
   threads: ChatThread[]

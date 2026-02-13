@@ -23,7 +23,7 @@ import {
   saveOutboundPropagationNode,
   savePerformanceSettings,
 } from '../services/settingsService'
-import { useSettings } from '../state/useSettings'
+import { useSettings } from '../hooks/useSettings'
 import type { BackupPayload, SettingsConfigPayload } from '../types'
 import { buildConfigPayload, mergeNotificationSettings, parseSettingsSection } from '../utils'
 

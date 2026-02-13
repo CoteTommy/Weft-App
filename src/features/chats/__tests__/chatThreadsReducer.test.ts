@@ -5,7 +5,7 @@ import type { ChatMessage, ChatThread } from '@shared/types/chat'
 import {
   reduceReceiptUpdate,
   reduceRuntimeMessage,
-} from './chatThreadsReducer'
+} from '../state/chatThreadsReducer'
 
 function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {

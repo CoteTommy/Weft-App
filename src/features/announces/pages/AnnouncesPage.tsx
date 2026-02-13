@@ -18,7 +18,7 @@ import { filterIndexedItems, indexSearchItems } from '@shared/utils/search'
 import { type LxmfSendMessageOptions,sendLxmfMessage } from '@lib/lxmf-api'
 
 import { sendHubJoin } from '../services/announcesService'
-import { useAnnounces } from '../state/useAnnounces'
+import { useAnnounces } from '../hooks/useAnnounces'
 
 export function AnnouncesPage() {
   const navigate = useNavigate()

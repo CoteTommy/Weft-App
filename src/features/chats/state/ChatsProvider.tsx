@@ -64,11 +64,11 @@ import {
   CHAT_REFRESH_DEBOUNCE_MS,
   type ChatsState,
   type IncomingNotificationItem,
-} from './types'
-import { useChatIncomingNotifications } from './useChatIncomingNotifications'
-import { useChatOfflineQueue } from './useChatOfflineQueue'
-import { useChatQueueRetryScheduler } from './useChatQueueRetryScheduler'
-import { useChatRuntimeEventPump } from './useChatRuntimeEventPump'
+} from '../types'
+import { useChatIncomingNotifications } from '../hooks/useChatIncomingNotifications'
+import { useChatOfflineQueue } from '../hooks/useChatOfflineQueue'
+import { useChatQueueRetryScheduler } from '../hooks/useChatQueueRetryScheduler'
+import { useChatRuntimeEventPump } from '../hooks/useChatRuntimeEventPump'
 
 const ChatsContext = createContext<ChatsState | undefined>(undefined)
 

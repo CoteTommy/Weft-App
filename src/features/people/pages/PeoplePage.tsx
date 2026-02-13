@@ -15,7 +15,7 @@ import {
 } from '@shared/utils/contactReference'
 import { filterIndexedItems, indexSearchItems } from '@shared/utils/search'
 
-import { usePeople } from '../state/usePeople'
+import { usePeople } from '../hooks/usePeople'
 
 export function PeoplePage() {
   const navigate = useNavigate()
