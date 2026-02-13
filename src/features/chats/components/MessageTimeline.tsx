@@ -115,7 +115,13 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
         if (disposed) {
           return
         }
-        setFetchedDeliveryTrace(trace.transitions)
+        setFetchedDeliveryTrace(
+          trace.transitions.map((entry) => ({
+            status: entry.status,
+            timestamp: entry.timestamp,
+            reasonCode: entry.reason_code,
+          })),
+        )
       })
       .catch(() => {
         if (!disposed) {
@@ -281,6 +287,11 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
                     <li key={`${entry.status}:${entry.timestamp}:${index}`} className="text-[11px] text-slate-600">
                       <span className="font-semibold text-slate-700">{entry.status}</span>{' '}
                       <span>({formatTraceTimestamp(entry.timestamp)})</span>
+                      {entry.reasonCode ? (
+                        <span className="ml-1 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
+                          {entry.reasonCode}
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

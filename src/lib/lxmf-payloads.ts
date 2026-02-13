@@ -196,6 +196,7 @@ export interface LxmfOutboundPropagationNodeResponse {
 export interface LxmfDeliveryTraceEntry {
   status: string
   timestamp: number
+  reason_code?: string
 }
 
 export interface LxmfMessageDeliveryTraceResponse {
@@ -301,6 +302,10 @@ export function parseLxmfMessageDeliveryTrace(
         timestamp: asNumber(
           trace.timestamp,
           `message_delivery_trace.transitions[${index}].timestamp`,
+        ),
+        reason_code: asOptionalString(
+          trace.reason_code,
+          `message_delivery_trace.transitions[${index}].reason_code`,
         ),
       }
     }),

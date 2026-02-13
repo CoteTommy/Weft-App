@@ -48,7 +48,11 @@ describe('lxmf payload parsers', () => {
       message_id: 'lxmf-123',
       transitions: [
         { status: 'queued', timestamp: 1_770_855_315 },
-        { status: 'retrying: propagated relay', timestamp: 1_770_855_320 },
+        {
+          status: 'retrying: propagated relay',
+          timestamp: 1_770_855_320,
+          reason_code: 'timeout',
+        },
       ],
     })
     expect(parsed.message_id).toBe('lxmf-123')
@@ -56,6 +60,7 @@ describe('lxmf payload parsers', () => {
       'queued',
       'retrying: propagated relay',
     ])
+    expect(parsed.transitions[1].reason_code).toBe('timeout')
   })
 
   test('parses rpc event payload from tauri pump', () => {

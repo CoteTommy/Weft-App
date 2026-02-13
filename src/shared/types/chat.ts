@@ -35,6 +35,7 @@ export interface ChatMessage {
   deliveryTrace?: Array<{
     status: string
     timestamp: number
+    reasonCode?: string
   }>
 }
 

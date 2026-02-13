@@ -469,6 +469,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
               deliveryTrace: appendDeliveryTraceEntry(
                 incomingMessage,
                 statusHints.statusDetail,
+                statusHints.reasonCode,
               ),
             }
 
@@ -565,7 +566,11 @@ export function ChatsProvider({ children }: PropsWithChildren) {
               status,
               statusDetail,
               statusReasonCode: reasonCode,
-              deliveryTrace: appendDeliveryTraceEntry(message, statusDetail),
+              deliveryTrace: appendDeliveryTraceEntry(
+                message,
+                statusDetail,
+                reasonCode,
+              ),
             }
           })
           if (!changed) {
@@ -744,13 +749,14 @@ function previewFromMessage(message: ChatMessage | undefined): string {
 function appendDeliveryTraceEntry(
   message: ChatMessage,
   statusDetail: string | undefined,
+  reasonCode?: string,
 ): ChatMessage['deliveryTrace'] {
   if (!statusDetail) {
     return message.deliveryTrace
   }
   const existing = message.deliveryTrace ?? []
   const timestamp = Math.floor(Date.now() / 1000)
-  const next = [...existing, { status: statusDetail, timestamp }]
+  const next = [...existing, { status: statusDetail, timestamp, reasonCode }]
   return next.slice(-32)
 }
 
