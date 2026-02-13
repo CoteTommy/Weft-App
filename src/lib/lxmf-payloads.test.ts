@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import {
   parseLxmfAnnounceList,
+  parseLxmfInterfaceList,
   parseLxmfMessageList,
+  parseLxmfOutboundPropagationNode,
+  parseLxmfPeerList,
+  parseLxmfPropagationNodeList,
   parseLxmfMessageDeliveryTrace,
   parseLxmfRpcEventOrNull,
 } from './lxmf-payloads'
@@ -83,6 +87,48 @@ describe('lxmf payload parsers', () => {
     expect(parsed.messages).toHaveLength(0)
     expect(parsed.meta?.contract_version).toBe('v2')
     expect(parsed.meta?.rpc_endpoint).toBe('127.0.0.1:4245')
+  })
+
+  test('parses peers/interfaces/propagation metadata', () => {
+    const peers = parseLxmfPeerList({
+      peers: [],
+      meta: {
+        contract_version: 'v2',
+        profile: 'weft2',
+        rpc_endpoint: '127.0.0.1:4245',
+      },
+    })
+    expect(peers.meta?.profile).toBe('weft2')
+
+    const interfaces = parseLxmfInterfaceList({
+      interfaces: [],
+      meta: {
+        contract_version: 'v2',
+        profile: 'weft2',
+        rpc_endpoint: '127.0.0.1:4245',
+      },
+    })
+    expect(interfaces.meta?.contract_version).toBe('v2')
+
+    const nodes = parseLxmfPropagationNodeList({
+      nodes: [],
+      meta: {
+        contract_version: 'v2',
+        profile: 'weft2',
+        rpc_endpoint: '127.0.0.1:4245',
+      },
+    })
+    expect(nodes.meta?.rpc_endpoint).toBe('127.0.0.1:4245')
+
+    const outbound = parseLxmfOutboundPropagationNode({
+      peer: null,
+      meta: {
+        contract_version: 'v2',
+        profile: 'weft2',
+        rpc_endpoint: '127.0.0.1:4245',
+      },
+    })
+    expect(outbound.meta?.profile).toBe('weft2')
   })
 
   test('parses rpc event payload from tauri pump', () => {

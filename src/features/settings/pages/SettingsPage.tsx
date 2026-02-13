@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { ConnectivityMode } from '../../../shared/runtime/preferences'
 import type { SettingsSnapshot } from '../../../shared/types/settings'
 import { Panel } from '../../../shared/ui/Panel'
@@ -14,6 +14,7 @@ import {
 } from '../services/settingsService'
 import { useSettings } from '../state/useSettings'
 import { DEFAULT_NOTIFICATION_SETTINGS, CONNECTIVITY_OPTIONS, SETTINGS_SECTIONS } from '../constants'
+import { InteropHealthCard } from '../components/InteropHealthCard'
 import { NotificationToggle } from '../components/NotificationToggle'
 import { OutboundPropagationRelayCard } from '../components/OutboundPropagationRelayCard'
 import { SettingsRow } from '../components/SettingsRow'
@@ -21,6 +22,7 @@ import type { BackupPayload, SettingsConfigPayload } from '../types'
 import { buildConfigPayload, mergeNotificationSettings, parseSettingsSection } from '../utils'
 
 export function SettingsPage() {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { settings, loading, error, refresh } = useSettings()
   const [displayNameDraft, setDisplayNameDraft] = useState('')
@@ -588,15 +590,28 @@ export function SettingsPage() {
               ) : null}
 
               {activeSection === 'advanced' ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-sm font-semibold text-slate-800">Diagnostics</p>
-                  <div className="mt-3 space-y-2 text-sm text-slate-600">
-                    <p>RPC Endpoint: {settings.rpcEndpoint}</p>
-                    <p>Profile Path: {settings.profile}</p>
-                    <p>Identity Hash: {settings.identityHash ?? 'n/a'}</p>
-                    <p>Peers</p>
-                    <p>Interfaces</p>
-                    <p>Announces</p>
+                <div className="space-y-3">
+                  <InteropHealthCard
+                    interop={settings.interop}
+                    onOpenConnectivity={() => {
+                      const next = new URLSearchParams(searchParams)
+                      next.set('section', 'connectivity')
+                      setSearchParams(next, { replace: true })
+                    }}
+                    onOpenChats={() => {
+                      void navigate('/chats')
+                    }}
+                    onOpenNetwork={() => {
+                      void navigate('/network')
+                    }}
+                  />
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-sm font-semibold text-slate-800">Runtime diagnostics</p>
+                    <div className="mt-3 space-y-2 text-sm text-slate-600">
+                      <p>RPC Endpoint: {settings.rpcEndpoint}</p>
+                      <p>Profile Path: {settings.profile}</p>
+                      <p>Identity Hash: {settings.identityHash ?? 'n/a'}</p>
+                    </div>
                   </div>
                 </div>
               ) : null}

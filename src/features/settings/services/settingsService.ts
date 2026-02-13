@@ -3,6 +3,7 @@ import {
   daemonStatus,
   getLxmfOutboundPropagationNode,
   getLxmfProfile,
+  listLxmfMessages,
   listLxmfPropagationNodes,
   probeLxmf,
   setLxmfOutboundPropagationNode,
@@ -15,21 +16,34 @@ import {
   updateWeftPreferences,
 } from '../../../shared/runtime/preferences'
 import { resolveDisplayName, setStoredDisplayName } from '../../../shared/utils/identity'
+import { buildInteropSnapshot } from './interopHealth'
 
 export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
   const preferences = getWeftPreferences()
-  const [status, probe, profile, propagationNodes, outboundPropagationNode] = await Promise.all([
+  const [status, probe, profile, propagationNodes, outboundPropagationNode, messages] = await Promise.all([
     daemonStatus(),
     probeLxmf(),
     getLxmfProfile().catch(() => null),
     listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
     getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
+    listLxmfMessages().catch(() => ({ messages: [], meta: null })),
   ])
   const displayName = resolveDisplayName(
     status.profile,
     probe.rpc.identity_hash,
     profile?.displayName ?? null,
   )
+  const interop = buildInteropSnapshot({
+    expectedProfile: preferences.profile,
+    expectedRpc: preferences.rpc,
+    actualProfile: status.profile,
+    actualRpc: status.rpc,
+    probe,
+    relaySelected: Boolean(outboundPropagationNode.peer),
+    propagationNodes: propagationNodes.nodes.length,
+    messages: messages.messages,
+    runtimeConnected: status.running,
+  })
   return {
     displayName,
     connection: status.running ? 'Connected' : 'Offline',
@@ -54,6 +68,7 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       connectionEnabled: preferences.connectionNotificationsEnabled,
       soundEnabled: preferences.notificationSoundEnabled,
     },
+    interop,
   }
 }
 
