@@ -115,11 +115,11 @@ export function MapPage() {
           <iframe
             title="OpenStreetMap Preview"
             src={mapEmbedUrl(selectedPoint.lat, selectedPoint.lon)}
-            className="mb-4 min-h-[320px] w-full flex-1 rounded-2xl border border-slate-200"
+            className="mb-4 min-h-80 w-full flex-1 rounded-2xl border border-slate-200"
             loading="lazy"
           />
         ) : (
-          <div className="mb-4 flex min-h-[320px] flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
+          <div className="mb-4 flex min-h-80 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
             Map preview appears after selecting a point.
           </div>
         )}

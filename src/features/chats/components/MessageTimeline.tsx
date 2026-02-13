@@ -304,7 +304,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
             </div>
 
             <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-sm break-words whitespace-pre-wrap text-slate-800">
+              <p className="text-sm wrap-break-word whitespace-pre-wrap text-slate-800">
                 {selectedMessage.body}
               </p>
             </div>

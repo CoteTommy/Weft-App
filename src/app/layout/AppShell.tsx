@@ -210,8 +210,8 @@ export function AppShell() {
   }, [])
 
   return (
-    <div className="motion-gpu relative h-screen overflow-hidden bg-[var(--app-bg)] text-slate-900">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1500px] gap-4 px-3 py-4 sm:px-4 lg:px-6 lg:py-6">
+    <div className="motion-gpu relative h-screen overflow-hidden bg-(--app-bg) text-slate-900">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-375 gap-4 px-3 py-4 sm:px-4 lg:px-6 lg:py-6">
         <SidebarNav />
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <TopBar />

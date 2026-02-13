@@ -54,5 +54,10 @@ export default defineConfig([
           }
         : {}),
     },
+    settings: {
+      tailwindcss: {
+        config: {},
+      },
+    },
   },
 ])

@@ -241,7 +241,7 @@ export function SettingsPage() {
                       <input
                         value={displayNameDraft}
                         onChange={event => setDisplayNameDraft(event.target.value)}
-                        className="h-10 min-w-[220px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
+                        className="h-10 min-w-55 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                         placeholder="Set your LXMF display name"
                       />
                       <button
