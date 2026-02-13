@@ -18,8 +18,8 @@
     "test": "bun test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier . --write",
-    "format:check": "prettier . --check",
+    "format": "prettier src --write",
+    "format:check": "prettier src --check",
     "preview": "vite preview"
   },
   "dependencies": {

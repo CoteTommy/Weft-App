@@ -4,3 +4,6 @@ src-tauri/target
 coverage
 bun.lock
 package-lock.json
+*.md
+docs/**/*.md
+README.md
