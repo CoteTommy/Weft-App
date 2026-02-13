@@ -1,3 +1,6 @@
+import { APP_NOTIFICATION_EVENT } from '@app/config/events'
+import { readStoredJson, type StorageWriteResult, writeStoredJson } from '@shared/runtime/storage'
+
 import { getWeftPreferences } from './preferences'
 
 export type AppNotificationKind = 'message' | 'system' | 'connection'
@@ -20,7 +23,7 @@ export interface AppNotificationInput {
   threadId?: string
 }
 
-export const APP_NOTIFICATION_EVENT = 'weft:app-notification'
+export { APP_NOTIFICATION_EVENT }
 
 const APP_NOTIFICATIONS_KEY = 'weft.notifications.v1'
 const MAX_NOTIFICATIONS = 120
@@ -32,7 +35,9 @@ export function publishAppNotification(input: AppNotificationInput): void {
   if (!shouldPublishNotification(input.kind ?? 'system')) {
     return
   }
-  window.dispatchEvent(new CustomEvent<AppNotificationInput>(APP_NOTIFICATION_EVENT, { detail: input }))
+  window.dispatchEvent(
+    new CustomEvent<AppNotificationInput>(APP_NOTIFICATION_EVENT, { detail: input })
+  )
   if (shouldPlayNotificationSound()) {
     playNotificationSound()
   }
@@ -42,29 +47,18 @@ export function getStoredAppNotifications(): AppNotification[] {
   if (typeof window === 'undefined') {
     return []
   }
-  const raw = window.localStorage.getItem(APP_NOTIFICATIONS_KEY)
-  if (!raw) {
+  const parsed = readStoredJson<unknown>(APP_NOTIFICATIONS_KEY)
+  if (!Array.isArray(parsed)) {
     return []
   }
-  try {
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-    return parsed
-      .map((item) => parseStoredNotification(item))
-      .filter((item): item is AppNotification => item !== null)
-      .slice(0, MAX_NOTIFICATIONS)
-  } catch {
-    return []
-  }
+  return parsed
+    .map(item => parseStoredNotification(item))
+    .filter((item): item is AppNotification => item !== null)
+    .slice(0, MAX_NOTIFICATIONS)
 }
 
-export function persistAppNotifications(items: AppNotification[]): void {
-  if (typeof window === 'undefined') {
-    return
-  }
-  window.localStorage.setItem(APP_NOTIFICATIONS_KEY, JSON.stringify(items.slice(0, MAX_NOTIFICATIONS)))
+export function persistAppNotifications(items: AppNotification[]): StorageWriteResult {
+  return writeStoredJson(APP_NOTIFICATIONS_KEY, items.slice(0, MAX_NOTIFICATIONS))
 }
 
 export function createAppNotification(input: AppNotificationInput): AppNotification | null {

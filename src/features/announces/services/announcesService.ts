@@ -1,16 +1,37 @@
-import { announceLxmfNow, listLxmfAnnounces, sendLxmfCommand } from '../../../lib/lxmf-api'
-import type { LxmfAnnounceRecord } from '../../../lib/lxmf-payloads'
-import type { AnnounceItem, AnnouncePriorityLabel } from '../../../shared/types/announces'
+import type { AnnounceItem, AnnouncePriorityLabel } from '@shared/types/announces'
+import { announceLxmfNow, listLxmfAnnounces, sendLxmfCommand } from '@lib/lxmf-api'
+import type { LxmfAnnounceRecord } from '@lib/lxmf-payloads'
 
 interface DerivedAnnounce extends AnnounceItem {
   postedAtMs: number
 }
 
-export async function fetchAnnounces(): Promise<AnnounceItem[]> {
-  const response = await listLxmfAnnounces()
+export interface FetchAnnouncesPageResult {
+  announces: AnnounceItem[]
+  nextCursor: string | null
+}
+
+export async function fetchAnnouncesPage(
+  cursor?: string | null
+): Promise<FetchAnnouncesPageResult> {
+  const response = await listLxmfAnnounces(
+    {},
+    {
+      limit: 200,
+      cursor: cursor ?? undefined,
+    }
+  )
   const announces = response.announces.map(mapRecordToAnnounce)
   announces.sort((a, b) => b.postedAtMs - a.postedAtMs)
-  return announces.map(toAnnounceItem)
+  return {
+    announces: announces.map(toAnnounceItem),
+    nextCursor: response.next_cursor,
+  }
+}
+
+export async function fetchAnnounces(): Promise<AnnounceItem[]> {
+  const page = await fetchAnnouncesPage()
+  return page.announces
 }
 
 export async function triggerAnnounceNow(): Promise<void> {
@@ -36,16 +57,18 @@ export async function sendHubJoin(destination: string): Promise<void> {
 }
 
 function mapRecordToAnnounce(record: LxmfAnnounceRecord): DerivedAnnounce {
-  const postedAtMs = normalizeTimestampMs(record.announce.posted_at ?? record.timestamp)
+  const postedAtMs = normalizeTimestampMs(record.timestamp)
+  const name = record.name?.trim()
+  const source = record.peer.trim()
   return {
-    id: `${record.id}:announce`,
-    title: record.announce.title?.trim() || record.title || 'Announcement',
-    body: record.announce.body?.trim() || record.content || 'No details',
-    audience: record.announce.audience?.trim() || 'public',
-    priority: toPriorityLabel(record.announce.priority),
+    id: record.id || `${source}:${record.timestamp}:announce`,
+    title: name?.length ? name : 'Announce',
+    body: `Peer seen ${record.seen_count} time(s)`,
+    audience: 'network',
+    priority: toPriorityLabel(undefined),
     postedAt: formatAnnounceDate(postedAtMs),
-    source: record.source.trim(),
-    capabilities: normalizeCapabilities(record.announce.capabilities),
+    source,
+    capabilities: normalizeCapabilities(record.capabilities),
     postedAtMs,
   }
 }
@@ -65,6 +88,45 @@ function toAnnounceItem(announce: DerivedAnnounce): AnnounceItem {
 
 function toPriorityLabel(value: string | undefined): AnnouncePriorityLabel {
   return value === 'urgent' ? 'Urgent' : 'Routine'
+}
+
+export function mapAnnounceEventPayload(payload: unknown): AnnounceItem | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null
+  }
+  const record = payload as Record<string, unknown>
+  const peer = typeof record.peer === 'string' ? record.peer.trim() : ''
+  if (!peer) {
+    return null
+  }
+  const timestamp =
+    typeof record.timestamp === 'number' && Number.isFinite(record.timestamp)
+      ? record.timestamp
+      : Date.now() / 1000
+  const seenCount =
+    typeof record.seen_count === 'number' && Number.isFinite(record.seen_count)
+      ? Math.max(0, Math.trunc(record.seen_count))
+      : 1
+  const capabilities = normalizeCapabilities(
+    Array.isArray(record.capabilities)
+      ? record.capabilities.filter((entry): entry is string => typeof entry === 'string')
+      : []
+  )
+  const name = typeof record.name === 'string' ? record.name.trim() : ''
+  const postedAtMs = normalizeTimestampMs(timestamp)
+  return {
+    id:
+      typeof record.id === 'string' && record.id.trim().length > 0
+        ? record.id.trim()
+        : `${peer}:${timestamp}:announce`,
+    title: name || 'Announce',
+    body: `Peer seen ${seenCount} time(s)`,
+    audience: 'network',
+    priority: 'Routine',
+    postedAt: formatAnnounceDate(postedAtMs),
+    source: peer,
+    capabilities,
+  }
 }
 
 function normalizeTimestampMs(value: number): number {

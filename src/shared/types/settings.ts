@@ -1,4 +1,6 @@
-import type { ConnectivityMode } from '../runtime/preferences'
+import type { DesktopAppearance } from '@lib/desktop-shell-api'
+
+import type { ConnectivityMode, MotionPreference } from '../runtime/preferences'
 
 export interface SettingsSnapshot {
   displayName: string
@@ -13,6 +15,14 @@ export interface SettingsSnapshot {
     rpc?: string
     transport?: string
     autoStartDaemon: boolean
+    outboundPropagationPeer: string | null
+    propagationNodes: Array<{
+      peer: string
+      name: string | null
+      last_seen: number
+      capabilities: string[]
+      selected: boolean
+    }>
   }
   notifications: {
     desktopEnabled: boolean
@@ -21,5 +31,40 @@ export interface SettingsSnapshot {
     systemEnabled: boolean
     connectionEnabled: boolean
     soundEnabled: boolean
+  }
+  performance: {
+    motionPreference: MotionPreference
+    hudEnabled: boolean
+  }
+  desktop: {
+    minimizeToTrayOnClose: boolean
+    startInTray: boolean
+    singleInstanceFocus: boolean
+    notificationsMuted: boolean
+    platform: string
+    appearance: DesktopAppearance
+  }
+  features: {
+    commandCenterEnabled: boolean
+  }
+  interop: {
+    status: 'healthy' | 'warning' | 'critical'
+    expectedProfile: string
+    expectedRpc: string | null
+    actualProfile: string
+    actualRpc: string
+    profileMatch: boolean
+    rpcMatch: boolean
+    rpcReachable: boolean
+    eventsReachable: boolean
+    sendPath: 'ok' | 'degraded' | 'blocked'
+    receivePath: 'ok' | 'degraded' | 'unknown' | 'blocked'
+    outboundPending: number
+    outboundFailed: number
+    lastInboundTs: number | null
+    lastOutboundTs: number | null
+    relaySelected: boolean
+    propagationNodes: number
+    findings: string[]
   }
 }

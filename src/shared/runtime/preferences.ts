@@ -1,4 +1,9 @@
+import { PREFERENCES_UPDATED_EVENT } from '@app/config/events'
+import { DEFAULT_MAIN_ROUTE } from '@app/config/routes'
+import { readStoredJson, type StorageWriteResult, writeStoredJson } from '@shared/runtime/storage'
+
 export type ConnectivityMode = 'automatic' | 'local_only' | 'lan_shared' | 'custom'
+export type MotionPreference = 'smooth' | 'snappy' | 'off'
 
 export interface WeftPreferences {
   onboardingCompleted: boolean
@@ -13,11 +18,17 @@ export interface WeftPreferences {
   systemNotificationsEnabled: boolean
   connectionNotificationsEnabled: boolean
   notificationSoundEnabled: boolean
+  motionPreference: MotionPreference
+  performanceHudEnabled: boolean
+  commandCenterEnabled: boolean
+  lastMainRoute?: string
   pendingRoute?: string
 }
 
 const PREFERENCES_KEY = 'weft.preferences.v1'
-export const PREFERENCES_UPDATED_EVENT = 'weft:preferences-updated'
+let volatilePreferences: WeftPreferences | null = null
+
+export { PREFERENCES_UPDATED_EVENT }
 
 const DEFAULT_PREFERENCES: WeftPreferences = {
   onboardingCompleted: false,
@@ -29,25 +40,30 @@ const DEFAULT_PREFERENCES: WeftPreferences = {
   systemNotificationsEnabled: true,
   connectionNotificationsEnabled: true,
   notificationSoundEnabled: false,
+  motionPreference: 'snappy',
+  performanceHudEnabled: false,
+  commandCenterEnabled: false,
+  lastMainRoute: DEFAULT_MAIN_ROUTE,
 }
 
 export function getWeftPreferences(): WeftPreferences {
+  if (volatilePreferences) {
+    return { ...volatilePreferences }
+  }
   if (typeof window === 'undefined') {
     return { ...DEFAULT_PREFERENCES }
   }
-  const raw = window.localStorage.getItem(PREFERENCES_KEY)
-  if (!raw) {
+  const parsed = readStoredJson<Partial<WeftPreferences>>(PREFERENCES_KEY)
+  if (!parsed) {
+    volatilePreferences = { ...DEFAULT_PREFERENCES }
     return { ...DEFAULT_PREFERENCES }
   }
-  try {
-    const parsed = JSON.parse(raw) as Partial<WeftPreferences>
-    return {
-      ...DEFAULT_PREFERENCES,
-      ...sanitizePreferences(parsed),
-    }
-  } catch {
-    return { ...DEFAULT_PREFERENCES }
+  const next = {
+    ...DEFAULT_PREFERENCES,
+    ...sanitizePreferences(parsed),
   }
+  volatilePreferences = next
+  return { ...next }
 }
 
 export function updateWeftPreferences(patch: Partial<WeftPreferences>): WeftPreferences {
@@ -66,7 +82,7 @@ export function hasCompletedOnboarding(): boolean {
 export function getRuntimeConnectionOptions(): { profile?: string; rpc?: string } {
   const preferences = getWeftPreferences()
   return {
-    profile: normalizeOptional(preferences.profile),
+    profile: normalizeProfile(preferences.profile),
     rpc: normalizeOptional(preferences.rpc),
   }
 }
@@ -96,11 +112,16 @@ export function consumePendingLaunchRoute(): string | null {
 }
 
 function persist(value: WeftPreferences): void {
+  volatilePreferences = { ...value }
   if (typeof window === 'undefined') {
     return
   }
-  window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify(value))
+  void persistWeftPreferences(value)
   window.dispatchEvent(new Event(PREFERENCES_UPDATED_EVENT))
+}
+
+export function persistWeftPreferences(value: WeftPreferences): StorageWriteResult {
+  return writeStoredJson(PREFERENCES_KEY, value)
 }
 
 function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPreferences> {
@@ -112,7 +133,7 @@ function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPrefe
     out.connectivityMode = parseConnectivityMode(value.connectivityMode)
   }
   if ('profile' in value) {
-    out.profile = normalizeOptional(value.profile)
+    out.profile = normalizeProfile(value.profile)
   }
   if ('rpc' in value) {
     out.rpc = normalizeOptional(value.rpc)
@@ -141,6 +162,18 @@ function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPrefe
   if ('notificationSoundEnabled' in value) {
     out.notificationSoundEnabled = parseBoolean(value.notificationSoundEnabled, false)
   }
+  if ('motionPreference' in value) {
+    out.motionPreference = parseMotionPreference(value.motionPreference)
+  }
+  if ('performanceHudEnabled' in value) {
+    out.performanceHudEnabled = parseBoolean(value.performanceHudEnabled, false)
+  }
+  if ('commandCenterEnabled' in value) {
+    out.commandCenterEnabled = parseBoolean(value.commandCenterEnabled, false)
+  }
+  if ('lastMainRoute' in value) {
+    out.lastMainRoute = normalizeRoute(value.lastMainRoute)
+  }
   if ('pendingRoute' in value) {
     out.pendingRoute = normalizeOptional(value.pendingRoute)
   }
@@ -159,12 +192,41 @@ function parseConnectivityMode(value: unknown): ConnectivityMode {
   return 'automatic'
 }
 
+function parseMotionPreference(value: unknown): MotionPreference {
+  if (value === 'smooth' || value === 'snappy' || value === 'off') {
+    return value
+  }
+  return 'snappy'
+}
+
 function normalizeOptional(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined
   }
   const normalized = value.trim()
   return normalized ? normalized : undefined
+}
+
+function normalizeProfile(value: unknown): string | undefined {
+  const normalized = normalizeOptional(value)
+  if (!normalized) {
+    return undefined
+  }
+  if (normalized.toLowerCase() === 'default') {
+    return undefined
+  }
+  return normalized
+}
+
+function normalizeRoute(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+  const normalized = value.trim()
+  if (!normalized.startsWith('/')) {
+    return undefined
+  }
+  return normalized
 }
 
 function parseBoolean(value: unknown, fallback: boolean): boolean {

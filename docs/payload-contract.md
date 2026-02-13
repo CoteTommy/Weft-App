@@ -1,199 +1,121 @@
-# LXMF Payload Contract (Desktop)
+# Payload Contract v2 (LXMF + Reticulum RPC)
 
-This document declares payload shapes used by Weft Desktop and the embedded `lxmf-rs` runtime.
+This file is the single contract source for desktop parity work across:
 
-## 1) Core Envelopes
+- `/Users/tommy/Documents/TAK/LXMF-rs`
+- `/Users/tommy/Documents/TAK/Reticulum-rs`
+- `/Users/tommy/Documents/TAK/Weft-Web`
 
-- `RpcRequest`
+The mirrored frontend copy is:
+
+- `/Users/tommy/Documents/TAK/Weft-Web/docs/payload-contract.md`
+
+## Version
+
+- Contract version: `v2`
+- Scope: desktop runtime only (Tauri embedded runtime, no sidecar)
+
+## Canonical Field Coverage
+
+Required LXMF field coverage for parity:
+
+| Domain | Field | Hex | JSON key form |
+| --- | --- | --- | --- |
+| telemetry | `FIELD_TELEMETRY` | `0x02` | `"2"` |
+| attachments | `FIELD_FILE_ATTACHMENTS` | `0x05` | `"5"` |
+| commands | `FIELD_COMMANDS` | `0x09` | `"9"` |
+| ticket | `FIELD_TICKET` | `0x0C` | `"12"` |
+| refs | `FIELD_RNR_REFS` | `0x0E` | `"14"` |
+| app extensions | extension map | `0x10` | `"16"` |
+
+Notes:
+
+- Integer LXMF keys must be preserved end-to-end via `_lxmf_fields_msgpack_b64`.
+- JSON key forms are expected when fields are rendered back to JSON from msgpack.
+
+## Schema Artifacts
+
+- `/Users/tommy/Documents/TAK/LXMF-rs/docs/schemas/contract-v2/payload-envelope.schema.json`
+- `/Users/tommy/Documents/TAK/LXMF-rs/docs/schemas/contract-v2/event-payload.schema.json`
+
+## Message Envelope (v2)
+
+Transport envelope key:
+
+- `_lxmf_fields_msgpack_b64`: base64 msgpack map preserving integer field IDs.
+
+App-extension conventions in field `16`:
+
+- `reply_to: string`
+- `reaction_to: string`
+- `emoji: string`
+- `sender?: string`
+
+Telemetry location conventions in field `2`:
+
+- `{ lat: number, lon: number, alt?: number, speed?: number, accuracy?: number }`
+
+## Announce Contract (backend-backed)
+
+`list_announces(limit?, before_ts?)` response:
+
 ```json
 {
-  "id": 1,
-  "method": "string",
-  "params": { "optional": "object" }
+  "announces": [
+    {
+      "id": "announce-...",
+      "peer": "hex32",
+      "timestamp": 1770855315,
+      "name": "Hub",
+      "name_source": "pn_meta",
+      "first_seen": 1770855300,
+      "seen_count": 3,
+      "app_data_hex": "hex",
+      "capabilities": ["topic_broker", "telemetry_relay"],
+      "rssi": -70.0,
+      "snr": 10.5,
+      "q": 0.91
+    }
+  ]
 }
 ```
 
-- `RpcResponse`
-```json
-{
-  "id": 1,
-  "result": {},
-  "error": null
-}
-```
+## RPC Additions (v2)
 
-- `RpcEvent`
-```json
-{
-  "event_type": "string",
-  "payload": {}
-}
-```
+- `list_announces(limit?, before_ts?)`
+- `get_outbound_propagation_node()`
+- `set_outbound_propagation_node(peer?)`
+- `list_propagation_nodes()`
+- `message_delivery_trace(message_id)`
 
-## 2) Tauri IPC Command Payloads
+## Event Payload Additions (v2)
 
-Current desktop command surface in `src-tauri`:
+- `announce_received`
+- `propagation_node_selected`
+- `receipt`
+- `outbound` (with method/error metadata)
+- `runtime_started`
+- `runtime_stopped`
 
-- `daemon_probe(profile?, rpc?) -> LxmfProbeReport`
-- `daemon_status(profile?, rpc?) -> LxmfDaemonLocalStatus`
-- `daemon_start(profile?, rpc?, managed?, reticulumd?, transport?) -> LxmfDaemonLocalStatus`
-- `daemon_stop(profile?, rpc?) -> LxmfDaemonLocalStatus`
-- `daemon_restart(profile?, rpc?, managed?, reticulumd?, transport?) -> LxmfDaemonLocalStatus`
-- `lxmf_list_messages(profile?, rpc?) -> { messages: MessageRecord[] }`
-- `lxmf_list_peers(profile?, rpc?) -> { peers: PeerRecord[] }`
-- `lxmf_send_message(...) -> { result: { message_id: string }, resolved: { source, destination } }`
-- `lxmf_announce_now(profile?, rpc?) -> { announce_id: number }`
-- `lxmf_poll_event(profile?, rpc?) -> RpcEvent | null`
+`announce_received` payload includes:
 
-## 3) Domain Record Shapes
+- `peer`, `timestamp`, `name`, `name_source`, `first_seen`, `seen_count`
+- `app_data_hex`, `capabilities`
+- optional signal fields: `rssi`, `snr`, `q`
 
-### MessageRecord
-```json
-{
-  "id": "string",
-  "source": "hex-16-byte-hash",
-  "destination": "hex-16-byte-hash",
-  "title": "string",
-  "content": "string",
-  "timestamp": 1738981163,
-  "direction": "in|out",
-  "fields": {},
-  "receipt_status": "string|null"
-}
-```
+## Delivery Trace States
 
-### PeerRecord
-```json
-{
-  "peer": "hex-16-byte-hash",
-  "last_seen": 1738981163,
-  "name": "string|null",
-  "name_source": "string|null",
-  "first_seen": 1738981140,
-  "seen_count": 3
-}
-```
+Persisted transition status strings include:
 
-### InterfaceRecord
-```json
-{
-  "type": "tcp_server|tcp_client|...",
-  "enabled": true,
-  "host": "string|null",
-  "port": 4242,
-  "name": "string|null"
-}
-```
+- `queued`
+- `sending`
+- `outbound_attempt: link`
+- `sent: link`
+- `retrying: opportunistic ...`
+- `sent: opportunistic`
+- `retrying: propagated relay ...`
+- `sent: propagated relay`
+- `delivered`
+- `failed:*`
 
-### DeliveryPolicy
-```json
-{
-  "auth_required": false,
-  "allowed_destinations": [],
-  "denied_destinations": [],
-  "ignored_destinations": [],
-  "prioritised_destinations": []
-}
-```
-
-### PropagationState
-```json
-{
-  "enabled": true,
-  "store_root": "string|null",
-  "target_cost": 0,
-  "total_ingested": 0,
-  "last_ingest_count": 0
-}
-```
-
-### StampPolicy
-```json
-{
-  "target_cost": 0,
-  "flexibility": 0
-}
-```
-
-### TicketRecord
-```json
-{
-  "destination": "hex-16-byte-hash",
-  "ticket": "hex",
-  "expires_at": 1738984763
-}
-```
-
-## 4) Event Payloads by `event_type`
-
-- `runtime_started`: `{ "profile": "string" }`
-- `runtime_stopped`: `{ "profile": "string" }`
-- `inbound`: `{ "message": MessageRecord }`
-- `outbound`: `{ "message": MessageRecord, "method": "string|null", "error?": "string" }`
-- `announce_received`: `{ "peer", "timestamp", "name", "name_source", "first_seen", "seen_count" }`
-- `announce_sent`: `{ "timestamp": number, "announce_id?": number }`
-- `interfaces_updated`: `{ "interfaces": InterfaceRecord[] }`
-- `config_reloaded`: `{ "timestamp": number }`
-- `peer_sync`: `{ "peer", "timestamp", "name", "name_source", "first_seen", "seen_count" }`
-- `peer_unpeer`: `{ "peer": "string", "removed": boolean }`
-- `receipt`: `{ "message_id": "string", "status": "string" }`
-
-## 5) Messaging Fields (`MessageRecord.fields`) for feature domains
-
-`fields` is open JSON. Weft reserves these keys:
-
-- `_lxmf`: transport options attached by daemon when sending
-  - `method`: `opportunistic|direct|propagated|paper`
-  - `stamp_cost`: number
-  - `include_ticket`: boolean
-- `attachments`: list of attachment descriptors
-  - `name`, `mime`, `size_bytes`, `sha256`, `uri`, `inline_base64`
-- `paper`: paper/document descriptor
-  - `uri`, `transient_id`, `title`, `category`, `revision`
-- `announce`: announcement descriptor
-  - `title`, `body`, `audience`, `priority`, `ttl_secs`, `posted_at`
-- `peer_snapshot`: peer summary payload for peer UI flows
-- `interface_snapshot`: interface summary payload for interface UI flows
-
-Canonical TS declarations live in:
-
-- `src/lib/lxmf-payloads.ts`
-- `src/lib/lxmf-contract.ts`
-
-## 6) RPC Methods (full daemon set)
-
-Messaging:
-- `list_messages`
-- `clear_messages`
-- `announce_now`
-- `send_message_v2`
-- `send_message`
-- `receive_message`
-- `record_receipt`
-
-Daemon/status:
-- `status`
-- `daemon_status_ex`
-
-Peers/interfaces:
-- `list_peers`
-- `peer_sync`
-- `peer_unpeer`
-- `clear_peers`
-- `list_interfaces`
-- `set_interfaces`
-- `reload_config`
-
-Policy/propagation/paper/stamp:
-- `get_delivery_policy`
-- `set_delivery_policy`
-- `propagation_status`
-- `propagation_enable`
-- `propagation_ingest`
-- `propagation_fetch`
-- `paper_ingest_uri`
-- `stamp_policy_get`
-- `stamp_policy_set`
-- `ticket_generate`
-- `clear_resources`
-- `clear_all`
+No outbound message should remain indefinitely in an ambiguous non-terminal state without subsequent retry/failure transition visibility.

@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react'
-import { paperIngestUri } from '../../../lib/lxmf-api'
-import { PageHeading } from '../../../shared/ui/PageHeading'
-import { Panel } from '../../../shared/ui/Panel'
-import { matchesQuery } from '../../../shared/utils/search'
-import { useFiles } from '../state/useFiles'
-import type { FileItem } from '../../../shared/types/files'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
+import type { FileItem } from '@shared/types/files'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
+import { matchesQuery } from '@shared/utils/search'
+import { paperIngestUri } from '@lib/lxmf-api'
+
+import { useFiles } from '../hooks/useFiles'
 
 export function FilesPage() {
   const { files, loading, error, refresh } = useFiles()
@@ -12,10 +15,23 @@ export function FilesPage() {
   const [paperUriInput, setPaperUriInput] = useState('')
   const [paperWorking, setPaperWorking] = useState(false)
   const [paperFeedback, setPaperFeedback] = useState<string | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const filteredFiles = useMemo(
-    () => files.filter((file) => matchesQuery(query, [file.name, file.kind, file.owner, file.sizeLabel])),
-    [files, query],
+    () =>
+      files.filter(file => matchesQuery(query, [file.name, file.kind, file.owner, file.sizeLabel])),
+    [files, query]
   )
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    }
+  }, [])
 
   return (
     <Panel className="flex h-full min-h-0 flex-col">
@@ -34,24 +50,27 @@ export function FilesPage() {
         }
       />
       <input
+        ref={searchInputRef}
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+        onChange={event => setQuery(event.target.value)}
+        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
         placeholder="Search files, notes, owner, or type"
       />
       <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Paper Message</p>
+        <p className="text-xs font-semibold tracking-wide text-amber-700 uppercase">
+          Paper Message
+        </p>
         <p className="mt-1 text-xs text-amber-800">
           Paste an <span className="font-mono">lxm://...</span> URI to ingest a paper message.
         </p>
         <textarea
           value={paperUriInput}
-          onChange={(event) => {
+          onChange={event => {
             setPaperUriInput(event.target.value)
             setPaperFeedback(null)
           }}
           rows={2}
-          className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none transition focus:border-amber-300"
+          className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-slate-800 transition outline-none focus:border-amber-300"
           placeholder="lxm://..."
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -67,7 +86,9 @@ export function FilesPage() {
                   }
                 } catch (clipboardError) {
                   setPaperFeedback(
-                    clipboardError instanceof Error ? clipboardError.message : String(clipboardError),
+                    clipboardError instanceof Error
+                      ? clipboardError.message
+                      : String(clipboardError)
                   )
                 }
               })()
@@ -94,7 +115,7 @@ export function FilesPage() {
                   await refresh()
                 } catch (ingestError) {
                   setPaperFeedback(
-                    ingestError instanceof Error ? ingestError.message : String(ingestError),
+                    ingestError instanceof Error ? ingestError.message : String(ingestError)
                   )
                 } finally {
                   setPaperWorking(false)
@@ -109,16 +130,20 @@ export function FilesPage() {
         {paperFeedback ? <p className="mt-2 text-xs text-slate-700">{paperFeedback}</p> : null}
       </div>
       {loading ? <p className="text-sm text-slate-500">Loading files...</p> : null}
-      {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
+      {error ? (
+        <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
+      ) : null}
       {!loading && files.length === 0 ? (
-        <p className="text-sm text-slate-500">No attachments or paper notes have been received yet.</p>
+        <p className="text-sm text-slate-500">
+          No attachments or paper notes have been received yet.
+        </p>
       ) : null}
       {!loading && files.length > 0 && filteredFiles.length === 0 ? (
         <p className="text-sm text-slate-500">No files match your search.</p>
       ) : null}
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         <ul className="space-y-2">
-          {filteredFiles.map((file) => (
+          {filteredFiles.map(file => (
             <li key={file.id}>
               <button
                 type="button"

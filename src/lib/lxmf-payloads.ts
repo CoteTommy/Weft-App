@@ -25,6 +25,17 @@ export interface LxmfAnnouncePayload {
   priority?: 'routine' | 'urgent'
   ttl_secs?: number
   posted_at?: number
+  capabilities?: string[]
+  name?: string
+  name_source?: string
+  first_seen?: number
+  seen_count?: number
+  app_data_hex?: string
+  signal?: {
+    rssi?: number
+    snr?: number
+    q?: number
+  }
 }
 
 export interface LxmfPeerSnapshotPayload {
@@ -119,41 +130,187 @@ export interface LxmfRpcEvent<TPayload = unknown> {
   payload: TPayload
 }
 
+export interface LxmfContractMeta {
+  contract_version?: string
+  profile?: string | null
+  rpc_endpoint?: string | null
+}
+
 export interface LxmfMessageListResponse {
   messages: LxmfMessageRecord[]
+  meta: LxmfContractMeta | null
 }
 
 export interface LxmfPeerListResponse {
   peers: LxmfPeerRecord[]
+  meta: LxmfContractMeta | null
 }
 
 export interface LxmfInterfaceListResponse {
   interfaces: LxmfInterfaceRecord[]
+  meta: LxmfContractMeta | null
+}
+
+export interface LxmfAnnounceRecord {
+  id: string
+  peer: string
+  timestamp: number
+  name: string | null
+  name_source: string | null
+  first_seen: number
+  seen_count: number
+  app_data_hex: string | null
+  capabilities: string[]
+  rssi: number | null
+  snr: number | null
+  q: number | null
+}
+
+export interface LxmfAnnounceListResponse {
+  announces: LxmfAnnounceRecord[]
+  next_cursor: string | null
+  meta: LxmfContractMeta | null
+}
+
+export interface LxmfInterfaceMetricsResponse {
+  total: number
+  enabled: number
+  disabled: number
+  by_type: Record<string, number>
+  interfaces: LxmfInterfaceRecord[]
+}
+
+export interface LxmfPropagationNodeRecord {
+  peer: string
+  name: string | null
+  last_seen: number
+  capabilities: string[]
+  selected: boolean
+}
+
+export interface LxmfPropagationNodeListResponse {
+  nodes: LxmfPropagationNodeRecord[]
+  meta: LxmfContractMeta | null
+}
+
+export interface LxmfOutboundPropagationNodeResponse {
+  peer: string | null
+  meta: LxmfContractMeta | null
+}
+
+export interface LxmfDeliveryTraceEntry {
+  status: string
+  timestamp: number
+  reason_code?: string
+}
+
+export interface LxmfMessageDeliveryTraceResponse {
+  message_id: string
+  transitions: LxmfDeliveryTraceEntry[]
+  meta: LxmfContractMeta | null
 }
 
 export function parseLxmfMessageList(value: unknown): LxmfMessageListResponse {
-  const root = asObject(value, 'messages')
-  const rawList = Array.isArray(root.messages)
-    ? root.messages
-    : Array.isArray(value)
-      ? value
-      : null
+  const rawList = readArrayField(value, 'messages')
   if (!rawList) {
     throw new Error('messages must be an array')
   }
   return {
     messages: rawList.map((entry, index) => parseMessageRecord(entry, `messages[${index}]`)),
+    meta: readMetaField(value, 'messages.meta'),
   }
 }
 
 export function parseLxmfPeerList(value: unknown): LxmfPeerListResponse {
-  const root = asObject(value, 'peers')
-  const rawList = Array.isArray(root.peers) ? root.peers : null
+  const rawList = readArrayField(value, 'peers')
   if (!rawList) {
     throw new Error('peers must be an array')
   }
   return {
     peers: rawList.map((entry, index) => parsePeerRecord(entry, `peers[${index}]`)),
+    meta: readMetaField(value, 'peers.meta'),
+  }
+}
+
+export function parseLxmfInterfaceList(value: unknown): LxmfInterfaceListResponse {
+  const rawList = readArrayField(value, 'interfaces')
+  if (!rawList) {
+    throw new Error('interfaces must be an array')
+  }
+  return {
+    interfaces: rawList.map((entry, index) => parseInterfaceRecord(entry, `interfaces[${index}]`)),
+    meta: readMetaField(value, 'interfaces.meta'),
+  }
+}
+
+export function parseLxmfAnnounceList(value: unknown): LxmfAnnounceListResponse {
+  const root = asObject(value, 'announces')
+  const rawList = readArrayField(root, 'announces')
+  if (!rawList) {
+    throw new Error('announces must be an array')
+  }
+  return {
+    announces: rawList.map((entry, index) => parseAnnounceRecord(entry, `announces[${index}]`)),
+    next_cursor: asNullableString(root.next_cursor, 'announces.next_cursor'),
+    meta: asNullableContractMeta(root.meta, 'announces.meta'),
+  }
+}
+
+export function parseLxmfInterfaceMetrics(value: unknown): LxmfInterfaceMetricsResponse {
+  const root = asObject(value, 'interface_metrics')
+  const interfaces = parseLxmfInterfaceList({
+    interfaces: root.interfaces,
+  }).interfaces
+  return {
+    total: asNumber(root.total, 'interface_metrics.total'),
+    enabled: asNumber(root.enabled, 'interface_metrics.enabled'),
+    disabled: asNumber(root.disabled, 'interface_metrics.disabled'),
+    by_type: asNumberMap(root.by_type, 'interface_metrics.by_type'),
+    interfaces,
+  }
+}
+
+export function parseLxmfPropagationNodeList(value: unknown): LxmfPropagationNodeListResponse {
+  const rawList = readArrayField(value, 'nodes')
+  if (!rawList) {
+    throw new Error('nodes must be an array')
+  }
+  return {
+    nodes: rawList.map((entry, index) => parsePropagationNodeRecord(entry, `nodes[${index}]`)),
+    meta: readMetaField(value, 'nodes.meta'),
+  }
+}
+
+export function parseLxmfOutboundPropagationNode(
+  value: unknown
+): LxmfOutboundPropagationNodeResponse {
+  const root = asObject(value, 'outbound_propagation_node')
+  return {
+    peer: asNullableString(root.peer, 'outbound_propagation_node.peer'),
+    meta: asNullableContractMeta(root.meta, 'outbound_propagation_node.meta'),
+  }
+}
+
+export function parseLxmfMessageDeliveryTrace(value: unknown): LxmfMessageDeliveryTraceResponse {
+  const root = asObject(value, 'message_delivery_trace')
+  const transitionsRaw = readArrayField(root, 'transitions') ?? []
+  return {
+    message_id: asString(root.message_id, 'message_delivery_trace.message_id'),
+    transitions: transitionsRaw.map((entry, index) => {
+      const trace = asObject(entry, `message_delivery_trace.transitions[${index}]`)
+      return {
+        status: asString(trace.status, `message_delivery_trace.transitions[${index}].status`),
+        timestamp: asNumber(
+          trace.timestamp,
+          `message_delivery_trace.transitions[${index}].timestamp`
+        ),
+        reason_code: asOptionalString(
+          trace.reason_code,
+          `message_delivery_trace.transitions[${index}].reason_code`
+        ),
+      }
+    }),
+    meta: asNullableContractMeta(root.meta, 'message_delivery_trace.meta'),
   }
 }
 
@@ -195,6 +352,57 @@ function parsePeerRecord(value: unknown, path: string): LxmfPeerRecord {
   }
 }
 
+function parseInterfaceRecord(value: unknown, path: string): LxmfInterfaceRecord {
+  const record = asObject(value, path)
+  return {
+    type: asString(record.type, `${path}.type`),
+    enabled: asBoolean(record.enabled, `${path}.enabled`),
+    host: asNullableString(record.host, `${path}.host`),
+    port: asNullableNumber(record.port, `${path}.port`),
+    name: asNullableString(record.name, `${path}.name`),
+  }
+}
+
+function parseAnnounceRecord(value: unknown, path: string): LxmfAnnounceRecord {
+  const record = asObject(value, path)
+  return {
+    id: asString(record.id, `${path}.id`),
+    peer: asString(record.peer, `${path}.peer`),
+    timestamp: asNumber(record.timestamp, `${path}.timestamp`),
+    name: asNullableString(record.name, `${path}.name`),
+    name_source: asNullableString(record.name_source, `${path}.name_source`),
+    first_seen: asNumber(record.first_seen, `${path}.first_seen`),
+    seen_count: asNumber(record.seen_count, `${path}.seen_count`),
+    app_data_hex: asNullableString(record.app_data_hex, `${path}.app_data_hex`),
+    capabilities: asOptionalCapabilities(record.capabilities) ?? [],
+    rssi: asNullableNumber(record.rssi, `${path}.rssi`),
+    snr: asNullableNumber(record.snr, `${path}.snr`),
+    q: asNullableNumber(record.q, `${path}.q`),
+  }
+}
+
+function parsePropagationNodeRecord(value: unknown, path: string): LxmfPropagationNodeRecord {
+  const record = asObject(value, path)
+  return {
+    peer: asString(record.peer, `${path}.peer`),
+    name: asNullableString(record.name, `${path}.name`),
+    last_seen: asNumber(record.last_seen, `${path}.last_seen`),
+    capabilities: asOptionalCapabilities(record.capabilities) ?? [],
+    selected: asBoolean(record.selected, `${path}.selected`),
+  }
+}
+
+function readArrayField(value: unknown, field: string): unknown[] | null {
+  if (Array.isArray(value)) {
+    return value
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null
+  }
+  const record = value as Record<string, unknown>
+  return Array.isArray(record[field]) ? record[field] : null
+}
+
 function asObject(value: unknown, path: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error(`${path} must be an object`)
@@ -223,9 +431,90 @@ function asNumber(value: unknown, path: string): number {
   return value
 }
 
+function asBoolean(value: unknown, path: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new Error(`${path} must be a boolean`)
+  }
+  return value
+}
+
+function asNullableNumber(value: unknown, path: string): number | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+  return asNumber(value, path)
+}
+
+function asOptionalString(value: unknown, path: string): string | undefined {
+  if (value === null || value === undefined) {
+    return undefined
+  }
+  return asString(value, path)
+}
+
+function asOptionalCapabilities(value: unknown): string[] | undefined {
+  if (value === null || value === undefined) {
+    return undefined
+  }
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>
+    if (Array.isArray(record.caps)) {
+      return asOptionalCapabilities(record.caps)
+    }
+    if (Array.isArray(record.capabilities)) {
+      return asOptionalCapabilities(record.capabilities)
+    }
+    return undefined
+  }
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+  const capabilities = value
+    .map(entry => {
+      if (typeof entry === 'string') {
+        return entry.trim()
+      }
+      if (typeof entry === 'number' || typeof entry === 'boolean') {
+        return String(entry)
+      }
+      return ''
+    })
+    .filter(entry => entry.length > 0)
+  return capabilities.length > 0 ? capabilities : undefined
+}
+
+function asNumberMap(value: unknown, path: string): Record<string, number> {
+  const record = asObject(value, path)
+  const output: Record<string, number> = {}
+  for (const [key, raw] of Object.entries(record)) {
+    output[key] = asNumber(raw, `${path}.${key}`)
+  }
+  return output
+}
+
 function asNullableObject(value: unknown, path: string): Record<string, unknown> | null {
   if (value === null || value === undefined) {
     return null
   }
   return asObject(value, path)
+}
+
+function readMetaField(value: unknown, path: string): LxmfContractMeta | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null
+  }
+  const record = value as Record<string, unknown>
+  return asNullableContractMeta(record.meta, path)
+}
+
+function asNullableContractMeta(value: unknown, path: string): LxmfContractMeta | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const record = asObject(value, path)
+  return {
+    contract_version: asOptionalString(record.contract_version, `${path}.contract_version`),
+    profile: asNullableString(record.profile, `${path}.profile`),
+    rpc_endpoint: asNullableString(record.rpc_endpoint, `${path}.rpc_endpoint`),
+  }
 }

@@ -1,0 +1,8 @@
+export const DISPLAY_NAME_UPDATED_EVENT = 'weft:display-name-updated'
+export const APP_NOTIFICATION_EVENT = 'weft:app-notification'
+export const PREFERENCES_UPDATED_EVENT = 'weft:preferences-updated'
+export const FOCUS_SEARCH_EVENT = 'weft:focus-search'
+export const FOCUS_NEW_CHAT_EVENT = 'weft:focus-new-chat'
+export const FOCUS_QUICK_REPLY_EVENT = 'weft:focus-quick-reply'
+export const OPEN_THREAD_EVENT = 'weft:open-thread'
+export const SINGLE_INSTANCE_EVENT = 'weft://single-instance'

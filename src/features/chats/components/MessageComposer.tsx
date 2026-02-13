@@ -1,16 +1,26 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
 import { Paperclip, StickyNote, X } from 'lucide-react'
+
 import type {
   OutboundAttachmentDraft,
   OutboundMessageDraft,
   OutboundSendOutcome,
-} from '../../../shared/types/chat'
+} from '@shared/types/chat'
+
+import {
+  clearComposerSession,
+  readComposerSession,
+  writeComposerSession,
+} from '../state/composerSession'
 
 interface MessageComposerProps {
   onSend?: (draft: OutboundMessageDraft) => Promise<OutboundSendOutcome> | void
+  focusToken?: number
+  sessionKey?: string
 }
 
-export function MessageComposer({ onSend }: MessageComposerProps) {
+export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageComposerProps) {
   const [text, setText] = useState('')
   const [attachments, setAttachments] = useState<OutboundAttachmentDraft[]>([])
   const [paperEnabled, setPaperEnabled] = useState(false)
@@ -23,11 +33,53 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const textInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    textInputRef.current?.focus()
+    textInputRef.current?.select()
+  }, [focusToken])
+
+  useEffect(() => {
+    const key = sessionKey?.trim()
+    if (!key) {
+      return
+    }
+    const restored = readComposerSession(key)
+    if (!restored) {
+      return
+    }
+    setText(restored.text)
+    setPaperEnabled(restored.paperEnabled)
+    setPaperTitle(restored.paperTitle)
+    setPaperCategory(restored.paperCategory)
+    setError(null)
+    setSendFeedback(null)
+  }, [sessionKey])
+
+  useEffect(() => {
+    const key = sessionKey?.trim()
+    if (!key) {
+      return
+    }
+    const hasDraft =
+      text.trim().length > 0 || paperTitle.trim().length > 0 || paperCategory.trim().length > 0
+    if (!hasDraft && !paperEnabled) {
+      clearComposerSession(key)
+      return
+    }
+    writeComposerSession(key, {
+      text,
+      paperEnabled,
+      paperTitle,
+      paperCategory,
+    })
+  }, [paperCategory, paperEnabled, paperTitle, sessionKey, text])
 
   return (
     <form
       className="rounded-2xl border border-slate-200 bg-white p-2"
-      onSubmit={(event) => {
+      onSubmit={event => {
         event.preventDefault()
         void (async () => {
           const trimmed = text.trim()
@@ -58,6 +110,9 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
             setPaperEnabled(false)
             setPaperTitle('')
             setPaperCategory('')
+            if (sessionKey?.trim()) {
+              clearComposerSession(sessionKey)
+            }
             setError(null)
             if (outcome?.paperUri) {
               setSendFeedback({
@@ -84,7 +139,7 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
         type="file"
         multiple
         className="hidden"
-        onChange={(event) => {
+        onChange={event => {
           const files = event.target.files
           if (!files || files.length === 0) {
             return
@@ -103,7 +158,7 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
                   dataBase64: await fileToBase64(file),
                 })
               }
-              setAttachments((previous) => [...previous, ...incoming])
+              setAttachments(previous => [...previous, ...incoming])
               setError(null)
               setSendFeedback(null)
             } catch (loadError) {
@@ -125,8 +180,8 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
               <button
                 type="button"
                 onClick={() =>
-                  setAttachments((previous) =>
-                    previous.filter((_, attachmentIndex) => attachmentIndex !== index),
+                  setAttachments(previous =>
+                    previous.filter((_, attachmentIndex) => attachmentIndex !== index)
                   )
                 }
                 className="rounded-full p-0.5 text-slate-500 transition hover:bg-slate-200"
@@ -142,24 +197,25 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
         <div className="mb-2 grid gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2">
           <input
             value={paperTitle}
-            onChange={(event) => setPaperTitle(event.target.value)}
-            className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs text-slate-700 outline-none transition focus:border-amber-300"
+            onChange={event => setPaperTitle(event.target.value)}
+            className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs text-slate-700 transition outline-none focus:border-amber-300"
             placeholder="Paper title (optional)"
           />
           <input
             value={paperCategory}
-            onChange={(event) => setPaperCategory(event.target.value)}
-            className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs text-slate-700 outline-none transition focus:border-amber-300"
+            onChange={event => setPaperCategory(event.target.value)}
+            className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs text-slate-700 transition outline-none focus:border-amber-300"
             placeholder="Paper category (optional)"
           />
         </div>
       ) : null}
       <div className="flex items-center gap-2">
         <input
-          className="h-11 flex-1 rounded-xl border border-transparent px-3 text-sm text-slate-800 outline-none transition focus:border-blue-200 focus:bg-blue-50/50"
+          ref={textInputRef}
+          className="h-11 flex-1 rounded-xl border border-transparent px-3 text-sm text-slate-800 transition outline-none focus:border-blue-200 focus:bg-blue-50/50"
           placeholder="Type a message..."
           value={text}
-          onChange={(event) => {
+          onChange={event => {
             setText(event.target.value)
             setSendFeedback(null)
           }}
@@ -175,7 +231,7 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
         </button>
         <button
           type="button"
-          onClick={() => setPaperEnabled((value) => !value)}
+          onClick={() => setPaperEnabled(value => !value)}
           className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100"
           aria-label="Toggle paper metadata"
           disabled={sending}

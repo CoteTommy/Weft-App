@@ -1,11 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
 import clsx from 'clsx'
-import { daemonRestart } from '../../../lib/lxmf-api'
-import { type ConnectivityMode, updateWeftPreferences } from '../../../shared/runtime/preferences'
-import { PageHeading } from '../../../shared/ui/PageHeading'
-import { Panel } from '../../../shared/ui/Panel'
-import { matchesQuery } from '../../../shared/utils/search'
-import { useInterfaces } from '../state/useInterfaces'
+
+import { type ConnectivityMode, updateWeftPreferences } from '@shared/runtime/preferences'
+import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
+import { matchesQuery } from '@shared/utils/search'
+import { daemonRestart } from '@lib/lxmf-api'
+
+import { useInterfaces } from '../hooks/useInterfaces'
 
 export function InterfacesPage() {
   const { interfaces, metrics, loading, error, refresh } = useInterfaces()
@@ -16,13 +20,25 @@ export function InterfacesPage() {
   const [wizardTransport, setWizardTransport] = useState('')
   const [applying, setApplying] = useState(false)
   const [wizardFeedback, setWizardFeedback] = useState<string | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const filteredInterfaces = useMemo(
     () =>
-      interfaces.filter((iface) =>
-        matchesQuery(query, [iface.name, iface.type, iface.address, iface.status, iface.source]),
+      interfaces.filter(iface =>
+        matchesQuery(query, [iface.name, iface.type, iface.address, iface.status, iface.source])
       ),
-    [interfaces, query],
+    [interfaces, query]
   )
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    }
+  }, [])
 
   return (
     <Panel className="flex h-full min-h-0 flex-col">
@@ -56,7 +72,7 @@ export function InterfacesPage() {
             { mode: 'local_only', label: 'Local only', transport: '127.0.0.1:0' },
             { mode: 'lan_shared', label: 'LAN shared', transport: '0.0.0.0:0' },
             { mode: 'custom', label: 'Custom', transport: '' },
-          ].map((preset) => (
+          ].map(preset => (
             <button
               key={preset.mode}
               type="button"
@@ -70,7 +86,7 @@ export function InterfacesPage() {
                 'rounded-xl border px-3 py-2 text-left text-xs font-semibold transition',
                 wizardMode === preset.mode
                   ? 'border-blue-300 bg-blue-50 text-blue-700'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
               )}
             >
               {preset.label}
@@ -80,20 +96,20 @@ export function InterfacesPage() {
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           <input
             value={wizardProfile}
-            onChange={(event) => setWizardProfile(event.target.value)}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none transition focus:border-blue-300"
+            onChange={event => setWizardProfile(event.target.value)}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 transition outline-none focus:border-blue-300"
             placeholder="Profile (default)"
           />
           <input
             value={wizardRpc}
-            onChange={(event) => setWizardRpc(event.target.value)}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none transition focus:border-blue-300"
+            onChange={event => setWizardRpc(event.target.value)}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 transition outline-none focus:border-blue-300"
             placeholder="RPC endpoint"
           />
           <input
             value={wizardTransport}
-            onChange={(event) => setWizardTransport(event.target.value)}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none transition focus:border-blue-300"
+            onChange={event => setWizardTransport(event.target.value)}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 transition outline-none focus:border-blue-300"
             placeholder="Transport bind"
           />
         </div>
@@ -124,7 +140,9 @@ export function InterfacesPage() {
                   await refresh()
                   setWizardFeedback('Profile applied and daemon restarted.')
                 } catch (applyError) {
-                  setWizardFeedback(applyError instanceof Error ? applyError.message : String(applyError))
+                  setWizardFeedback(
+                    applyError instanceof Error ? applyError.message : String(applyError)
+                  )
                 } finally {
                   setApplying(false)
                 }
@@ -138,9 +156,10 @@ export function InterfacesPage() {
         </div>
       </div>
       <input
+        ref={searchInputRef}
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+        onChange={event => setQuery(event.target.value)}
+        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
         placeholder="Search interfaces by name, type, status, or address"
       />
       {Object.keys(metrics.byType).length > 0 ? (
@@ -156,7 +175,9 @@ export function InterfacesPage() {
         </div>
       ) : null}
       {loading ? <p className="text-sm text-slate-500">Loading interfaces...</p> : null}
-      {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
+      {error ? (
+        <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
+      ) : null}
       {!loading && interfaces.length === 0 ? (
         <p className="text-sm text-slate-500">No interface data is available yet.</p>
       ) : null}
@@ -166,7 +187,7 @@ export function InterfacesPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         <ul className="space-y-2">
-          {filteredInterfaces.map((iface) => (
+          {filteredInterfaces.map(iface => (
             <li
               key={iface.id}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300 hover:bg-slate-50/70"
@@ -183,7 +204,7 @@ export function InterfacesPage() {
                     'rounded-full px-2 py-1 text-xs font-semibold',
                     iface.status === 'Enabled'
                       ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-slate-100 text-slate-700',
+                      : 'bg-slate-100 text-slate-700'
                   )}
                 >
                   {iface.status}
@@ -205,7 +226,7 @@ interface SummaryTileProps {
 function SummaryTile({ label, value }: SummaryTileProps) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{label}</p>
       <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
     </div>
   )

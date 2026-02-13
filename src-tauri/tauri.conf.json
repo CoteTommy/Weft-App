@@ -12,15 +12,76 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Weft Desktop",
         "width": 1440,
         "height": 920,
+        "minWidth": 960,
+        "minHeight": 620,
         "resizable": true,
         "fullscreen": false
       }
     ],
     "security": {
-      "csp": null
+      "freezePrototype": true,
+      "capabilities": ["default"],
+      "headers": {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "csp": {
+        "default-src": "'self'",
+        "base-uri": "'self'",
+        "form-action": "'self'",
+        "frame-ancestors": "'none'",
+        "object-src": "'none'",
+        "connect-src": ["'self'", "ipc:", "http://ipc.localhost", "https://ipc.localhost"],
+        "font-src": ["'self'", "https://fonts.gstatic.com", "data:"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "img-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost",
+          "https://asset.localhost",
+          "data:",
+          "blob:",
+          "https:"
+        ],
+        "frame-src": ["'self'", "https://www.openstreetmap.org"],
+        "worker-src": ["'self'", "blob:"],
+        "script-src": "'self'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "base-uri": "'self'",
+        "form-action": "'self'",
+        "frame-ancestors": "'none'",
+        "object-src": "'none'",
+        "connect-src": [
+          "'self'",
+          "ipc:",
+          "http://ipc.localhost",
+          "https://ipc.localhost",
+          "http://localhost:5173",
+          "http://127.0.0.1:5173",
+          "ws://localhost:5173",
+          "ws://127.0.0.1:5173"
+        ],
+        "font-src": ["'self'", "https://fonts.gstatic.com", "data:"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "img-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost",
+          "https://asset.localhost",
+          "data:",
+          "blob:",
+          "https:"
+        ],
+        "frame-src": ["'self'", "https://www.openstreetmap.org"],
+        "worker-src": ["'self'", "blob:"],
+        "script-src": ["'self'", "'unsafe-eval'"]
+      }
     }
   },
   "plugins": {
@@ -32,7 +93,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

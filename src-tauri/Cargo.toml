@@ -22,7 +22,7 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 base64 = "0.22"
 log = "0.4"
-tauri = { version = "2.10.0", features = [] }
+tauri = { version = "2.10.0", features = ["tray-icon"] }
 tauri-plugin-log = "2"
 tauri-plugin-deep-link = "2.4.7"
 tauri-plugin-single-instance = { version = "2.4.0", features = ["deep-link"] }
@@ -33,7 +33,14 @@ serde_cbor = "0.11"
 lxmf = { path = "../../LXMF-rs/crates/lxmf", package = "lxmf", features = ["cli", "embedded-runtime"] }
 
 [patch.crates-io]
-reticulum-rs = { git = "https://github.com/FreeTAKTeam/Reticulum-rs.git", rev = "960b216", package = "reticulum-rs" }
+reticulum-rs = { path = "../../Reticulum-rs/crates/reticulum", package = "reticulum-rs" }
 
 [dev-dependencies]
 tempfile = "3.17.1"
+
+[profile.release]
+opt-level = "z"
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true

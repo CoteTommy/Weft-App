@@ -8,14 +8,15 @@ import {
   useMemo,
   useState,
 } from 'react'
+
 import {
   APP_NOTIFICATION_EVENT,
-  createAppNotification,
   type AppNotification,
   type AppNotificationInput,
+  createAppNotification,
   getStoredAppNotifications,
   persistAppNotifications,
-} from '../../shared/runtime/notifications'
+} from '@shared/runtime/notifications'
 
 interface NotificationCenterState {
   notifications: AppNotification[]
@@ -29,14 +30,16 @@ interface NotificationCenterState {
 const NotificationCenterContext = createContext<NotificationCenterState | undefined>(undefined)
 
 export function NotificationCenterProvider({ children }: PropsWithChildren) {
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => getStoredAppNotifications())
+  const [notifications, setNotifications] = useState<AppNotification[]>(() =>
+    getStoredAppNotifications()
+  )
 
   const addNotification = useCallback((input: AppNotificationInput) => {
     const next = createAppNotification(input)
     if (!next) {
       return
     }
-    setNotifications((previous) => {
+    setNotifications(previous => {
       const updated = [next, ...previous].slice(0, 120)
       persistAppNotifications(updated)
       return updated
@@ -48,9 +51,9 @@ export function NotificationCenterProvider({ children }: PropsWithChildren) {
     if (!normalizedId) {
       return
     }
-    setNotifications((previous) => {
+    setNotifications(previous => {
       let changed = false
-      const updated = previous.map((notification) => {
+      const updated = previous.map(notification => {
         if (notification.id !== normalizedId || notification.read) {
           return notification
         }
@@ -68,17 +71,17 @@ export function NotificationCenterProvider({ children }: PropsWithChildren) {
   }, [])
 
   const markAllRead = useCallback(() => {
-    setNotifications((previous) => {
-      if (previous.every((notification) => notification.read)) {
+    setNotifications(previous => {
+      if (previous.every(notification => notification.read)) {
         return previous
       }
-      const updated = previous.map((notification) =>
+      const updated = previous.map(notification =>
         notification.read
           ? notification
           : {
               ...notification,
               read: true,
-            },
+            }
       )
       persistAppNotifications(updated)
       return updated
@@ -86,7 +89,7 @@ export function NotificationCenterProvider({ children }: PropsWithChildren) {
   }, [])
 
   const clearAll = useCallback(() => {
-    setNotifications((previous) => {
+    setNotifications(previous => {
       if (previous.length === 0) {
         return previous
       }
@@ -112,16 +115,23 @@ export function NotificationCenterProvider({ children }: PropsWithChildren) {
   const value = useMemo(
     () => ({
       notifications,
-      unreadCount: notifications.reduce((count, notification) => count + (notification.read ? 0 : 1), 0),
+      unreadCount: notifications.reduce(
+        (count, notification) => count + (notification.read ? 0 : 1),
+        0
+      ),
       addNotification,
       markRead,
       markAllRead,
       clearAll,
     }),
-    [addNotification, clearAll, markAllRead, markRead, notifications],
+    [addNotification, clearAll, markAllRead, markRead, notifications]
   )
 
-  return <NotificationCenterContext.Provider value={value}>{children}</NotificationCenterContext.Provider>
+  return (
+    <NotificationCenterContext.Provider value={value}>
+      {children}
+    </NotificationCenterContext.Provider>
+  )
 }
 
 export function useNotificationCenter(): NotificationCenterState {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parseLxmfProbeReport } from './lxmf-contract'
 
 describe('parseLxmfProbeReport', () => {
@@ -46,7 +47,7 @@ describe('parseLxmfProbeReport', () => {
         local: {},
         rpc: {},
         events: {},
-      }),
+      })
     ).toThrow('probe.profile must be a string')
   })
 })

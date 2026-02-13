@@ -1,30 +1,49 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { AppShell } from './layout/AppShell'
-import { WelcomePage } from '../features/welcome/pages/WelcomePage'
-import { ChatsPage } from '../features/chats/pages/ChatsPage'
-import { ChatThreadPage } from '../features/chats/pages/ChatThreadPage'
-import { ChatsStateLayout } from '../features/chats/state/ChatsProvider'
-import { PeoplePage } from '../features/people/pages/PeoplePage'
-import { FilesPage } from '../features/files/pages/FilesPage'
-import { SettingsPage } from '../features/settings/pages/SettingsPage'
-import { AnnouncesPage } from '../features/announces/pages/AnnouncesPage'
-import { InterfacesPage } from '../features/interfaces/pages/InterfacesPage'
-import { NetworkPage } from '../features/network/pages/NetworkPage'
-import { MapPage } from '../features/map/pages/MapPage'
-import { DeepLinkBridge } from './runtime/DeepLinkBridge'
-import { NotificationCenterProvider } from './state/NotificationCenterProvider'
+
+import { MotionConfig } from 'framer-motion'
+
+import { APP_ROUTES } from '@app/config/routes'
+import { AppShell } from '@app/layout/AppShell'
+import { MAIN_ROUTES, sanitizeMainRoute } from '@app/routing/mainRoutes'
+import { prefetchRouteChunks } from '@app/routing/prefetch'
+import { DeepLinkBridge } from '@app/runtime/DeepLinkBridge'
+import { transitionForMotionPreference } from '@app/runtime/motion'
+import { NotificationCenterProvider } from '@app/state/NotificationCenterProvider'
+import { RuntimeHealthProvider } from '@app/state/RuntimeHealthProvider'
+import { ChatsStateLayout } from '@features/chats/state/ChatsProvider'
 import {
+  getWeftPreferences,
   hasCompletedOnboarding,
+  type MotionPreference,
   PREFERENCES_UPDATED_EVENT,
-} from '../shared/runtime/preferences'
+} from '@shared/runtime/preferences'
+import { normalizeMainRoute } from '@shared/runtime/sessionRestore'
+
+const WelcomePage = lazy(() =>
+  import('@features/welcome/pages/WelcomePage').then(module => ({ default: module.WelcomePage }))
+)
 
 export default function App() {
+  const initialPreferences = getWeftPreferences()
   const [onboardingCompleted, setOnboardingCompleted] = useState(() => hasCompletedOnboarding())
+  const [motionPreference, setMotionPreference] = useState<MotionPreference>(
+    initialPreferences.motionPreference
+  )
+  const [commandCenterEnabled, setCommandCenterEnabled] = useState(
+    initialPreferences.commandCenterEnabled
+  )
+  const [lastMainRoute, setLastMainRoute] = useState(
+    sanitizeMainRoute(normalizeMainRoute(initialPreferences.lastMainRoute))
+  )
 
   useEffect(() => {
     const handleUpdate = () => {
+      const preferences = getWeftPreferences()
       setOnboardingCompleted(hasCompletedOnboarding())
+      setMotionPreference(preferences.motionPreference)
+      setCommandCenterEnabled(preferences.commandCenterEnabled)
+      setLastMainRoute(sanitizeMainRoute(normalizeMainRoute(preferences.lastMainRoute)))
     }
     window.addEventListener(PREFERENCES_UPDATED_EVENT, handleUpdate)
     return () => {
@@ -32,35 +51,60 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    prefetchRouteChunks(commandCenterEnabled)
+  }, [commandCenterEnabled])
+
   return (
-    <NotificationCenterProvider>
-      <DeepLinkBridge onboardingCompleted={onboardingCompleted} />
-      <Routes>
-        <Route
-          path="/welcome"
-          element={onboardingCompleted ? <Navigate to="/chats" replace /> : <WelcomePage />}
-        />
-        <Route
-          element={onboardingCompleted ? <ChatsStateLayout /> : <Navigate to="/welcome" replace />}
-        >
-          <Route element={<AppShell />}>
-            <Route index element={<Navigate to="/chats" replace />} />
-            <Route path="/chats" element={<ChatsPage />} />
-            <Route path="/chats/:chatId" element={<ChatThreadPage />} />
-            <Route path="/people" element={<PeoplePage />} />
-            <Route path="/map" element={<MapPage />} />
-            <Route path="/network" element={<NetworkPage />} />
-            <Route path="/interfaces" element={<InterfacesPage />} />
-            <Route path="/announces" element={<AnnouncesPage />} />
-            <Route path="/files" element={<FilesPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Route>
-        </Route>
-        <Route
-          path="*"
-          element={<Navigate to={onboardingCompleted ? '/chats' : '/welcome'} replace />}
-        />
-      </Routes>
-    </NotificationCenterProvider>
+    <MotionConfig
+      reducedMotion={motionPreference === 'off' ? 'always' : 'user'}
+      transition={transitionForMotionPreference(motionPreference)}
+    >
+      <RuntimeHealthProvider>
+        <NotificationCenterProvider>
+          <DeepLinkBridge onboardingCompleted={onboardingCompleted} />
+          <Suspense fallback={<AppRouteFallback />}>
+            <Routes>
+              <Route
+                path={APP_ROUTES.welcome}
+                element={
+                  onboardingCompleted ? <Navigate to={lastMainRoute} replace /> : <WelcomePage />
+                }
+              />
+              <Route
+                element={
+                  onboardingCompleted ? (
+                    <ChatsStateLayout />
+                  ) : (
+                    <Navigate to={APP_ROUTES.welcome} replace />
+                  )
+                }
+              >
+                <Route element={<AppShell />}>
+                  <Route index element={<Navigate to={lastMainRoute} replace />} />
+                  {MAIN_ROUTES.map(route => (
+                    <Route
+                      key={route.path}
+                      path={route.path}
+                      element={route.element({ commandCenterEnabled })}
+                    />
+                  ))}
+                </Route>
+              </Route>
+              <Route
+                path="*"
+                element={
+                  <Navigate to={onboardingCompleted ? lastMainRoute : APP_ROUTES.welcome} replace />
+                }
+              />
+            </Routes>
+          </Suspense>
+        </NotificationCenterProvider>
+      </RuntimeHealthProvider>
+    </MotionConfig>
   )
+}
+
+function AppRouteFallback() {
+  return <div className="p-6 text-sm text-zinc-500">Loading...</div>
 }

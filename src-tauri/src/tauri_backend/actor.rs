@@ -1,13 +1,15 @@
 use super::selector::RuntimeSelector;
 use lxmf::cli::daemon::DaemonStatus;
+use lxmf::cli::daemon::DaemonSupervisor;
 use lxmf::cli::profile::{load_reticulum_config, profile_paths, ProfileSettings};
+use lxmf::payload_fields::CommandEntry;
 use lxmf::runtime::{
     self, EventsProbeReport, RpcProbeReport, RuntimeConfig, RuntimeHandle, RuntimeProbeReport,
+    SendCommandRequest, SendMessageRequest,
 };
 use serde::Serialize;
 use serde_json::Value;
 use std::sync::mpsc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 const INFERRED_TRANSPORT_BIND: &str = "127.0.0.1:0";
 
@@ -33,6 +35,14 @@ pub(crate) enum ActorCommand {
         selector: RuntimeSelector,
         method: String,
         params: Option<Value>,
+    },
+    SendMessage {
+        selector: RuntimeSelector,
+        request: SendMessageRequest,
+    },
+    SendCommand {
+        selector: RuntimeSelector,
+        request: SendCommandRequest,
     },
     PollEvent {
         selector: RuntimeSelector,
@@ -85,39 +95,43 @@ pub(crate) fn rpc_actor_call(
     })
 }
 
-pub(crate) fn resolve_source_hash(
-    actor: &RuntimeActor,
-    selector: &RuntimeSelector,
-    source: Option<String>,
-) -> Result<String, String> {
-    if let Some(source) = super::selector::clean_arg(source) {
-        return Ok(source);
-    }
-
-    for method in ["daemon_status_ex", "status"] {
-        if let Ok(status) = rpc_actor_call(actor, selector.clone(), method, None) {
-            if let Some(hash) = source_hash_from_status(&status) {
-                return Ok(hash);
-            }
-        }
-    }
-
-    Err(
-        "source not provided and daemon did not report delivery/identity hash; pass source or start daemon"
-            .to_string(),
-    )
-}
-
 pub(crate) fn clean_required_arg(value: String, name: &str) -> Result<String, String> {
     super::selector::clean_arg(Some(value)).ok_or_else(|| format!("{name} is required"))
 }
 
-pub(crate) fn generate_message_id() -> String {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    format!("lxmf-{now}")
+pub(crate) fn parse_command_entries(
+    commands: Vec<String>,
+    commands_hex: Vec<String>,
+) -> Result<Vec<CommandEntry>, String> {
+    let mut out = Vec::new();
+
+    for value in commands {
+        let (command_id, payload) = split_command_spec(&value)?;
+        out.push(CommandEntry::from_text(command_id, payload));
+    }
+    for value in commands_hex {
+        let (command_id, payload_hex) = split_command_spec(&value)?;
+        let payload = hex::decode(payload_hex)
+            .map_err(|err| format!("invalid command hex '{value}': {err}"))?;
+        out.push(CommandEntry::from_bytes(command_id, payload));
+    }
+
+    Ok(out)
+}
+
+fn split_command_spec(value: &str) -> Result<(u8, &str), String> {
+    let (id_raw, payload_raw) = value
+        .split_once(':')
+        .ok_or_else(|| format!("invalid command '{value}', expected ID:PAYLOAD"))?;
+    let id = id_raw
+        .trim()
+        .parse::<u8>()
+        .map_err(|_| format!("invalid command id '{id_raw}' in '{value}'"))?;
+    let payload = payload_raw.trim();
+    if payload.is_empty() {
+        return Err(format!("command payload cannot be empty in '{value}'"));
+    }
+    Ok((id, payload))
 }
 
 fn runtime_worker(rx: mpsc::Receiver<ActorRequest>) {
@@ -143,9 +157,20 @@ fn runtime_worker(rx: mpsc::Receiver<ActorRequest>) {
                 selector,
                 method,
                 params,
-            } => (rpc_with_handle(&handle, &selector, &method, params), false),
+            } => (
+                rpc_with_handle(&mut handle, &selector, &method, params),
+                false,
+            ),
+            ActorCommand::SendMessage { selector, request } => (
+                send_message_with_handle(&mut handle, &selector, request),
+                false,
+            ),
+            ActorCommand::SendCommand { selector, request } => (
+                send_command_with_handle(&mut handle, &selector, request),
+                false,
+            ),
             ActorCommand::PollEvent { selector } => {
-                (poll_event_with_handle(&handle, &selector), false)
+                (poll_event_with_handle(&mut handle, &selector), false)
             }
             ActorCommand::StopAny => {
                 if let Some(current) = handle.take() {
@@ -231,6 +256,7 @@ fn start_handle(
     if let Some(current) = handle.take() {
         current.stop();
     }
+    stop_managed_profile_daemon(&selector);
 
     let runtime = runtime::start(RuntimeConfig {
         profile: selector.profile_name,
@@ -241,6 +267,32 @@ fn start_handle(
     let status = runtime.status();
     *handle = Some(runtime);
     to_json_value(&status)
+}
+
+fn stop_managed_profile_daemon(selector: &RuntimeSelector) {
+    if !selector.profile_settings.managed {
+        return;
+    }
+
+    let supervisor =
+        DaemonSupervisor::new(&selector.profile_name, selector.profile_settings.clone());
+    match supervisor.status() {
+        Ok(status) if status.running => {
+            log::warn!(
+                "stopping external reticulumd for profile={} rpc={} pid={:?} before embedded runtime start",
+                selector.profile_name,
+                selector.profile_settings.rpc,
+                status.pid
+            );
+            if let Err(err) = supervisor.stop() {
+                log::warn!("failed to stop external reticulumd before embedded start: {err}");
+            }
+        }
+        Ok(_) => {}
+        Err(err) => {
+            log::debug!("failed to inspect external reticulumd state before embedded start: {err}");
+        }
+    }
 }
 
 fn stop_handle(
@@ -254,18 +306,42 @@ fn stop_handle(
 }
 
 fn runtime_for_selector<'a>(
-    handle: &'a Option<RuntimeHandle>,
+    handle: &'a mut Option<RuntimeHandle>,
     selector: &RuntimeSelector,
 ) -> Result<&'a RuntimeHandle, String> {
-    match handle.as_ref() {
-        Some(runtime) if runtime_matches_selector(runtime, selector) => Ok(runtime),
-        Some(_) => Err("runtime is active for a different profile or rpc endpoint".to_string()),
-        None => Err("runtime not started; run daemon_start first".to_string()),
+    let requires_restart = match handle.as_ref() {
+        Some(runtime) => !runtime_matches_selector(runtime, selector),
+        None => true,
+    };
+
+    if requires_restart {
+        if let Some(current) = handle.take() {
+            current.stop();
+        }
+        stop_managed_profile_daemon(selector);
+        let (transport, _) =
+            resolve_transport_for_status(&selector.profile_name, &selector.profile_settings);
+        let runtime = runtime::start(RuntimeConfig {
+            profile: selector.profile_name.clone(),
+            rpc: Some(selector.profile_settings.rpc.clone()),
+            transport,
+        })
+        .map_err(|err| {
+            format!(
+                "failed to start runtime for profile '{}' rpc '{}': {err}",
+                selector.profile_name, selector.profile_settings.rpc
+            )
+        })?;
+        *handle = Some(runtime);
     }
+
+    handle
+        .as_ref()
+        .ok_or_else(|| "runtime unavailable after start".to_string())
 }
 
 fn rpc_with_handle(
-    handle: &Option<RuntimeHandle>,
+    handle: &mut Option<RuntimeHandle>,
     selector: &RuntimeSelector,
     method: &str,
     params: Option<Value>,
@@ -275,30 +351,42 @@ fn rpc_with_handle(
 }
 
 fn poll_event_with_handle(
-    handle: &Option<RuntimeHandle>,
+    handle: &mut Option<RuntimeHandle>,
     selector: &RuntimeSelector,
 ) -> Result<Value, String> {
     let runtime = runtime_for_selector(handle, selector)?;
     to_json_value(&runtime.poll_event())
 }
 
+fn send_message_with_handle(
+    handle: &mut Option<RuntimeHandle>,
+    selector: &RuntimeSelector,
+    request: SendMessageRequest,
+) -> Result<Value, String> {
+    let runtime = runtime_for_selector(handle, selector)?;
+    to_json_value(
+        &runtime
+            .send_message(request)
+            .map_err(|err| err.to_string())?,
+    )
+}
+
+fn send_command_with_handle(
+    handle: &mut Option<RuntimeHandle>,
+    selector: &RuntimeSelector,
+    request: SendCommandRequest,
+) -> Result<Value, String> {
+    let runtime = runtime_for_selector(handle, selector)?;
+    to_json_value(
+        &runtime
+            .send_command(request)
+            .map_err(|err| err.to_string())?,
+    )
+}
+
 fn runtime_matches_selector(runtime: &RuntimeHandle, selector: &RuntimeSelector) -> bool {
     let settings = runtime.settings();
     runtime.profile() == selector.profile_name && settings.rpc == selector.profile_settings.rpc
-}
-
-fn source_hash_from_status(value: &Value) -> Option<String> {
-    for key in ["delivery_destination_hash", "identity_hash"] {
-        if let Some(hash) = value
-            .get(key)
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|candidate| !candidate.is_empty())
-        {
-            return Some(hash.to_string());
-        }
-    }
-    None
 }
 
 fn stopped_status(selector: &RuntimeSelector) -> DaemonStatus {
@@ -345,6 +433,8 @@ mod tests {
     use super::{ActorCommand, RuntimeActor};
     use crate::tauri_backend::selector::RuntimeSelector;
     use lxmf::cli::profile::init_profile;
+    use lxmf::payload_fields::CommandEntry;
+    use lxmf::runtime::{SendCommandRequest, SendMessageRequest};
     use serde_json::json;
 
     #[test]
@@ -380,6 +470,51 @@ mod tests {
             })
             .expect("list_messages");
         assert!(messages.get("messages").is_some());
+
+        let outbound = actor
+            .request(ActorCommand::SendMessage {
+                selector: selector.clone(),
+                request: SendMessageRequest {
+                    id: Some("tauri-smoke-msg-out-1".to_string()),
+                    source: None,
+                    destination: "cccccccccccccccccccccccccccccccc".to_string(),
+                    title: "smoke".to_string(),
+                    content: "hello outbound".to_string(),
+                    fields: None,
+                    method: None,
+                    stamp_cost: None,
+                    include_ticket: false,
+                },
+            })
+            .expect("send message");
+        assert_eq!(
+            outbound.get("id").and_then(Value::as_str),
+            Some("tauri-smoke-msg-out-1")
+        );
+
+        let outbound_command = actor
+            .request(ActorCommand::SendCommand {
+                selector: selector.clone(),
+                request: SendCommandRequest {
+                    message: SendMessageRequest {
+                        id: Some("tauri-smoke-msg-cmd-1".to_string()),
+                        source: None,
+                        destination: "dddddddddddddddddddddddddddddddd".to_string(),
+                        title: String::new(),
+                        content: String::new(),
+                        fields: None,
+                        method: None,
+                        stamp_cost: None,
+                        include_ticket: false,
+                    },
+                    commands: vec![CommandEntry::from_text(1, "ping")],
+                },
+            })
+            .expect("send command");
+        assert_eq!(
+            outbound_command.get("id").and_then(Value::as_str),
+            Some("tauri-smoke-msg-cmd-1")
+        );
 
         let injected = actor
             .request(ActorCommand::Rpc {
@@ -417,6 +552,20 @@ mod tests {
                     && entry.get("direction").and_then(Value::as_str) == Some("in")
             }),
             "expected injected inbound message in list_messages"
+        );
+        assert!(
+            list.iter().any(|entry| {
+                entry.get("id").and_then(Value::as_str) == Some("tauri-smoke-msg-out-1")
+                    && entry.get("direction").and_then(Value::as_str) == Some("out")
+            }),
+            "expected typed outbound message in list_messages"
+        );
+        assert!(
+            list.iter().any(|entry| {
+                entry.get("id").and_then(Value::as_str) == Some("tauri-smoke-msg-cmd-1")
+                    && entry.get("direction").and_then(Value::as_str) == Some("out")
+            }),
+            "expected typed outbound command message in list_messages"
         );
 
         let stopped = actor

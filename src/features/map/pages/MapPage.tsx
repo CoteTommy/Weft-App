@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react'
-import { PageHeading } from '../../../shared/ui/PageHeading'
-import { Panel } from '../../../shared/ui/Panel'
-import { matchesQuery } from '../../../shared/utils/search'
-import { parseLxmfContactReference } from '../../../shared/utils/contactReference'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
+import { parseLxmfContactReference } from '@shared/utils/contactReference'
+import { matchesQuery } from '@shared/utils/search'
+
+import { useMapPoints } from '../hooks/useMapPoints'
 import { sendLocationToDestination } from '../services/mapService'
-import { useMapPoints } from '../state/useMapPoints'
 
 export function MapPage() {
   const { points, loading, error, refresh } = useMapPoints()
@@ -14,17 +17,29 @@ export function MapPage() {
   const [locationLabel, setLocationLabel] = useState('My location')
   const [shareFeedback, setShareFeedback] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const filteredPoints = useMemo(
     () =>
-      points.filter((point) =>
-        matchesQuery(query, [point.label, point.source, point.when, point.lat, point.lon]),
+      points.filter(point =>
+        matchesQuery(query, [point.label, point.source, point.when, point.lat, point.lon])
       ),
-    [points, query],
+    [points, query]
   )
   const selectedPoint = useMemo(
-    () => filteredPoints.find((point) => point.id === selectedId) ?? filteredPoints[0] ?? null,
-    [filteredPoints, selectedId],
+    () => filteredPoints.find(point => point.id === selectedId) ?? filteredPoints[0] ?? null,
+    [filteredPoints, selectedId]
   )
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    }
+  }, [])
 
   return (
     <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -44,13 +59,16 @@ export function MapPage() {
           }
         />
         <input
+          ref={searchInputRef}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+          onChange={event => setQuery(event.target.value)}
+          className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
           placeholder="Search points by label, source, or coordinates"
         />
         {loading ? <p className="text-sm text-slate-500">Loading map points...</p> : null}
-        {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
+        {error ? (
+          <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
+        ) : null}
         {!loading && points.length === 0 ? (
           <p className="text-sm text-slate-500">
             No location points found yet. Share messages with `geo:lat,lon` to populate this map.
@@ -59,7 +77,7 @@ export function MapPage() {
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           <ul className="space-y-2">
-            {filteredPoints.map((point) => (
+            {filteredPoints.map(point => (
               <li key={point.id}>
                 <button
                   type="button"
@@ -97,11 +115,11 @@ export function MapPage() {
           <iframe
             title="OpenStreetMap Preview"
             src={mapEmbedUrl(selectedPoint.lat, selectedPoint.lon)}
-            className="mb-4 min-h-[320px] w-full flex-1 rounded-2xl border border-slate-200"
+            className="mb-4 min-h-80 w-full flex-1 rounded-2xl border border-slate-200"
             loading="lazy"
           />
         ) : (
-          <div className="mb-4 flex min-h-[320px] flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
+          <div className="mb-4 flex min-h-80 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
             Map preview appears after selecting a point.
           </div>
         )}
@@ -130,7 +148,7 @@ export function MapPage() {
 
         <form
           className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
-          onSubmit={(event) => {
+          onSubmit={event => {
             event.preventDefault()
             void (async () => {
               const parsedDestination = parseLxmfContactReference(destinationInput)
@@ -161,22 +179,22 @@ export function MapPage() {
             })()
           }}
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Share your location
           </p>
           <input
             value={destinationInput}
-            onChange={(event) => {
+            onChange={event => {
               setDestinationInput(event.target.value)
               setShareFeedback(null)
             }}
-            className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+            className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
             placeholder="Destination hash or lxma:// link"
           />
           <input
             value={locationLabel}
-            onChange={(event) => setLocationLabel(event.target.value)}
-            className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+            onChange={event => setLocationLabel(event.target.value)}
+            className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
             placeholder="Location label"
           />
           <button

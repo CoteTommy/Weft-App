@@ -1,12 +1,8 @@
-import { listLxmfPeers } from '../../../lib/lxmf-api'
-import type { LxmfPeerRecord } from '../../../lib/lxmf-payloads'
-import type {
-  NetworkPeerItem,
-  NetworkPeerStatus,
-  NetworkPeerTrust,
-} from '../../../shared/types/network'
-import { shortHash } from '../../../shared/utils/identity'
-import { formatRelativeFromNow } from '../../../shared/utils/time'
+import type { NetworkPeerItem, NetworkPeerStatus, NetworkPeerTrust } from '@shared/types/network'
+import { shortHash } from '@shared/utils/identity'
+import { formatRelativeFromNow } from '@shared/utils/time'
+import { listLxmfPeers } from '@lib/lxmf-api'
+import type { LxmfPeerRecord } from '@lib/lxmf-payloads'
 
 export async function fetchNetworkPeers(): Promise<NetworkPeerItem[]> {
   const response = await listLxmfPeers()

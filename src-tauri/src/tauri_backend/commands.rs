@@ -2,16 +2,21 @@ use super::actor::{
     clean_required_arg, parse_command_entries, rpc_actor_call, ActorCommand, RuntimeActor,
 };
 use super::selector::{clean_arg, default_transport, RuntimeSelector};
+use super::{
+    current_system_appearance, DesktopShellPreferencePatch, DesktopShellState, EventPumpControl,
+    DEFAULT_EVENT_PUMP_INTERVAL_MS, TRAY_ACTION_CHANNEL,
+};
 use base64::Engine as _;
-use lxmf::constants::FIELD_FILE_ATTACHMENTS;
 use lxmf::cli::profile::{load_profile_settings, save_profile_settings};
-use lxmf::payload_fields::TRANSPORT_FIELDS_MSGPACK_B64_KEY;
+use lxmf::constants::{FIELD_FILE_ATTACHMENTS, FIELD_TELEMETRY};
+use lxmf::payload_fields::{decode_transport_fields_json, TRANSPORT_FIELDS_MSGPACK_B64_KEY};
 use lxmf::runtime::{SendCommandRequest, SendMessageRequest};
-use serde_json::{json, Value};
 use serde::Deserialize;
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
-use tauri::State;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
 pub(crate) fn daemon_probe(
@@ -126,82 +131,37 @@ pub(crate) fn lxmf_list_announces(
     actor: State<'_, RuntimeActor>,
     profile: Option<String>,
     rpc: Option<String>,
+    limit: Option<usize>,
+    before_ts: Option<i64>,
+    cursor: Option<String>,
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
-    let mut announces = Vec::new();
-
-    if let Ok(messages) = rpc_actor_call(&actor, selector.clone(), "list_messages", None) {
-        let message_list = array_from_response(messages, "messages")?;
-        for entry in message_list {
-            let Some(record) = entry.as_object() else {
-                continue;
-            };
-            let Some(fields) = record.get("fields").and_then(Value::as_object) else {
-                continue;
-            };
-            let Some(announce) = fields.get("announce").and_then(Value::as_object) else {
-                continue;
-            };
-
-            announces.push(json!({
-                "id": record.get("id").and_then(Value::as_str).unwrap_or("").to_string(),
-                "source": record.get("source").and_then(Value::as_str).unwrap_or("").to_string(),
-                "destination": record.get("destination").and_then(Value::as_str).unwrap_or("").to_string(),
-                "title": record.get("title").and_then(Value::as_str).unwrap_or("").to_string(),
-                "content": record.get("content").and_then(Value::as_str).unwrap_or("").to_string(),
-                "timestamp": record.get("timestamp").and_then(Value::as_f64).unwrap_or(0.0),
-                "announce": Value::Object(announce.clone()),
-            }));
-        }
+    let mut params = serde_json::Map::new();
+    if let Some(limit) = limit {
+        params.insert("limit".to_string(), json!(limit.clamp(1, 5000)));
     }
-
-    if let Ok(peers_response) = rpc_actor_call(&actor, selector.clone(), "list_peers", None) {
-        let peers = array_from_response(peers_response, "peers")?;
-        for peer_entry in peers {
-            let Some(peer) = peer_entry.as_object() else {
-                continue;
-            };
-            let peer_hash = peer
-                .get("peer")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .trim()
-                .to_string();
-            if peer_hash.is_empty() {
-                continue;
-            }
-            let last_seen = peer.get("last_seen").and_then(Value::as_f64).unwrap_or(0.0);
-            let seen_count = peer.get("seen_count").and_then(Value::as_u64).unwrap_or(0);
-            let peer_name = peer
-                .get("name")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .unwrap_or(peer_hash.as_str())
-                .to_string();
-            let peer_capabilities = extract_peer_capabilities(peer);
-
-            announces.push(json!({
-                "id": format!("peer-{}-{}", peer_hash, last_seen),
-                "source": peer_hash,
-                "destination": "",
-                "title": format!("Announce from {}", peer_name),
-                "content": format!("Peer seen {} time(s)", seen_count),
-                "timestamp": last_seen,
-                "announce": {
-                    "title": format!("Announce from {}", peer_name),
-                    "body": format!("Last seen at {}", last_seen),
-                    "audience": "local",
-                    "priority": "routine",
-                    "posted_at": last_seen,
-                    "capabilities": peer_capabilities,
-                },
-            }));
-        }
+    if let Some(before_ts) = before_ts {
+        params.insert("before_ts".to_string(), json!(before_ts));
     }
+    if let Some(cursor) = clean_arg(cursor) {
+        params.insert("cursor".to_string(), json!(cursor));
+    }
+    let response = rpc_actor_call(
+        &actor,
+        selector,
+        "list_announces",
+        if params.is_empty() {
+            None
+        } else {
+            Some(Value::Object(params))
+        },
+    )?;
+    let announces = array_from_response(&response, "announces")?;
 
     Ok(json!({
         "announces": announces,
+        "next_cursor": response.get("next_cursor").cloned().unwrap_or(Value::Null),
+        "meta": response.get("meta").cloned().unwrap_or(Value::Null),
     }))
 }
 
@@ -213,7 +173,7 @@ pub(crate) fn lxmf_interface_metrics(
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
     let response = rpc_actor_call(&actor, selector, "list_interfaces", None)?;
-    let interfaces = array_from_response(response, "interfaces")?;
+    let interfaces = array_from_response(&response, "interfaces")?;
 
     let mut enabled = 0usize;
     let mut by_type: BTreeMap<String, usize> = BTreeMap::new();
@@ -237,6 +197,63 @@ pub(crate) fn lxmf_interface_metrics(
         "by_type": by_type,
         "interfaces": interfaces,
     }))
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_list_propagation_nodes(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(&actor, selector, "list_propagation_nodes", None)
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_get_outbound_propagation_node(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(&actor, selector, "get_outbound_propagation_node", None)
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_set_outbound_propagation_node(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    peer: Option<String>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "set_outbound_propagation_node",
+        Some(json!({
+            "peer": clean_arg(peer),
+        })),
+    )
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_message_delivery_trace(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    message_id: String,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    let message_id = clean_required_arg(message_id, "message_id")?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "message_delivery_trace",
+        Some(json!({
+            "message_id": message_id
+        })),
+    )
 }
 
 #[tauri::command]
@@ -279,6 +296,34 @@ pub(crate) fn lxmf_poll_event(
 }
 
 #[tauri::command]
+pub(crate) fn lxmf_start_event_pump(
+    app: AppHandle,
+    actor: State<'_, RuntimeActor>,
+    event_pump: State<'_, EventPumpControl>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    interval_ms: Option<u64>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    let interval_ms = interval_ms.unwrap_or(DEFAULT_EVENT_PUMP_INTERVAL_MS);
+    event_pump.start(app, actor.inner().clone(), selector, interval_ms)?;
+    Ok(json!({
+        "running": true,
+        "interval_ms": interval_ms.clamp(100, 5_000),
+    }))
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_stop_event_pump(
+    event_pump: State<'_, EventPumpControl>,
+) -> Result<Value, String> {
+    event_pump.stop();
+    Ok(json!({
+        "running": false
+    }))
+}
+
+#[tauri::command]
 pub(crate) fn lxmf_get_profile(
     profile: Option<String>,
     rpc: Option<String>,
@@ -313,6 +358,60 @@ pub(crate) fn lxmf_set_display_name(
 }
 
 #[tauri::command]
+pub(crate) fn desktop_get_shell_preferences(
+    app: AppHandle,
+    desktop_shell: State<'_, DesktopShellState>,
+) -> Result<Value, String> {
+    let prefs = desktop_shell.snapshot();
+    Ok(json!({
+        "minimize_to_tray_on_close": prefs.minimize_to_tray_on_close,
+        "start_in_tray": prefs.start_in_tray,
+        "single_instance_focus": prefs.single_instance_focus,
+        "notifications_muted": prefs.notifications_muted,
+        "platform": std::env::consts::OS,
+        "appearance": current_system_appearance(&app),
+    }))
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn desktop_set_shell_preferences(
+    app: AppHandle,
+    desktop_shell: State<'_, DesktopShellState>,
+    minimize_to_tray_on_close: Option<bool>,
+    start_in_tray: Option<bool>,
+    single_instance_focus: Option<bool>,
+    notifications_muted: Option<bool>,
+) -> Result<Value, String> {
+    let next = desktop_shell.apply_patch(
+        &app,
+        DesktopShellPreferencePatch {
+            minimize_to_tray_on_close,
+            start_in_tray,
+            single_instance_focus,
+            notifications_muted,
+        },
+    )?;
+    if notifications_muted.is_some() {
+        let _ = app.emit(
+            TRAY_ACTION_CHANNEL,
+            json!({
+                "action": "notifications_muted",
+                "muted": next.notifications_muted,
+            }),
+        );
+    }
+    Ok(json!({
+        "minimize_to_tray_on_close": next.minimize_to_tray_on_close,
+        "start_in_tray": next.start_in_tray,
+        "single_instance_focus": next.single_instance_focus,
+        "notifications_muted": next.notifications_muted,
+        "platform": std::env::consts::OS,
+        "appearance": current_system_appearance(&app),
+    }))
+}
+
+#[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lxmf_send_message(
     actor: State<'_, RuntimeActor>,
@@ -327,10 +426,23 @@ pub(crate) fn lxmf_send_message(
     method: Option<String>,
     stamp_cost: Option<u32>,
     include_ticket: Option<bool>,
+    reply_to: Option<String>,
+    reaction_to: Option<String>,
+    reaction_emoji: Option<String>,
+    reaction_sender: Option<String>,
+    telemetry_location: Option<Value>,
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
     let destination = clean_required_arg(destination, "destination")?;
     let content = clean_required_arg(content, "content")?;
+    let fields = merge_send_fields(
+        fields,
+        reply_to,
+        reaction_to,
+        reaction_emoji,
+        reaction_sender,
+        telemetry_location,
+    )?;
     let request = SendMessageRequest {
         id: clean_arg(id),
         source: clean_arg(source),
@@ -389,11 +501,23 @@ pub(crate) fn lxmf_send_rich_message(
     method: Option<String>,
     stamp_cost: Option<u32>,
     include_ticket: Option<bool>,
+    reply_to: Option<String>,
+    reaction_to: Option<String>,
+    reaction_emoji: Option<String>,
+    reaction_sender: Option<String>,
+    telemetry_location: Option<Value>,
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
     let destination = clean_required_arg(destination, "destination")?;
     let content = clean_required_arg(content, "content")?;
-    let fields = build_attachment_fields(attachments.as_deref().unwrap_or_default())?;
+    let fields = merge_send_fields(
+        build_attachment_fields(attachments.as_deref().unwrap_or_default())?,
+        reply_to,
+        reaction_to,
+        reaction_emoji,
+        reaction_sender,
+        telemetry_location,
+    )?;
     let request = SendMessageRequest {
         id: clean_arg(id),
         source: clean_arg(source),
@@ -491,7 +615,7 @@ pub(crate) fn lxmf_send_command(
     }))
 }
 
-fn array_from_response(value: Value, field: &str) -> Result<Vec<Value>, String> {
+fn array_from_response(value: &Value, field: &str) -> Result<Vec<Value>, String> {
     if let Some(array) = value.as_array() {
         return Ok(array.clone());
     }
@@ -505,6 +629,7 @@ fn array_from_response(value: Value, field: &str) -> Result<Vec<Value>, String> 
     Ok(array.clone())
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn extract_peer_capabilities(peer: &serde_json::Map<String, Value>) -> Vec<String> {
     for key in ["capabilities", "caps", "announce_capabilities"] {
         if let Some(caps) = extract_capabilities_from_json(peer.get(key)) {
@@ -512,7 +637,12 @@ fn extract_peer_capabilities(peer: &serde_json::Map<String, Value>) -> Vec<Strin
         }
     }
 
-    for key in ["app_data_hex", "announce_app_data_hex", "app_data", "announce_app_data"] {
+    for key in [
+        "app_data_hex",
+        "announce_app_data_hex",
+        "app_data",
+        "announce_app_data",
+    ] {
         let Some(raw) = peer.get(key) else {
             continue;
         };
@@ -527,6 +657,7 @@ fn extract_peer_capabilities(peer: &serde_json::Map<String, Value>) -> Vec<Strin
     Vec::new()
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn extract_capabilities_from_json(value: Option<&Value>) -> Option<Vec<String>> {
     let value = value?;
     if let Some(array) = value.as_array() {
@@ -548,6 +679,7 @@ fn extract_capabilities_from_json(value: Option<&Value>) -> Option<Vec<String>> 
     None
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn extract_bytes(value: &Value) -> Option<Vec<u8>> {
     if let Some(text) = value.as_str() {
         let trimmed = text.trim();
@@ -584,6 +716,7 @@ fn extract_bytes(value: &Value) -> Option<Vec<u8>> {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn decode_capabilities_from_announce_app_data(app_data: &[u8]) -> Option<Vec<String>> {
     let mut cursor = Cursor::new(app_data);
     let value = rmpv::decode::read_value(&mut cursor).ok()?;
@@ -597,6 +730,7 @@ fn decode_capabilities_from_announce_app_data(app_data: &[u8]) -> Option<Vec<Str
     decode_capabilities_from_app_data_entry(&entries[2])
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn decode_capabilities_from_app_data_entry(entry: &rmpv::Value) -> Option<Vec<String>> {
     match entry {
         rmpv::Value::Map(map) => decode_capabilities_from_map_entry(map),
@@ -621,6 +755,7 @@ fn decode_capabilities_from_app_data_entry(entry: &rmpv::Value) -> Option<Vec<St
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn decode_capabilities_from_map_entry(map: &[(rmpv::Value, rmpv::Value)]) -> Option<Vec<String>> {
     for (key, value) in map {
         let Some(key_name) = key.as_str() else {
@@ -644,6 +779,7 @@ fn decode_capabilities_from_map_entry(map: &[(rmpv::Value, rmpv::Value)]) -> Opt
     None
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn rmpv_array_to_bytes(values: &[rmpv::Value]) -> Option<Vec<u8>> {
     let mut bytes = Vec::with_capacity(values.len());
     for value in values {
@@ -656,6 +792,7 @@ fn rmpv_array_to_bytes(values: &[rmpv::Value]) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn decode_capabilities_from_payload(raw: &[u8]) -> Option<Vec<String>> {
     if raw.is_empty() {
         return None;
@@ -676,6 +813,7 @@ fn decode_capabilities_from_payload(raw: &[u8]) -> Option<Vec<String>> {
     None
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn normalize_capabilities_iter<'a>(values: impl Iterator<Item = &'a str>) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
@@ -689,20 +827,190 @@ fn normalize_capabilities_iter<'a>(values: impl Iterator<Item = &'a str>) -> Vec
     out
 }
 
+const FIELD_APP_EXTENSIONS: u8 = 0x10;
+
+#[allow(clippy::too_many_arguments)]
+fn merge_send_fields(
+    fields: Option<Value>,
+    reply_to: Option<String>,
+    reaction_to: Option<String>,
+    reaction_emoji: Option<String>,
+    reaction_sender: Option<String>,
+    telemetry_location: Option<Value>,
+) -> Result<Option<Value>, String> {
+    let app_extensions =
+        build_app_extensions_value(reply_to, reaction_to, reaction_emoji, reaction_sender)?;
+    let telemetry = build_telemetry_value(telemetry_location)?;
+    if app_extensions.is_none() && telemetry.is_none() {
+        return Ok(fields);
+    }
+
+    let mut map_entries = if let Some(existing) = fields.as_ref() {
+        decode_or_convert_field_map(existing)?
+    } else {
+        Vec::new()
+    };
+
+    if let Some(extensions) = app_extensions {
+        upsert_numeric_field(&mut map_entries, FIELD_APP_EXTENSIONS, extensions);
+    }
+    if let Some(telemetry) = telemetry {
+        upsert_numeric_field(&mut map_entries, FIELD_TELEMETRY, telemetry);
+    }
+
+    let encoded = rmp_serde::to_vec(&rmpv::Value::Map(map_entries))
+        .map_err(|err| format!("failed to encode message fields: {err}"))?;
+    let payload = base64::engine::general_purpose::STANDARD.encode(encoded);
+    Ok(Some(json!({
+        TRANSPORT_FIELDS_MSGPACK_B64_KEY: payload
+    })))
+}
+
+fn build_app_extensions_value(
+    reply_to: Option<String>,
+    reaction_to: Option<String>,
+    reaction_emoji: Option<String>,
+    reaction_sender: Option<String>,
+) -> Result<Option<rmpv::Value>, String> {
+    let reply_to = clean_arg(reply_to);
+    let reaction_to = clean_arg(reaction_to);
+    let reaction_emoji = clean_arg(reaction_emoji);
+    let reaction_sender = clean_arg(reaction_sender);
+
+    if reaction_to.is_some() != reaction_emoji.is_some() {
+        return Err("reaction metadata requires both reaction_to and reaction_emoji".to_string());
+    }
+    if reply_to.is_none() && reaction_to.is_none() {
+        return Ok(None);
+    }
+
+    let mut entries = Vec::new();
+    if let Some(reply_to) = reply_to {
+        entries.push((
+            rmpv::Value::String("reply_to".into()),
+            rmpv::Value::String(reply_to.into()),
+        ));
+    }
+    if let (Some(reaction_to), Some(reaction_emoji)) = (reaction_to, reaction_emoji) {
+        entries.push((
+            rmpv::Value::String("reaction_to".into()),
+            rmpv::Value::String(reaction_to.into()),
+        ));
+        entries.push((
+            rmpv::Value::String("emoji".into()),
+            rmpv::Value::String(reaction_emoji.into()),
+        ));
+        if let Some(sender) = reaction_sender {
+            entries.push((
+                rmpv::Value::String("sender".into()),
+                rmpv::Value::String(sender.into()),
+            ));
+        }
+    }
+
+    Ok(Some(rmpv::Value::Map(entries)))
+}
+
+fn build_telemetry_value(telemetry_location: Option<Value>) -> Result<Option<rmpv::Value>, String> {
+    let Some(telemetry_location) = telemetry_location else {
+        return Ok(None);
+    };
+    let object = telemetry_location
+        .as_object()
+        .ok_or_else(|| "telemetry_location must be an object".to_string())?;
+    let lat = read_finite_number(object, &["lat", "latitude"])
+        .ok_or_else(|| "telemetry_location.lat is required".to_string())?;
+    let lon = read_finite_number(object, &["lon", "lng", "longitude"])
+        .ok_or_else(|| "telemetry_location.lon is required".to_string())?;
+    let alt = read_finite_number(object, &["alt", "altitude"]).unwrap_or(0.0);
+    let speed = read_finite_number(object, &["speed"]).unwrap_or(0.0);
+    let bearing = read_finite_number(object, &["bearing", "heading"]).unwrap_or(0.0);
+    let accuracy = read_finite_number(object, &["accuracy"]).unwrap_or(0.0);
+    let updated = read_finite_number(object, &["updated", "last_update", "timestamp"])
+        .map(|value| value.round() as i64)
+        .unwrap_or_else(|| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_secs() as i64)
+                .unwrap_or(0)
+        });
+
+    let packed =
+        pack_sideband_location_telemetry(lat, lon, alt, speed, bearing, accuracy, updated)?;
+    Ok(Some(rmpv::Value::Binary(packed)))
+}
+
+fn read_finite_number(object: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<f64> {
+    for key in keys {
+        if let Some(number) = object
+            .get(*key)
+            .and_then(Value::as_f64)
+            .filter(|value| value.is_finite())
+        {
+            return Some(number);
+        }
+    }
+    None
+}
+
+fn decode_or_convert_field_map(value: &Value) -> Result<Vec<(rmpv::Value, rmpv::Value)>, String> {
+    if let Some(raw) = decode_transport_fields_json(value)
+        .map_err(|err| format!("failed to decode {TRANSPORT_FIELDS_MSGPACK_B64_KEY}: {err}"))?
+    {
+        let map = raw
+            .as_map()
+            .ok_or_else(|| "decoded transport fields must be a msgpack map".to_string())?;
+        return Ok(map.clone());
+    }
+
+    let encoded = rmp_serde::to_vec(value)
+        .map_err(|err| format!("failed to encode fields as msgpack: {err}"))?;
+    let mut cursor = Cursor::new(encoded);
+    let decoded = rmpv::decode::read_value(&mut cursor)
+        .map_err(|err| format!("failed to decode fields msgpack value: {err}"))?;
+    let map = decoded
+        .as_map()
+        .ok_or_else(|| "fields must be an object/map".to_string())?;
+    Ok(map.clone())
+}
+
+fn upsert_numeric_field(
+    entries: &mut Vec<(rmpv::Value, rmpv::Value)>,
+    field_id: u8,
+    value: rmpv::Value,
+) {
+    entries.retain(|(key, _)| !field_key_matches(key, field_id));
+    entries.push((rmpv::Value::Integer((field_id as i64).into()), value));
+}
+
+fn field_key_matches(key: &rmpv::Value, field_id: u8) -> bool {
+    key.as_i64() == Some(field_id as i64)
+        || key.as_u64() == Some(field_id as u64)
+        || key
+            .as_str()
+            .map(|value| value.trim() == field_id.to_string())
+            .unwrap_or(false)
+}
+
 fn build_attachment_fields(attachments: &[RichAttachmentInput]) -> Result<Option<Value>, String> {
     if attachments.is_empty() {
         return Ok(None);
     }
     let mut encoded_attachments = Vec::with_capacity(attachments.len());
     for (index, attachment) in attachments.iter().enumerate() {
-        let name = clean_required_arg(attachment.name.clone(), &format!("attachments[{index}].name"))?;
+        let name = clean_required_arg(
+            attachment.name.clone(),
+            &format!("attachments[{index}].name"),
+        )?;
         let bytes = decode_attachment_bytes(&attachment.data_base64)
             .map_err(|err| format!("attachments[{index}].data_base64 {err}"))?;
         if bytes.is_empty() {
-            return Err(format!("attachments[{index}].data_base64 must not be empty"));
+            return Err(format!(
+                "attachments[{index}].data_base64 must not be empty"
+            ));
         }
         encoded_attachments.push(rmpv::Value::Array(vec![
-            rmpv::Value::Binary(name.into_bytes()),
+            rmpv::Value::String(name.into()),
             rmpv::Value::Binary(bytes),
         ]));
     }
@@ -711,12 +1019,60 @@ fn build_attachment_fields(attachments: &[RichAttachmentInput]) -> Result<Option
         rmpv::Value::Integer((FIELD_FILE_ATTACHMENTS as i64).into()),
         rmpv::Value::Array(encoded_attachments),
     )]);
-    let encoded =
-        rmp_serde::to_vec(&fields_map).map_err(|err| format!("failed to encode attachment fields: {err}"))?;
+    let encoded = rmp_serde::to_vec(&fields_map)
+        .map_err(|err| format!("failed to encode attachment fields: {err}"))?;
     let payload = base64::engine::general_purpose::STANDARD.encode(encoded);
     Ok(Some(json!({
         TRANSPORT_FIELDS_MSGPACK_B64_KEY: payload
     })))
+}
+
+fn pack_sideband_location_telemetry(
+    lat: f64,
+    lon: f64,
+    alt: f64,
+    speed: f64,
+    bearing: f64,
+    accuracy: f64,
+    updated: i64,
+) -> Result<Vec<u8>, String> {
+    const SID_TIME: u8 = 0x01;
+    const SID_LOCATION: u8 = 0x02;
+
+    let lat_raw = ((lat.clamp(-90.0, 90.0) * 1e6).round() as i32)
+        .to_be_bytes()
+        .to_vec();
+    let lon_raw = ((lon.clamp(-180.0, 180.0) * 1e6).round() as i32)
+        .to_be_bytes()
+        .to_vec();
+    let alt_raw = ((alt * 1e2).round() as i32).to_be_bytes().to_vec();
+    let speed_raw = ((speed.max(0.0) * 1e2).round() as u32)
+        .to_be_bytes()
+        .to_vec();
+    let bearing_raw = ((bearing * 1e2).round() as i32).to_be_bytes().to_vec();
+    let accuracy_raw = ((accuracy.max(0.0) * 1e2).round() as u16)
+        .to_be_bytes()
+        .to_vec();
+
+    let payload = rmpv::Value::Map(vec![
+        (
+            rmpv::Value::Integer((SID_TIME as i64).into()),
+            rmpv::Value::Integer(updated.into()),
+        ),
+        (
+            rmpv::Value::Integer((SID_LOCATION as i64).into()),
+            rmpv::Value::Array(vec![
+                rmpv::Value::Binary(lat_raw),
+                rmpv::Value::Binary(lon_raw),
+                rmpv::Value::Binary(alt_raw),
+                rmpv::Value::Binary(speed_raw),
+                rmpv::Value::Binary(bearing_raw),
+                rmpv::Value::Binary(accuracy_raw),
+                rmpv::Value::Integer(updated.into()),
+            ]),
+        ),
+    ]);
+    rmp_serde::to_vec(&payload).map_err(|err| format!("failed to encode telemetry payload: {err}"))
 }
 
 fn decode_attachment_bytes(value: &str) -> Result<Vec<u8>, String> {
@@ -742,9 +1098,8 @@ mod tests {
             "caps": ["topic_broker", "attachments"],
         }))
         .expect("encode capability payload");
-        let announce_app_data =
-            rmp_serde::to_vec(&(b"RCH".to_vec(), 1u32, capability_payload))
-                .expect("encode announce app-data");
+        let announce_app_data = rmp_serde::to_vec(&(b"RCH".to_vec(), 1u32, capability_payload))
+            .expect("encode announce app-data");
 
         let caps = decode_capabilities_from_announce_app_data(&announce_app_data)
             .expect("decode caps from app-data");
@@ -759,9 +1114,8 @@ mod tests {
             "caps": ["telemetry_relay", "attachments"],
         }))
         .expect("encode cbor capability payload");
-        let announce_app_data =
-            rmp_serde::to_vec(&(b"RCH".to_vec(), 1u32, capability_payload))
-                .expect("encode announce app-data");
+        let announce_app_data = rmp_serde::to_vec(&(b"RCH".to_vec(), 1u32, capability_payload))
+            .expect("encode announce app-data");
 
         let caps = decode_capabilities_from_announce_app_data(&announce_app_data)
             .expect("decode caps from app-data");
@@ -776,9 +1130,8 @@ mod tests {
             "caps": ["group_chat"],
         }))
         .expect("encode capability payload");
-        let announce_app_data =
-            rmp_serde::to_vec(&(b"RCH".to_vec(), 1u32, capability_payload))
-                .expect("encode announce app-data");
+        let announce_app_data = rmp_serde::to_vec(&(b"RCH".to_vec(), 1u32, capability_payload))
+            .expect("encode announce app-data");
 
         let mut peer = serde_json::Map::new();
         peer.insert("peer".into(), Value::String("abc123".into()));
@@ -810,5 +1163,79 @@ mod tests {
         assert_eq!(map[0].0.as_i64(), Some(FIELD_FILE_ATTACHMENTS as i64));
         let entries = map[0].1.as_array().expect("attachment array");
         assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries[0].as_array().and_then(|entry| entry[0].as_str()),
+            Some("hello.txt")
+        );
+    }
+
+    #[test]
+    fn build_telemetry_value_encodes_sideband_telemeter_payload() {
+        let telemetry = build_telemetry_value(Some(json!({
+            "lat": 48.8566,
+            "lon": 2.3522,
+            "alt": 35.5,
+            "speed": 4.2,
+            "bearing": 180.0,
+            "accuracy": 3.4,
+            "updated": 1_770_855_315,
+        })))
+        .expect("telemetry value")
+        .expect("some telemetry");
+
+        let bytes = match &telemetry {
+            rmpv::Value::Binary(bytes) => bytes.as_slice(),
+            other => panic!("expected binary telemetry, got {other:?}"),
+        };
+        let decoded: rmpv::Value = rmp_serde::from_slice(bytes).expect("decode packed telemetry");
+        let map = decoded.as_map().expect("map");
+        assert!(map.iter().any(|(key, _)| key.as_i64() == Some(0x01)));
+        let location = map
+            .iter()
+            .find(|(key, _)| key.as_i64() == Some(0x02))
+            .and_then(|(_, value)| value.as_array())
+            .expect("location sensor");
+        assert_eq!(location.len(), 7);
+    }
+
+    #[test]
+    fn merge_send_fields_keeps_attachments_and_adds_extensions_and_telemetry() {
+        let attachment_fields = build_attachment_fields(&[RichAttachmentInput {
+            name: "hello.txt".to_string(),
+            data_base64: base64::engine::general_purpose::STANDARD.encode(b"hello world"),
+            mime: Some("text/plain".to_string()),
+            size_bytes: Some(11),
+        }])
+        .expect("build fields");
+
+        let merged = merge_send_fields(
+            attachment_fields,
+            Some("reply-123".to_string()),
+            Some("target-456".to_string()),
+            Some("👍".to_string()),
+            Some("alice".to_string()),
+            Some(json!({
+                "lat": 48.8566,
+                "lon": 2.3522,
+                "accuracy": 4.5,
+            })),
+        )
+        .expect("merge fields")
+        .expect("merged fields");
+
+        let decoded = lxmf::payload_fields::decode_transport_fields_json(&merged)
+            .expect("decode transport")
+            .expect("msgpack map");
+        let map = decoded.as_map().expect("map");
+
+        assert!(map
+            .iter()
+            .any(|(key, _)| key.as_i64() == Some(FIELD_FILE_ATTACHMENTS as i64)));
+        assert!(map
+            .iter()
+            .any(|(key, _)| key.as_i64() == Some(FIELD_APP_EXTENSIONS as i64)));
+        assert!(map
+            .iter()
+            .any(|(key, _)| key.as_i64() == Some(FIELD_TELEMETRY as i64)));
     }
 }

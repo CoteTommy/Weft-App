@@ -15,11 +15,28 @@ export interface ChatMessage {
   author: string
   sender: 'self' | 'peer'
   body: string
+  kind?: 'message' | 'reaction' | 'location' | 'command'
+  replyToId?: string
+  reaction?: {
+    to: string
+    emoji: string
+    sender?: string
+  }
+  location?: {
+    lat: number
+    lon: number
+  }
   attachments: ChatAttachment[]
   paper?: ChatPaperMeta
   sentAt: string
   status?: 'sending' | 'sent' | 'delivered' | 'failed'
   statusDetail?: string
+  statusReasonCode?: string
+  deliveryTrace?: Array<{
+    status: string
+    timestamp: number
+    reasonCode?: string
+  }>
 }
 
 export interface ChatThread {
@@ -31,6 +48,7 @@ export interface ChatThread {
   pinned: boolean
   muted: boolean
   lastActivity: string
+  lastActivityAtMs: number
   messages: ChatMessage[]
 }
 
@@ -55,4 +73,5 @@ export interface OutboundMessageDraft {
 export interface OutboundSendOutcome {
   paperUri?: string
   backendStatus?: string
+  messageId?: string
 }
