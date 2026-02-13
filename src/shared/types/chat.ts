@@ -31,6 +31,7 @@ export interface ChatMessage {
   sentAt: string
   status?: 'sending' | 'sent' | 'delivered' | 'failed'
   statusDetail?: string
+  statusReasonCode?: string
   deliveryTrace?: Array<{
     status: string
     timestamp: number

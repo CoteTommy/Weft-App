@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
+  Activity,
   Bell,
   BellRing,
   CheckCheck,
@@ -11,17 +12,47 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react'
-import { daemonStart, probeLxmf } from '../../lib/lxmf-api'
+import {
+  daemonStart,
+  daemonStatus,
+  getLxmfOutboundPropagationNode,
+  getLxmfProfile,
+  listLxmfInterfaces,
+  listLxmfPropagationNodes,
+  probeLxmf,
+  type LxmfProfileInfo,
+} from '../../lib/lxmf-api'
+import type { LxmfDaemonLocalStatus, LxmfProbeReport } from '../../lib/lxmf-contract'
+import type {
+  LxmfInterfaceListResponse,
+  LxmfOutboundPropagationNodeResponse,
+  LxmfPropagationNodeListResponse,
+} from '../../lib/lxmf-payloads'
 import { publishAppNotification } from '../../shared/runtime/notifications'
 import { formatRelativeFromNow } from '../../shared/utils/time'
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
+
+interface DiagnosticsSnapshot {
+  capturedAtMs: number
+  status: LxmfDaemonLocalStatus
+  probe: LxmfProbeReport
+  profile: LxmfProfileInfo | null
+  outboundNode: LxmfOutboundPropagationNodeResponse
+  propagationNodes: LxmfPropagationNodeListResponse
+  interfaces: LxmfInterfaceListResponse
+}
 
 export function TopBar() {
   const [probing, setProbing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false)
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
+  const [diagnosticsSnapshot, setDiagnosticsSnapshot] = useState<DiagnosticsSnapshot | null>(null)
   const notificationMenuRef = useRef<HTMLDivElement | null>(null)
+  const diagnosticsRef = useRef<HTMLDivElement | null>(null)
   const hasProbedRef = useRef(false)
   const previousConnectedRef = useRef<boolean | null>(null)
   const { notifications, unreadCount, markRead, markAllRead, clearAll } = useNotificationCenter()
@@ -62,6 +93,34 @@ export function TopBar() {
     }
   }, [rememberConnectivity])
 
+  const loadDiagnostics = useCallback(async () => {
+    try {
+      setDiagnosticsLoading(true)
+      setDiagnosticsError(null)
+      const [status, probe, profile, outboundNode, propagationNodes, interfaces] = await Promise.all([
+        daemonStatus(),
+        probeLxmf(),
+        getLxmfProfile().catch(() => null),
+        getLxmfOutboundPropagationNode().catch(() => ({ peer: null })),
+        listLxmfPropagationNodes().catch(() => ({ nodes: [] })),
+        listLxmfInterfaces().catch(() => ({ interfaces: [] })),
+      ])
+      setDiagnosticsSnapshot({
+        capturedAtMs: Date.now(),
+        status,
+        probe,
+        profile,
+        outboundNode,
+        propagationNodes,
+        interfaces,
+      })
+    } catch (loadError) {
+      setDiagnosticsError(loadError instanceof Error ? loadError.message : String(loadError))
+    } finally {
+      setDiagnosticsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void refresh()
     const interval = window.setInterval(() => {
@@ -83,17 +142,24 @@ export function TopBar() {
   const recentNotifications = useMemo(() => notifications.slice(0, 40), [notifications])
 
   useEffect(() => {
-    if (!notificationMenuOpen) {
+    if (!notificationMenuOpen && !diagnosticsOpen) {
       return
     }
     const onPointerDown = (event: MouseEvent) => {
-      if (!notificationMenuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node
+      const inNotifications = notificationMenuRef.current?.contains(target)
+      const inDiagnostics = diagnosticsRef.current?.contains(target)
+      if (!inNotifications) {
         setNotificationMenuOpen(false)
+      }
+      if (!inDiagnostics) {
+        setDiagnosticsOpen(false)
       }
     }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setNotificationMenuOpen(false)
+        setDiagnosticsOpen(false)
       }
     }
     document.addEventListener('mousedown', onPointerDown)
@@ -102,7 +168,16 @@ export function TopBar() {
       document.removeEventListener('mousedown', onPointerDown)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [notificationMenuOpen])
+  }, [diagnosticsOpen, notificationMenuOpen])
+
+  useEffect(() => {
+    if (!diagnosticsOpen) {
+      return
+    }
+    if (!diagnosticsSnapshot && !diagnosticsLoading) {
+      void loadDiagnostics()
+    }
+  }, [diagnosticsLoading, diagnosticsOpen, diagnosticsSnapshot, loadDiagnostics])
 
   return (
     <header className="relative mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/70 bg-white/80 px-4 py-3 shadow-[0_15px_40px_-32px_rgba(31,41,55,0.55)]">
@@ -227,6 +302,95 @@ export function TopBar() {
             </div>
           ) : null}
         </div>
+        <div className="relative" ref={diagnosticsRef}>
+          <button
+            className={clsx(
+              'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition',
+              diagnosticsOpen
+                ? 'border-blue-300 bg-blue-50 text-blue-700'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+            )}
+            onClick={() => {
+              setDiagnosticsOpen((previous) => !previous)
+            }}
+          >
+            <Activity className="h-3.5 w-3.5" />
+            Diagnostics
+          </button>
+          {diagnosticsOpen ? (
+            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(420px,94vw)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_45px_-28px_rgba(15,23,42,0.55)]">
+              <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Runtime diagnostics
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void loadDiagnostics()
+                  }}
+                  disabled={diagnosticsLoading}
+                  className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                >
+                  {diagnosticsLoading ? 'Refreshing...' : 'Refresh'}
+                </button>
+              </div>
+              {diagnosticsError ? (
+                <div className="px-3 py-2 text-xs text-rose-700">{diagnosticsError}</div>
+              ) : null}
+              {diagnosticsSnapshot ? (
+                <div className="max-h-96 space-y-2 overflow-y-auto p-3 text-xs text-slate-600">
+                  <DetailRowInline label="Captured" value={formatRelativeFromNow(diagnosticsSnapshot.capturedAtMs)} />
+                  <DetailRowInline label="Profile" value={diagnosticsSnapshot.status.profile} />
+                  <DetailRowInline label="Display name" value={diagnosticsSnapshot.profile?.displayName ?? '—'} />
+                  <DetailRowInline label="RPC endpoint" value={diagnosticsSnapshot.status.rpc} mono />
+                  <DetailRowInline
+                    label="Connection"
+                    value={diagnosticsSnapshot.probe.rpc.reachable && diagnosticsSnapshot.status.running ? 'Healthy' : 'Degraded'}
+                  />
+                  <DetailRowInline
+                    label="RPC latency"
+                    value={
+                      diagnosticsSnapshot.probe.rpc.roundtrip_ms !== null
+                        ? `${diagnosticsSnapshot.probe.rpc.roundtrip_ms} ms`
+                        : '—'
+                    }
+                  />
+                  <DetailRowInline
+                    label="Identity"
+                    value={shortenValue(diagnosticsSnapshot.probe.rpc.identity_hash)}
+                    mono
+                  />
+                  <DetailRowInline
+                    label="Selected relay"
+                    value={diagnosticsSnapshot.outboundNode.peer ?? 'None selected'}
+                    mono
+                  />
+                  <DetailRowInline
+                    label="Propagation nodes"
+                    value={String(diagnosticsSnapshot.propagationNodes.nodes.length)}
+                  />
+                  <DetailRowInline
+                    label="Interfaces"
+                    value={summarizeInterfaces(diagnosticsSnapshot.interfaces)}
+                  />
+                  <DetailRowInline
+                    label="Last event"
+                    value={diagnosticsSnapshot.probe.events.event_type ?? '—'}
+                  />
+                  {diagnosticsSnapshot.probe.rpc.errors.length > 0 ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
+                      {diagnosticsSnapshot.probe.rpc.errors.join(' | ')}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="px-3 py-4 text-xs text-slate-500">
+                  {diagnosticsLoading ? 'Loading diagnostics...' : 'No diagnostics loaded.'}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
         <span
           className={clsx(
             'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold',
@@ -259,4 +423,30 @@ export function TopBar() {
       </div>
     </header>
   )
+}
+
+function DetailRowInline({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-slate-500">{label}</span>
+      <span className={clsx('max-w-[240px] break-all text-right text-slate-700', mono && 'font-mono text-[11px]')}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function summarizeInterfaces(interfaces: LxmfInterfaceListResponse): string {
+  const enabled = interfaces.interfaces.filter((item) => item.enabled).length
+  return `${enabled}/${interfaces.interfaces.length} enabled`
+}
+
+function shortenValue(value: string | null): string {
+  if (!value) {
+    return '—'
+  }
+  if (value.length <= 20) {
+    return value
+  }
+  return `${value.slice(0, 10)}...${value.slice(-8)}`
 }

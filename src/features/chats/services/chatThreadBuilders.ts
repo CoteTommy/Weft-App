@@ -96,6 +96,7 @@ function toChatMessage(record: LxmfMessageRecord, counterparty: string, selfAuth
     sentAt: formatClockTime(timestampMs),
     status: mapReceiptStatus(record.direction, record.receipt_status),
     statusDetail,
+    statusReasonCode: inferReasonCode(statusDetail),
   }
 }
 
@@ -166,10 +167,36 @@ function normalizeStatusDetail(value: string | null): string | undefined {
   return normalized.length > 0 ? normalized : undefined
 }
 
+function inferReasonCode(statusDetail: string | undefined): string | undefined {
+  if (!statusDetail) {
+    return undefined
+  }
+  const normalized = statusDetail.toLowerCase()
+  if (normalized.includes('receipt timeout')) {
+    return 'receipt_timeout'
+  }
+  if (normalized.includes('timeout')) {
+    return 'timeout'
+  }
+  if (
+    normalized.includes('no route') ||
+    normalized.includes('no path') ||
+    normalized.includes('no known path')
+  ) {
+    return 'no_path'
+  }
+  if (normalized.includes('no propagation relay selected')) {
+    return 'relay_unset'
+  }
+  if (normalized.includes('retry budget exhausted')) {
+    return 'retry_budget_exhausted'
+  }
+  return undefined
+}
+
 function isInternalCommandRecord(record: LxmfMessageRecord): boolean {
   if (record.direction !== 'out') {
     return false
   }
   return record.content.trim().startsWith('\\\\\\\\\\')
 }
-

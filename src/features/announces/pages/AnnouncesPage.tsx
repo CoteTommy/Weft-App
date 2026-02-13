@@ -18,7 +18,8 @@ import { sendHubJoin } from '../services/announcesService'
 
 export function AnnouncesPage() {
   const navigate = useNavigate()
-  const { announces, loading, announcing, error, refresh, announceNow } = useAnnounces()
+  const { announces, loading, loadingMore, hasMore, announcing, error, refresh, loadMore, announceNow } =
+    useAnnounces()
   const [query, setQuery] = useState('')
   const [selectedAnnounce, setSelectedAnnounce] = useState<AnnounceItem | null>(null)
   const [replyText, setReplyText] = useState('')
@@ -196,6 +197,20 @@ export function AnnouncesPage() {
               </li>
             ))}
           </ul>
+          {!loading && hasMore ? (
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                disabled={loadingMore}
+                onClick={() => {
+                  void loadMore()
+                }}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              >
+                {loadingMore ? 'Loading...' : 'Load more'}
+              </button>
+            </div>
+          ) : null}
         </div>
       </Panel>
 

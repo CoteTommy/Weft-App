@@ -216,6 +216,7 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
               <DetailRow label="Time" value={selectedMessage.sentAt} />
               <DetailRow label="Status" value={selectedMessage.status ? renderStatus(selectedMessage.status) : '—'} />
               <DetailRow label="Backend status" value={selectedMessage.statusDetail ?? '—'} />
+              <DetailRow label="Reason code" value={selectedMessage.statusReasonCode ?? '—'} />
               <DetailRow
                 label="Delivery trace"
                 value={deliveryTraceLoading ? 'Loading...' : `${deliveryTrace.length} transition(s)`}

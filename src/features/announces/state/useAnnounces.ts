@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { startLxmfEventPump, subscribeLxmfEvents } from '../../../lib/lxmf-api'
 import type { AnnounceItem } from '../../../shared/types/announces'
 import {
-  fetchAnnounces,
+  fetchAnnouncesPage,
   mapAnnounceEventPayload,
   triggerAnnounceNow,
 } from '../services/announcesService'
@@ -10,18 +10,24 @@ import {
 interface UseAnnouncesState {
   announces: AnnounceItem[]
   loading: boolean
+  loadingMore: boolean
+  hasMore: boolean
   announcing: boolean
   error: string | null
   refresh: () => Promise<void>
+  loadMore: () => Promise<void>
   announceNow: () => Promise<void>
 }
 
 export function useAnnounces(): UseAnnouncesState {
   const [announces, setAnnounces] = useState<AnnounceItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const [announcing, setAnnouncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const refreshingRef = useRef(false)
+  const nextCursorRef = useRef<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (refreshingRef.current) {
@@ -30,8 +36,10 @@ export function useAnnounces(): UseAnnouncesState {
     refreshingRef.current = true
     try {
       setError(null)
-      const items = await fetchAnnounces()
-      setAnnounces(items)
+      const page = await fetchAnnouncesPage()
+      nextCursorRef.current = page.nextCursor
+      setHasMore(Boolean(page.nextCursor))
+      setAnnounces(page.announces)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : String(loadError))
     } finally {
@@ -39,6 +47,39 @@ export function useAnnounces(): UseAnnouncesState {
       refreshingRef.current = false
     }
   }, [])
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || refreshingRef.current) {
+      return
+    }
+    const cursor = nextCursorRef.current
+    if (!cursor) {
+      setHasMore(false)
+      return
+    }
+
+    setLoadingMore(true)
+    try {
+      setError(null)
+      const page = await fetchAnnouncesPage(cursor)
+      nextCursorRef.current = page.nextCursor
+      setHasMore(Boolean(page.nextCursor))
+      setAnnounces((previous) => {
+        const seen = new Set(previous.map((entry) => entry.id))
+        const merged = [...previous]
+        for (const item of page.announces) {
+          if (!seen.has(item.id)) {
+            merged.push(item)
+          }
+        }
+        return merged
+      })
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : String(loadError))
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [loadingMore])
 
   const announceNow = useCallback(async () => {
     try {
@@ -103,9 +144,12 @@ export function useAnnounces(): UseAnnouncesState {
   return {
     announces,
     loading,
+    loadingMore,
+    hasMore,
     announcing,
     error,
     refresh,
+    loadMore,
     announceNow,
   }
 }

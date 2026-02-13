@@ -6,11 +6,30 @@ interface DerivedAnnounce extends AnnounceItem {
   postedAtMs: number
 }
 
-export async function fetchAnnounces(): Promise<AnnounceItem[]> {
-  const response = await listLxmfAnnounces({}, { limit: 500 })
+export interface FetchAnnouncesPageResult {
+  announces: AnnounceItem[]
+  nextCursor: string | null
+}
+
+export async function fetchAnnouncesPage(cursor?: string | null): Promise<FetchAnnouncesPageResult> {
+  const response = await listLxmfAnnounces(
+    {},
+    {
+      limit: 200,
+      cursor: cursor ?? undefined,
+    },
+  )
   const announces = response.announces.map(mapRecordToAnnounce)
   announces.sort((a, b) => b.postedAtMs - a.postedAtMs)
-  return announces.map(toAnnounceItem)
+  return {
+    announces: announces.map(toAnnounceItem),
+    nextCursor: response.next_cursor,
+  }
+}
+
+export async function fetchAnnounces(): Promise<AnnounceItem[]> {
+  const page = await fetchAnnouncesPage()
+  return page.announces
 }
 
 export async function triggerAnnounceNow(): Promise<void> {
