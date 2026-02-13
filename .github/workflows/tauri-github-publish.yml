@@ -52,10 +52,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          cache: npm
 
       - name: setup bun
         uses: oven-sh/setup-bun@v2
+
+      - name: cache bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
 
       - name: install frontend dependencies
         run: bun install --frozen-lockfile
