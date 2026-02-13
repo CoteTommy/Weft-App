@@ -9,6 +9,7 @@ const tauriDevHost = process.env.TAURI_DEV_HOST
 const currentDir = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  base: process.env.TAURI_ENV_PLATFORM ? './' : '/',
   plugins: [react(), tailwindcss()],
   clearScreen: false,
   envPrefix: ['VITE_', 'TAURI_'],
