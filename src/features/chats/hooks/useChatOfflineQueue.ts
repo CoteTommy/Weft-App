@@ -1,6 +1,5 @@
 import {
   type Dispatch,
-  type MutableRefObject,
   type RefObject,
   type SetStateAction,
   useEffect,
@@ -24,7 +23,7 @@ export type UseChatOfflineQueueParams = {
 
 export type UseChatOfflineQueueResult = {
   offlineQueue: OfflineQueueEntry[]
-  offlineQueueRef: MutableRefObject<OfflineQueueEntry[]>
+  offlineQueueRef: RefObject<OfflineQueueEntry[]>
   setOfflineQueue: Dispatch<SetStateAction<OfflineQueueEntry[]>>
 }
 
