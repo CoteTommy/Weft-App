@@ -22,12 +22,16 @@ import {
   PREFERENCES_UPDATED_EVENT,
   type MotionPreference,
 } from '../shared/runtime/preferences'
+import { normalizeMainRoute } from '../shared/runtime/sessionRestore'
 
 export default function App() {
   const initialPreferences = getWeftPreferences()
   const [onboardingCompleted, setOnboardingCompleted] = useState(() => hasCompletedOnboarding())
   const [motionPreference, setMotionPreference] = useState<MotionPreference>(initialPreferences.motionPreference)
   const [commandCenterEnabled, setCommandCenterEnabled] = useState(initialPreferences.commandCenterEnabled)
+  const [lastMainRoute, setLastMainRoute] = useState(
+    normalizeMainRoute(initialPreferences.lastMainRoute),
+  )
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -35,6 +39,7 @@ export default function App() {
       setOnboardingCompleted(hasCompletedOnboarding())
       setMotionPreference(preferences.motionPreference)
       setCommandCenterEnabled(preferences.commandCenterEnabled)
+      setLastMainRoute(normalizeMainRoute(preferences.lastMainRoute))
     }
     window.addEventListener(PREFERENCES_UPDATED_EVENT, handleUpdate)
     return () => {
@@ -52,13 +57,13 @@ export default function App() {
         <Routes>
           <Route
             path="/welcome"
-            element={onboardingCompleted ? <Navigate to="/chats" replace /> : <WelcomePage />}
+            element={onboardingCompleted ? <Navigate to={lastMainRoute} replace /> : <WelcomePage />}
           />
           <Route
             element={onboardingCompleted ? <ChatsStateLayout /> : <Navigate to="/welcome" replace />}
           >
             <Route element={<AppShell />}>
-              <Route index element={<Navigate to="/chats" replace />} />
+              <Route index element={<Navigate to={lastMainRoute} replace />} />
               <Route path="/chats" element={<ChatsPage />} />
               <Route path="/chats/:chatId" element={<ChatThreadPage />} />
               <Route path="/people" element={<PeoplePage />} />
@@ -77,7 +82,7 @@ export default function App() {
           </Route>
           <Route
             path="*"
-            element={<Navigate to={onboardingCompleted ? '/chats' : '/welcome'} replace />}
+            element={<Navigate to={onboardingCompleted ? lastMainRoute : '/welcome'} replace />}
           />
         </Routes>
       </NotificationCenterProvider>

@@ -173,6 +173,7 @@ export function ChatThreadPage() {
             </div>
             <MessageComposer
               focusToken={composerFocusToken}
+              sessionKey={thread.id}
               onSend={(draft) => {
                 return sendMessage(thread.id, draft)
               }}

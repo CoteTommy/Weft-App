@@ -34,6 +34,25 @@ import { publishAppNotification } from '../../../shared/runtime/notifications'
 import { fetchChatThreads, postChatMessage, buildThreads } from '../services/chatService'
 import { deriveReasonCode, deriveReceiptStatus } from '../services/chatThreadBuilders'
 import {
+  clearOfflineQueue,
+  enqueueSendError,
+  extendIgnoredFailedMessageIds,
+  getIgnoredFailedMessageIds,
+  getStoredOfflineQueue,
+  markQueueEntryAttemptFailed,
+  markQueueEntryDelivered,
+  markQueueEntrySending,
+  nextDueQueueEntry,
+  pauseQueueEntry,
+  persistOfflineQueue,
+  persistIgnoredFailedMessageIds,
+  removeQueueEntry,
+  resumeQueueEntry,
+  retryQueueEntryNow,
+  syncQueueFromThreads,
+  type OfflineQueueEntry,
+} from './offlineQueue'
+import {
   getStoredThreadPreferences,
   persistThreadPreferences,
   resolveThreadPreference,
@@ -45,6 +64,12 @@ interface ChatsState {
   error: string | null
   refresh: () => Promise<void>
   sendMessage: (threadId: string, draft: OutboundMessageDraft) => Promise<OutboundSendOutcome>
+  offlineQueue: OfflineQueueEntry[]
+  retryQueueNow: (queueId: string) => Promise<void>
+  pauseQueue: (queueId: string) => void
+  resumeQueue: (queueId: string) => void
+  removeQueue: (queueId: string) => void
+  clearQueue: () => void
   markThreadRead: (threadId: string) => void
   markAllRead: () => void
   createThread: (destination: string, name?: string) => string | null
@@ -58,9 +83,15 @@ export function ChatsProvider({ children }: PropsWithChildren) {
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [offlineQueue, setOfflineQueue] = useState<OfflineQueueEntry[]>(() =>
+    getStoredOfflineQueue(),
+  )
   const knownMessageIdsRef = useRef<Map<string, Set<string>>>(new Map())
   const unreadCountsRef = useRef<Map<string, number>>(new Map())
   const draftThreadsRef = useRef<Map<string, ChatThread>>(new Map())
+  const offlineQueueRef = useRef<OfflineQueueEntry[]>(offlineQueue)
+  const ignoredFailedMessageIdsRef = useRef<Set<string>>(getIgnoredFailedMessageIds())
+  const queueInFlightRef = useRef<Set<string>>(new Set())
   const hasLoadedRef = useRef(false)
   const refreshingRef = useRef(false)
   const notificationsEnabledRef = useRef(getWeftPreferences().notificationsEnabled)
@@ -260,6 +291,101 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     }
   }, [applyThreadMetadata, emitIncomingNotifications])
 
+  const markFailedMessagesIgnored = useCallback((messageIds: string[]) => {
+    const next = extendIgnoredFailedMessageIds(
+      ignoredFailedMessageIdsRef.current,
+      messageIds,
+    )
+    ignoredFailedMessageIdsRef.current = next
+    persistIgnoredFailedMessageIds(next)
+  }, [])
+
+  const runQueueEntry = useCallback(
+    async (entry: OfflineQueueEntry) => {
+      if (queueInFlightRef.current.has(entry.id)) {
+        return
+      }
+      queueInFlightRef.current.add(entry.id)
+      setOfflineQueue((previous) => markQueueEntrySending(previous, entry.id))
+      try {
+        await postChatMessage(entry.threadId, entry.draft)
+        setOfflineQueue((previous) => markQueueEntryDelivered(previous, entry.id))
+        if (entry.sourceMessageId) {
+          markFailedMessagesIgnored([entry.sourceMessageId])
+        }
+        publishAppNotification({
+          kind: 'system',
+          title: 'Queued message sent',
+          body: `Recovered delivery to ${shortHash(entry.destination, 8)}.`,
+          threadId: entry.threadId,
+        })
+        await refresh()
+      } catch (queueError) {
+        const message = queueError instanceof Error ? queueError.message : String(queueError)
+        setOfflineQueue((previous) =>
+          markQueueEntryAttemptFailed(previous, entry.id, message),
+        )
+      } finally {
+        queueInFlightRef.current.delete(entry.id)
+      }
+    },
+    [markFailedMessagesIgnored, refresh],
+  )
+
+  const retryQueueNow = useCallback(
+    async (queueId: string) => {
+      const id = queueId.trim()
+      if (!id) {
+        return
+      }
+      setOfflineQueue((previous) => retryQueueEntryNow(previous, id))
+      const entry = offlineQueueRef.current.find((candidate) => candidate.id === id)
+      if (!entry) {
+        return
+      }
+      await runQueueEntry(entry)
+    },
+    [runQueueEntry],
+  )
+
+  const pauseQueue = useCallback((queueId: string) => {
+    const id = queueId.trim()
+    if (!id) {
+      return
+    }
+    setOfflineQueue((previous) => pauseQueueEntry(previous, id))
+  }, [])
+
+  const resumeQueue = useCallback((queueId: string) => {
+    const id = queueId.trim()
+    if (!id) {
+      return
+    }
+    setOfflineQueue((previous) => resumeQueueEntry(previous, id))
+  }, [])
+
+  const removeQueue = useCallback((queueId: string) => {
+    const id = queueId.trim()
+    if (!id) {
+      return
+    }
+    const entry = offlineQueueRef.current.find((candidate) => candidate.id === id)
+    if (entry?.sourceMessageId) {
+      markFailedMessagesIgnored([entry.sourceMessageId])
+    }
+    setOfflineQueue((previous) => removeQueueEntry(previous, id))
+  }, [markFailedMessagesIgnored])
+
+  const clearQueue = useCallback(() => {
+    const ignoredIds = offlineQueueRef.current
+      .map((entry) => entry.sourceMessageId)
+      .filter((entry): entry is string => Boolean(entry))
+    if (ignoredIds.length > 0) {
+      markFailedMessagesIgnored(ignoredIds)
+    }
+    setOfflineQueue(clearOfflineQueue())
+  }, [markFailedMessagesIgnored])
+
   const markThreadRead = useCallback((threadId: string) => {
     const id = threadId.trim()
     if (!id) {
@@ -317,9 +443,19 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         publishAppNotification({
           kind: 'system',
           title: 'Message failed',
-          body: message,
+          body: `${message}. Added to offline queue.`,
           threadId,
         })
+        const reasonCode = deriveReasonCode(message)
+        setOfflineQueue((previous) =>
+          enqueueSendError(previous, {
+            threadId,
+            destination: threadId,
+            draft,
+            reason: message,
+            reasonCode,
+          }),
+        )
         return {}
       }
     },
@@ -661,6 +797,30 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
+  useEffect(() => {
+    offlineQueueRef.current = offlineQueue
+    persistOfflineQueue(offlineQueue)
+  }, [offlineQueue])
+
+  useEffect(() => {
+    setOfflineQueue((previous) =>
+      syncQueueFromThreads(previous, threads, ignoredFailedMessageIdsRef.current),
+    )
+  }, [threads])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      const due = nextDueQueueEntry(offlineQueueRef.current)
+      if (!due) {
+        return
+      }
+      void runQueueEntry(due)
+    }, 2_000)
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [runQueueEntry])
+
   const value = useMemo(
     () => ({
       threads,
@@ -668,6 +828,12 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       error,
       refresh,
       sendMessage,
+      offlineQueue,
+      retryQueueNow,
+      pauseQueue,
+      resumeQueue,
+      removeQueue,
+      clearQueue,
       markThreadRead,
       markAllRead,
       createThread,
@@ -677,11 +843,17 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     [
       createThread,
       error,
+      offlineQueue,
       loading,
       markAllRead,
       markThreadRead,
+      pauseQueue,
+      removeQueue,
       refresh,
+      resumeQueue,
+      retryQueueNow,
       sendMessage,
+      clearQueue,
       setThreadMuted,
       setThreadPinned,
       threads,

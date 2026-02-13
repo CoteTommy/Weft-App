@@ -5,13 +5,19 @@ import type {
   OutboundMessageDraft,
   OutboundSendOutcome,
 } from '../../../shared/types/chat'
+import {
+  clearComposerSession,
+  readComposerSession,
+  writeComposerSession,
+} from '../state/composerSession'
 
 interface MessageComposerProps {
   onSend?: (draft: OutboundMessageDraft) => Promise<OutboundSendOutcome> | void
   focusToken?: number
+  sessionKey?: string
 }
 
-export function MessageComposer({ onSend, focusToken = 0 }: MessageComposerProps) {
+export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageComposerProps) {
   const [text, setText] = useState('')
   const [attachments, setAttachments] = useState<OutboundAttachmentDraft[]>([])
   const [paperEnabled, setPaperEnabled] = useState(false)
@@ -30,6 +36,42 @@ export function MessageComposer({ onSend, focusToken = 0 }: MessageComposerProps
     textInputRef.current?.focus()
     textInputRef.current?.select()
   }, [focusToken])
+
+  useEffect(() => {
+    const key = sessionKey?.trim()
+    if (!key) {
+      return
+    }
+    const restored = readComposerSession(key)
+    if (!restored) {
+      return
+    }
+    setText(restored.text)
+    setPaperEnabled(restored.paperEnabled)
+    setPaperTitle(restored.paperTitle)
+    setPaperCategory(restored.paperCategory)
+    setError(null)
+    setSendFeedback(null)
+  }, [sessionKey])
+
+  useEffect(() => {
+    const key = sessionKey?.trim()
+    if (!key) {
+      return
+    }
+    const hasDraft =
+      text.trim().length > 0 || paperTitle.trim().length > 0 || paperCategory.trim().length > 0
+    if (!hasDraft && !paperEnabled) {
+      clearComposerSession(key)
+      return
+    }
+    writeComposerSession(key, {
+      text,
+      paperEnabled,
+      paperTitle,
+      paperCategory,
+    })
+  }, [paperCategory, paperEnabled, paperTitle, sessionKey, text])
 
   return (
     <form
@@ -65,6 +107,9 @@ export function MessageComposer({ onSend, focusToken = 0 }: MessageComposerProps
             setPaperEnabled(false)
             setPaperTitle('')
             setPaperCategory('')
+            if (sessionKey?.trim()) {
+              clearComposerSession(sessionKey)
+            }
             setError(null)
             if (outcome?.paperUri) {
               setSendFeedback({

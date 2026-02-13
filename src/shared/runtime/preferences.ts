@@ -17,6 +17,7 @@ export interface WeftPreferences {
   motionPreference: MotionPreference
   performanceHudEnabled: boolean
   commandCenterEnabled: boolean
+  lastMainRoute?: string
   pendingRoute?: string
 }
 
@@ -36,6 +37,7 @@ const DEFAULT_PREFERENCES: WeftPreferences = {
   motionPreference: 'snappy',
   performanceHudEnabled: false,
   commandCenterEnabled: false,
+  lastMainRoute: '/chats',
 }
 
 export function getWeftPreferences(): WeftPreferences {
@@ -157,6 +159,9 @@ function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPrefe
   if ('commandCenterEnabled' in value) {
     out.commandCenterEnabled = parseBoolean(value.commandCenterEnabled, false)
   }
+  if ('lastMainRoute' in value) {
+    out.lastMainRoute = normalizeRoute(value.lastMainRoute)
+  }
   if ('pendingRoute' in value) {
     out.pendingRoute = normalizeOptional(value.pendingRoute)
   }
@@ -196,6 +201,17 @@ function normalizeProfile(value: unknown): string | undefined {
     return undefined
   }
   if (normalized.toLowerCase() === 'default') {
+    return undefined
+  }
+  return normalized
+}
+
+function normalizeRoute(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+  const normalized = value.trim()
+  if (!normalized.startsWith('/')) {
     return undefined
   }
   return normalized

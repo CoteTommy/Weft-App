@@ -10,8 +10,10 @@ import { TopBar } from './TopBar'
 import {
   getWeftPreferences,
   PREFERENCES_UPDATED_EVENT,
+  updateWeftPreferences,
   type MotionPreference,
 } from '../../shared/runtime/preferences'
+import { isRestorableMainRoute } from '../../shared/runtime/sessionRestore'
 
 export function AppShell() {
   const navigate = useNavigate()
@@ -19,6 +21,7 @@ export function AppShell() {
   const reduceMotion = useReducedMotion()
   const pageMotion = useAnimationControls()
   const routeAnimationFrameRef = useRef<number | null>(null)
+  const lastPersistedRouteRef = useRef<string>(getWeftPreferences().lastMainRoute ?? '/chats')
   const [motionPreference, setMotionPreference] = useState<MotionPreference>(
     () => getWeftPreferences().motionPreference,
   )
@@ -79,6 +82,20 @@ export function AppShell() {
       }
     }
   }, [location.pathname, motionPreference, pageMotion, reduceMotion])
+
+  useEffect(() => {
+    const route = `${location.pathname}${location.search}`.trim()
+    if (!isRestorableMainRoute(route)) {
+      return
+    }
+    if (lastPersistedRouteRef.current === route) {
+      return
+    }
+    lastPersistedRouteRef.current = route
+    updateWeftPreferences({
+      lastMainRoute: route,
+    })
+  }, [location.pathname, location.search])
 
   return (
     <div className="relative h-screen overflow-hidden bg-[var(--app-bg)] text-slate-900 motion-gpu">
