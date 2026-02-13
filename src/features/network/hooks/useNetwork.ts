@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
-
+import { useAsyncResource } from '@shared/runtime/useAsyncResource'
 import type { NetworkPeerItem } from '@shared/types/network'
 
 import { fetchNetworkPeers } from '../services/networkService'
@@ -12,25 +11,12 @@ interface UseNetworkState {
 }
 
 export function useNetwork(): UseNetworkState {
-  const [peers, setPeers] = useState<NetworkPeerItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const refresh = useCallback(async () => {
-    try {
-      setError(null)
-      const items = await fetchNetworkPeers()
-      setPeers(items)
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
+  const {
+    data: peers,
+    loading,
+    error,
+    refresh,
+  } = useAsyncResource<NetworkPeerItem[]>(fetchNetworkPeers, [])
 
   return {
     peers,

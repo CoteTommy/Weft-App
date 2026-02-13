@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { useVirtualizer } from '@tanstack/react-virtual'
 import clsx from 'clsx'
 
 import { APP_ROUTES } from '@app/config/routes'
@@ -24,8 +25,8 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
   const holdTimeoutRef = useRef<number | null>(null)
   const holdTriggeredRef = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  const [scrollTop, setScrollTop] = useState(0)
-  const [viewportHeight, setViewportHeight] = useState(0)
+  const detailsDialogRef = useRef<HTMLDivElement | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const [stickToBottom, setStickToBottom] = useState(true)
   const estimatedMessageHeight = 118
   const overscan = 8
@@ -66,24 +67,16 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
     [selectedReasonCode]
   )
   const latestMessageId = messages[messages.length - 1]?.id ?? null
-  const visibleCount = Math.max(1, Math.ceil(viewportHeight / estimatedMessageHeight))
-  const startIndex = Math.max(0, Math.floor(scrollTop / estimatedMessageHeight) - overscan)
-  const endIndex = Math.min(messages.length, startIndex + visibleCount + overscan * 2)
-  const topPadding = startIndex * estimatedMessageHeight
-  const bottomPadding = Math.max(0, (messages.length - endIndex) * estimatedMessageHeight)
-  const visibleMessages = useMemo(
-    () => messages.slice(startIndex, endIndex),
-    [endIndex, messages, startIndex]
-  )
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => estimatedMessageHeight,
+    overscan,
+  })
+  const virtualItems = virtualizer.getVirtualItems()
   const setTimelineContainerRef = useCallback((node: HTMLDivElement | null) => {
     scrollContainerRef.current = node
-    if (!node) {
-      setViewportHeight(0)
-      setScrollTop(0)
-      return
-    }
-    setViewportHeight(node.clientHeight)
-    setScrollTop(node.scrollTop)
   }, [])
 
   const closeModal = useCallback(() => {
@@ -127,29 +120,40 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
   )
 
   useEffect(() => {
-    const node = scrollContainerRef.current
-    if (!node) {
-      return
-    }
-    if (typeof ResizeObserver === 'undefined') {
-      return
-    }
-    const resizeObserver = new ResizeObserver(() => {
-      setViewportHeight(node.clientHeight)
-    })
-    resizeObserver.observe(node)
-    return () => {
-      resizeObserver.disconnect()
-    }
-  }, [])
-
-  useEffect(() => {
     if (!selectedMessage) {
       return
     }
+    closeButtonRef.current?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault()
         closeModal()
+        return
+      }
+      if (event.key !== 'Tab') {
+        return
+      }
+      const root = detailsDialogRef.current
+      if (!root) {
+        return
+      }
+      const focusable = getFocusableElements(root)
+      if (focusable.length === 0) {
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement
+      if (event.shiftKey) {
+        if (active === first || !root.contains(active)) {
+          event.preventDefault()
+          last.focus()
+        }
+        return
+      }
+      if (active === last || !root.contains(active)) {
+        event.preventDefault()
+        first.focus()
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -205,16 +209,11 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
   }, [selectedMessage])
 
   useLayoutEffect(() => {
-    const node = scrollContainerRef.current
-    if (!node) {
+    if (!stickToBottom || messages.length === 0) {
       return
     }
-    if (!stickToBottom) {
-      return
-    }
-    node.scrollTop = node.scrollHeight
-    setScrollTop(node.scrollTop)
-  }, [latestMessageId, messages.length, stickToBottom])
+    virtualizer.scrollToIndex(messages.length - 1, { align: 'end' })
+  }, [latestMessageId, messages.length, stickToBottom, virtualizer])
 
   return (
     <>
@@ -222,64 +221,83 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
         ref={setTimelineContainerRef}
         onScroll={event => {
           const node = event.currentTarget
-          setScrollTop(node.scrollTop)
           setStickToBottom(node.scrollHeight - node.clientHeight - node.scrollTop <= 96)
         }}
         className={clsx('min-h-0 overflow-y-auto', className)}
       >
         <div
-          className="space-y-3"
+          className="relative"
           style={{
-            paddingTop: `${topPadding}px`,
-            paddingBottom: `${bottomPadding}px`,
+            height: `${virtualizer.getTotalSize()}px`,
           }}
         >
-          {visibleMessages.map(message => (
-            <article
-              key={message.id}
-              className={clsx('flex', message.sender === 'self' ? 'justify-end' : 'justify-start')}
-            >
-              <button
-                type="button"
-                onPointerDown={() => startHold(message)}
-                onPointerUp={clearHoldTimer}
-                onPointerCancel={clearHoldTimer}
-                onPointerLeave={clearHoldTimer}
-                onClick={() => openDetails(message)}
-                className={clsx(
-                  'max-w-[80%] rounded-2xl px-4 py-3 text-left transition focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:outline-none',
-                  message.sender === 'self'
-                    ? 'bg-blue-600 text-white hover:bg-blue-500'
-                    : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50'
-                )}
+          {virtualItems.map(virtualItem => {
+            const message = messages[virtualItem.index]
+            if (!message) {
+              return null
+            }
+            return (
+              <div
+                key={message.id}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
               >
-                <p className="text-sm leading-relaxed">{message.body}</p>
-                {message.attachments.length > 0 ? (
-                  <div className="mt-2 space-y-1">
-                    {message.attachments.map((attachment, index) => (
-                      <p
-                        key={`${attachment.name}:${index}`}
-                        className="truncate text-[11px] font-semibold opacity-80"
-                      >
-                        Attachment: {attachment.name} ({formatBytes(attachment.sizeBytes)})
+                <article
+                  className={clsx(
+                    'flex pb-3',
+                    message.sender === 'self' ? 'justify-end' : 'justify-start'
+                  )}
+                >
+                  <button
+                    type="button"
+                    onPointerDown={() => startHold(message)}
+                    onPointerUp={clearHoldTimer}
+                    onPointerCancel={clearHoldTimer}
+                    onPointerLeave={clearHoldTimer}
+                    onClick={() => openDetails(message)}
+                    className={clsx(
+                      'max-w-[80%] rounded-2xl px-4 py-3 text-left transition focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:outline-none',
+                      message.sender === 'self'
+                        ? 'bg-blue-600 text-white hover:bg-blue-500'
+                        : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50'
+                    )}
+                  >
+                    <p className="text-sm leading-relaxed">{message.body}</p>
+                    {message.attachments.length > 0 ? (
+                      <div className="mt-2 space-y-1">
+                        {message.attachments.map((attachment, index) => (
+                          <p
+                            key={`${attachment.name}:${index}`}
+                            className="truncate text-[11px] font-semibold opacity-80"
+                          >
+                            Attachment: {attachment.name} ({formatBytes(attachment.sizeBytes)})
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                    {message.paper ? (
+                      <p className="mt-2 text-[11px] font-semibold opacity-80">
+                        Paper note{message.paper.title ? `: ${message.paper.title}` : ''}
                       </p>
-                    ))}
-                  </div>
-                ) : null}
-                {message.paper ? (
-                  <p className="mt-2 text-[11px] font-semibold opacity-80">
-                    Paper note{message.paper.title ? `: ${message.paper.title}` : ''}
-                  </p>
-                ) : null}
-                <div className="mt-2 flex items-center justify-end gap-2 text-[11px] opacity-75">
-                  <span>{message.sentAt}</span>
-                  {message.sender === 'self' && message.status ? (
-                    <span>{renderStatus(message.status)}</span>
-                  ) : null}
-                </div>
-              </button>
-            </article>
-          ))}
+                    ) : null}
+                    <div className="mt-2 flex items-center justify-end gap-2 text-[11px] opacity-75">
+                      <span>{message.sentAt}</span>
+                      {message.sender === 'self' && message.status ? (
+                        <span>{renderStatus(message.status)}</span>
+                      ) : null}
+                    </div>
+                  </button>
+                </article>
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -289,12 +307,19 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
           onClick={closeModal}
         >
           <div
+            ref={detailsDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="message-details-title"
             className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl"
             onClick={event => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-base font-semibold text-slate-900">Message details</h3>
+              <h3 id="message-details-title" className="text-base font-semibold text-slate-900">
+                Message details
+              </h3>
               <button
+                ref={closeButtonRef}
                 type="button"
                 onClick={closeModal}
                 className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
@@ -304,7 +329,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
             </div>
 
             <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-sm wrap-break-word whitespace-pre-wrap text-slate-800">
+              <p className="text-sm break-words whitespace-pre-wrap text-slate-800">
                 {selectedMessage.body}
               </p>
             </div>
@@ -628,4 +653,18 @@ function formatBytes(size: number): string {
     return `${(size / 1024).toFixed(1)} KB`
   }
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function getFocusableElements(root: HTMLElement): HTMLElement[] {
+  const selector = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(',')
+  return [...root.querySelectorAll<HTMLElement>(selector)].filter(
+    element => !element.hasAttribute('disabled') && !element.getAttribute('aria-hidden')
+  )
 }

@@ -1,10 +1,16 @@
 import type { FileItem } from '@shared/types/files'
-import type {
-  LxmfAttachmentPayload,
-  LxmfMessageFields,
-  LxmfMessageRecord,
-  LxmfPaperPayload,
-} from '@lib/lxmf-payloads'
+import type { LxmfAttachmentPayload, LxmfMessageFields, LxmfPaperPayload } from '@lib/lxmf-payloads'
+
+export interface PayloadParseMessageRecord {
+  id: string
+  source: string
+  destination: string
+  title: string
+  content: string
+  timestamp: number
+  direction: string
+  fields: LxmfMessageFields | null
+}
 
 export interface ParsedMapPoint {
   id: string
@@ -16,19 +22,21 @@ export interface ParsedMapPoint {
   direction: 'in' | 'out' | 'unknown'
 }
 
-export function extractMapPointsFromMessages(records: LxmfMessageRecord[]): ParsedMapPoint[] {
+export function extractMapPointsFromMessages(
+  records: PayloadParseMessageRecord[]
+): ParsedMapPoint[] {
   const points = records.flatMap(extractPointsFromMessage)
   points.sort((left, right) => timestampFromPointId(right.id) - timestampFromPointId(left.id))
   return points
 }
 
-export function extractFilesFromMessages(records: LxmfMessageRecord[]): FileItem[] {
+export function extractFilesFromMessages(records: PayloadParseMessageRecord[]): FileItem[] {
   const files = records.flatMap(extractFilesFromMessage)
   files.sort((left, right) => left.name.localeCompare(right.name))
   return files
 }
 
-function extractPointsFromMessage(record: LxmfMessageRecord): ParsedMapPoint[] {
+function extractPointsFromMessage(record: PayloadParseMessageRecord): ParsedMapPoint[] {
   const points = [
     ...extractFieldLocationPoints(record),
     ...extractGeoUriPoints(record),
@@ -38,7 +46,7 @@ function extractPointsFromMessage(record: LxmfMessageRecord): ParsedMapPoint[] {
   return dedupePoints(points)
 }
 
-function extractFieldLocationPoints(record: LxmfMessageRecord): ParsedMapPoint[] {
+function extractFieldLocationPoints(record: PayloadParseMessageRecord): ParsedMapPoint[] {
   const location = parseLocationMeta(record.fields)
   if (!location || !isValidCoordinate(location.lat, location.lon)) {
     return []
@@ -53,22 +61,22 @@ function extractFieldLocationPoints(record: LxmfMessageRecord): ParsedMapPoint[]
   ]
 }
 
-function extractGeoUriPoints(record: LxmfMessageRecord): ParsedMapPoint[] {
+function extractGeoUriPoints(record: PayloadParseMessageRecord): ParsedMapPoint[] {
   const pattern = /geo:([+-]?\d+(?:\.\d+)?),([+-]?\d+(?:\.\d+)?)/gi
   return extractWithPattern(record, pattern)
 }
 
-function extractOsmPoints(record: LxmfMessageRecord): ParsedMapPoint[] {
+function extractOsmPoints(record: PayloadParseMessageRecord): ParsedMapPoint[] {
   const pattern = /mlat=([+-]?\d+(?:\.\d+)?).*?mlon=([+-]?\d+(?:\.\d+)?)/gi
   return extractWithPattern(record, pattern)
 }
 
-function extractGooglePoints(record: LxmfMessageRecord): ParsedMapPoint[] {
+function extractGooglePoints(record: PayloadParseMessageRecord): ParsedMapPoint[] {
   const pattern = /[?&]q=([+-]?\d+(?:\.\d+)?),([+-]?\d+(?:\.\d+)?)/gi
   return extractWithPattern(record, pattern)
 }
 
-function extractWithPattern(record: LxmfMessageRecord, pattern: RegExp): ParsedMapPoint[] {
+function extractWithPattern(record: PayloadParseMessageRecord, pattern: RegExp): ParsedMapPoint[] {
   const text = `${record.title}\n${record.content}`
   const points: ParsedMapPoint[] = []
   for (const match of text.matchAll(pattern)) {
@@ -90,7 +98,7 @@ function extractWithPattern(record: LxmfMessageRecord, pattern: RegExp): ParsedM
 }
 
 function buildMapPoint(
-  record: LxmfMessageRecord,
+  record: PayloadParseMessageRecord,
   lat: number,
   lon: number,
   label: string
@@ -121,7 +129,7 @@ function dedupePoints(points: ParsedMapPoint[]): ParsedMapPoint[] {
   return output
 }
 
-function extractFilesFromMessage(record: LxmfMessageRecord): FileItem[] {
+function extractFilesFromMessage(record: PayloadParseMessageRecord): FileItem[] {
   const fields = asFields(record.fields)
   if (!fields) {
     return []
@@ -177,7 +185,7 @@ function extractFilesFromMessage(record: LxmfMessageRecord): FileItem[] {
 }
 
 function parseLocationMeta(
-  fields: LxmfMessageRecord['fields']
+  fields: PayloadParseMessageRecord['fields']
 ): { lat: number; lon: number } | undefined {
   const root = asObject(fields)
   if (!root) {
@@ -246,7 +254,7 @@ function parseCanonicalAttachments(
   return out
 }
 
-function asFields(value: LxmfMessageRecord['fields']): LxmfMessageFields | null {
+function asFields(value: PayloadParseMessageRecord['fields']): LxmfMessageFields | null {
   return value ?? null
 }
 

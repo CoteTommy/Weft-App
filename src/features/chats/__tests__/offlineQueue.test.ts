@@ -4,8 +4,11 @@ import type { ChatThread } from '@shared/types/chat'
 
 import {
   extendIgnoredFailedMessageIds,
+  loadStoredOfflineQueue,
   markQueueEntryAttemptFailed,
   MAX_AUTO_RETRY_ATTEMPTS,
+  type OfflineQueueEntry,
+  persistOfflineQueue,
   retryDelayMs,
   syncQueueFromThreads,
 } from '../state/offlineQueue'
@@ -20,6 +23,7 @@ function makeThread(messageId: string): ChatThread {
     pinned: false,
     muted: false,
     lastActivity: 'now',
+    lastActivityAtMs: Date.now(),
     messages: [
       {
         id: messageId,
@@ -75,4 +79,130 @@ describe('offline queue state helpers', () => {
     expect(queue[0].status).toBe('paused')
     expect(queue[0].lastError?.toLowerCase().includes('auto-paused')).toBe(true)
   })
+
+  test('migrates legacy queue entries and keeps attachment payloads', async () => {
+    const storage = createLocalStorageMock()
+    const previousWindow = (globalThis as { window?: unknown }).window
+    ;(globalThis as { window: unknown }).window = {
+      localStorage: storage,
+    }
+    try {
+      storage.setItem(
+        'weft.chat.offline-queue.v1',
+        JSON.stringify([
+          {
+            id: 'legacy-1',
+            source: 'send_error',
+            threadId: 'deadbeef',
+            destination: 'deadbeef',
+            draft: {
+              text: 'hello',
+              attachments: [
+                {
+                  name: 'note.txt',
+                  sizeBytes: 5,
+                  dataBase64: 'aGVsbG8=',
+                },
+              ],
+            },
+            attempts: 0,
+            nextRetryAtMs: 10,
+            createdAtMs: 1,
+            updatedAtMs: 1,
+            status: 'queued',
+          },
+        ])
+      )
+
+      const loaded = await loadStoredOfflineQueue()
+      expect(loaded).toHaveLength(1)
+      expect(loaded[0].draft.attachments?.[0].dataBase64).toBe('aGVsbG8=')
+      expect(storage.getItem('weft.chat.offline-queue.v2')).toBeTruthy()
+      expect(storage.getItem('weft.chat.offline-queue.v1')).toBeNull()
+    } finally {
+      if (previousWindow === undefined) {
+        delete (globalThis as { window?: unknown }).window
+      } else {
+        ;(globalThis as { window: unknown }).window = previousWindow
+      }
+    }
+  })
+
+  test('returns quota error when queue persistence exceeds storage capacity', async () => {
+    const storage = createLocalStorageMock({
+      setItem() {
+        throw new DOMException('quota exceeded', 'QuotaExceededError')
+      },
+    })
+    const previousWindow = (globalThis as { window?: unknown }).window
+    ;(globalThis as { window: unknown }).window = {
+      localStorage: storage,
+    }
+    try {
+      const entry: OfflineQueueEntry = {
+        id: 'draft-1',
+        source: 'send_error',
+        threadId: 'deadbeef',
+        destination: 'deadbeef',
+        draft: {
+          text: 'hello',
+          attachments: [
+            {
+              name: 'tiny.txt',
+              sizeBytes: 5,
+              dataBase64: 'aGVsbG8=',
+            },
+          ],
+        },
+        attempts: 0,
+        nextRetryAtMs: 100,
+        createdAtMs: 100,
+        updatedAtMs: 100,
+        status: 'queued',
+      }
+
+      const result = await persistOfflineQueue([entry])
+      expect(result.ok).toBe(false)
+      if (result.ok) {
+        return
+      }
+      expect(result.code).toBe('quota')
+    } finally {
+      if (previousWindow === undefined) {
+        delete (globalThis as { window?: unknown }).window
+      } else {
+        ;(globalThis as { window: unknown }).window = previousWindow
+      }
+    }
+  })
 })
+
+function createLocalStorageMock(overrides?: {
+  setItem?: (key: string, value: string) => void
+}): Storage {
+  const data = new Map<string, string>()
+  return {
+    get length() {
+      return data.size
+    },
+    clear() {
+      data.clear()
+    },
+    getItem(key: string) {
+      return data.has(key) ? (data.get(key) ?? null) : null
+    },
+    key(index: number) {
+      return [...data.keys()][index] ?? null
+    },
+    removeItem(key: string) {
+      data.delete(key)
+    },
+    setItem(key: string, value: string) {
+      if (overrides?.setItem) {
+        overrides.setItem(key, value)
+        return
+      }
+      data.set(key, value)
+    },
+  }
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useAsyncResource } from '@shared/runtime/useAsyncResource'
 
 import { fetchMapPoints, type MapPoint } from '../services/mapService'
 
@@ -10,25 +10,7 @@ interface UseMapPointsState {
 }
 
 export function useMapPoints(): UseMapPointsState {
-  const [points, setPoints] = useState<MapPoint[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const refresh = useCallback(async () => {
-    try {
-      setError(null)
-      const next = await fetchMapPoints()
-      setPoints(next)
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
+  const { data: points, loading, error, refresh } = useAsyncResource<MapPoint[]>(fetchMapPoints, [])
 
   return {
     points,

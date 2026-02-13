@@ -18,6 +18,7 @@ import {
 
 import { OPEN_THREAD_EVENT } from '@app/config/events'
 import { SETTINGS_CONNECTIVITY_ROUTE } from '@app/config/routes'
+import { useRuntimeHealth } from '@app/state/RuntimeHealthProvider'
 import { useChatsState } from '@features/chats/state/ChatsProvider'
 import { publishAppNotification } from '@shared/runtime/notifications'
 import {
@@ -26,24 +27,12 @@ import {
   updateWeftPreferences,
 } from '@shared/runtime/preferences'
 import { formatRelativeFromNow } from '@shared/utils/time'
-import {
-  daemonRestart,
-  daemonStart,
-  daemonStatus,
-  getLxmfMessageDeliveryTrace,
-  getLxmfOutboundPropagationNode,
-  getLxmfProfile,
-  listLxmfInterfaces,
-  listLxmfMessages,
-  listLxmfPropagationNodes,
-  probeLxmf,
-  setLxmfOutboundPropagationNode,
-} from '@lib/lxmf-api'
+import { daemonRestart, daemonStart, probeLxmf } from '@lib/lxmf-api'
 import type { LxmfProbeReport } from '@lib/lxmf-contract'
-import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
-import type { DeliveryDiagnosticsSnapshot, RecoveryEvent } from './DeliveryDiagnosticsDrawer'
+import { useDeliveryDiagnostics } from './topbar/useDeliveryDiagnostics'
+import { useRelayRecovery } from './topbar/useRelayRecovery'
 
 const DeliveryDiagnosticsDrawer = lazy(() =>
   import('./DeliveryDiagnosticsDrawer').then(module => ({
@@ -58,42 +47,39 @@ function preloadDeliveryDiagnosticsDrawer() {
 export function TopBar() {
   const navigate = useNavigate()
   const reduceMotion = useReducedMotion()
-  const [probing, setProbing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false)
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
-  const [hasOpenedDiagnostics, setHasOpenedDiagnostics] = useState(false)
-  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
-  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
-  const [diagnosticsSnapshot, setDiagnosticsSnapshot] =
-    useState<DeliveryDiagnosticsSnapshot | null>(null)
   const [runtimeTarget, setRuntimeTarget] = useState(() => getRuntimeConnectionOptions())
   const [runtimeMismatch, setRuntimeMismatch] = useState<string | null>(null)
-  const [recoveryEvents, setRecoveryEvents] = useState<RecoveryEvent[]>([])
   const notificationMenuRef = useRef<HTMLDivElement | null>(null)
   const hasProbedRef = useRef(false)
   const previousConnectedRef = useRef<boolean | null>(null)
   const previousMismatchRef = useRef<string | null>(null)
   const previousAutoSyncRef = useRef<string | null>(null)
   const runtimeRecoveryRef = useRef<Set<string>>(new Set())
-  const relayRecoveryAtMsRef = useRef(0)
   const { notifications, unreadCount, markRead, markAllRead, clearAll } = useNotificationCenter()
   const { offlineQueue, retryQueueNow, pauseQueue, resumeQueue, removeQueue, clearQueue } =
     useChatsState()
-
-  const appendRecoveryEvent = useCallback((entry: Omit<RecoveryEvent, 'id' | 'atMs'>) => {
-    setRecoveryEvents(previous =>
-      [
-        {
-          ...entry,
-          id: `${entry.category}:${entry.status}:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`,
-          atMs: Date.now(),
-        },
-        ...previous,
-      ].slice(0, 24)
-    )
-  }, [])
+  const {
+    snapshot: runtimeSnapshot,
+    loading: probing,
+    error,
+    refresh: refreshRuntimeHealth,
+  } = useRuntimeHealth()
+  const isConnected = Boolean(
+    runtimeSnapshot?.probe.rpc.reachable && runtimeSnapshot?.probe.local.running
+  )
+  const { recoveryEvents, appendRecoveryEvent, attemptRelayRecovery } =
+    useRelayRecovery(offlineQueue)
+  const {
+    diagnosticsOpen,
+    hasOpenedDiagnostics,
+    diagnosticsLoading,
+    diagnosticsError,
+    diagnosticsSnapshot,
+    openDiagnostics,
+    closeDiagnostics,
+    loadDiagnostics,
+  } = useDeliveryDiagnostics()
 
   const rememberConnectivity = useCallback((connected: boolean) => {
     const previous = previousConnectedRef.current
@@ -166,73 +152,10 @@ export function TopBar() {
     [appendRecoveryEvent, runtimeTarget]
   )
 
-  const attemptRelayRecovery = useCallback(
-    async (manual: boolean) => {
-      const nowMs = Date.now()
-      if (!manual && nowMs - relayRecoveryAtMsRef.current < 60_000) {
-        return
-      }
-      const requiresRelay = offlineQueue.some(
-        entry => entry.reasonCode === 'relay_unset' && entry.status !== 'paused'
-      )
-      if (!manual && !requiresRelay) {
-        return
-      }
-      relayRecoveryAtMsRef.current = nowMs
-      try {
-        const [outboundNode, propagationNodes] = await Promise.all([
-          getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
-          listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
-        ])
-        if (outboundNode.peer) {
-          appendRecoveryEvent({
-            category: 'relay',
-            status: 'info',
-            detail: `Relay already selected (${shortenValue(outboundNode.peer)}).`,
-          })
-          return
-        }
-        const candidate = [...propagationNodes.nodes].sort(
-          (left, right) => right.last_seen - left.last_seen
-        )[0]
-        if (!candidate) {
-          appendRecoveryEvent({
-            category: 'relay',
-            status: 'failed',
-            detail: 'No propagation nodes available for automatic relay selection.',
-          })
-          return
-        }
-        await setLxmfOutboundPropagationNode(candidate.peer)
-        appendRecoveryEvent({
-          category: 'relay',
-          status: 'success',
-          detail: `Selected relay ${shortenValue(candidate.peer)} automatically.`,
-        })
-        publishAppNotification({
-          kind: 'system',
-          title: 'Relay selected automatically',
-          body: `Using ${shortenValue(candidate.peer)} for propagated delivery.`,
-        })
-      } catch (relayError) {
-        appendRecoveryEvent({
-          category: 'relay',
-          status: 'failed',
-          detail: relayError instanceof Error ? relayError.message : String(relayError),
-        })
-      }
-    },
-    [appendRecoveryEvent, offlineQueue]
-  )
-
-  const refresh = useCallback(async () => {
-    try {
-      setProbing(true)
-      setError(null)
-      const probe = await probeLxmf()
+  const reconcileRuntimeProbe = useCallback(
+    async (probe: LxmfProbeReport) => {
       const nextConnected = probe.rpc.reachable && probe.local.running
       const mismatch = buildRuntimeMismatch(runtimeTarget, probe)
-      setIsConnected(nextConnected)
       rememberConnectivity(nextConnected)
 
       if (mismatch && nextConnected) {
@@ -283,59 +206,19 @@ export function TopBar() {
         })
       }
       previousMismatchRef.current = mismatch
-    } catch (probeError) {
-      setIsConnected(false)
-      setRuntimeMismatch(null)
-      setError(probeError instanceof Error ? probeError.message : String(probeError))
-      rememberConnectivity(false)
-    } finally {
-      setProbing(false)
-    }
-  }, [appendRecoveryEvent, attemptRuntimeRecovery, rememberConnectivity, runtimeTarget])
+    },
+    [appendRecoveryEvent, attemptRuntimeRecovery, rememberConnectivity, runtimeTarget]
+  )
 
-  const loadDiagnostics = useCallback(async () => {
-    try {
-      setDiagnosticsLoading(true)
-      setDiagnosticsError(null)
-      const [status, probe, profile, outboundNode, propagationNodes, interfaces, messages] =
-        await Promise.all([
-          daemonStatus(),
-          probeLxmf(),
-          getLxmfProfile().catch(() => null),
-          getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
-          listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
-          listLxmfInterfaces().catch(() => ({ interfaces: [], meta: null })),
-          listLxmfMessages().catch(() => ({ messages: [], meta: null })),
-        ])
-      const messageCandidates = selectDiagnosticsMessages(messages.messages)
-      const traceResults = await Promise.all(
-        messageCandidates.map(async message => {
-          const trace = await getLxmfMessageDeliveryTrace(message.id).catch(() => null)
-          return {
-            id: message.id,
-            destination: message.destination,
-            timestamp: message.timestamp,
-            receiptStatus: message.receipt_status,
-            transitions: trace?.transitions ?? [],
-          }
-        })
-      )
-      setDiagnosticsSnapshot({
-        capturedAtMs: Date.now(),
-        status,
-        probe,
-        profile,
-        outboundNode,
-        propagationNodes,
-        interfaces,
-        outboundMessages: traceResults,
-      })
-    } catch (loadError) {
-      setDiagnosticsError(loadError instanceof Error ? loadError.message : String(loadError))
-    } finally {
-      setDiagnosticsLoading(false)
+  const refresh = useCallback(async () => {
+    const next = await refreshRuntimeHealth()
+    if (!next) {
+      setRuntimeMismatch(null)
+      rememberConnectivity(false)
+      return
     }
-  }, [])
+    await reconcileRuntimeProbe(next.probe)
+  }, [reconcileRuntimeProbe, refreshRuntimeHealth, rememberConnectivity])
 
   const runAutoRecoveryNow = useCallback(async () => {
     await refresh()
@@ -344,12 +227,19 @@ export function TopBar() {
   }, [attemptRelayRecovery, loadDiagnostics, refresh])
 
   useEffect(() => {
-    void refresh()
-    const interval = window.setInterval(() => {
-      void refresh()
-    }, 20_000)
-    return () => window.clearInterval(interval)
-  }, [refresh])
+    if (!runtimeSnapshot) {
+      if (error) {
+        rememberConnectivity(false)
+      }
+      return
+    }
+    const timeoutId = window.setTimeout(() => {
+      void reconcileRuntimeProbe(runtimeSnapshot.probe)
+    }, 0)
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [error, reconcileRuntimeProbe, rememberConnectivity, runtimeSnapshot])
 
   useEffect(() => {
     const syncTarget = () => {
@@ -564,8 +454,7 @@ export function TopBar() {
             onMouseEnter={preloadDeliveryDiagnosticsDrawer}
             onFocus={preloadDeliveryDiagnosticsDrawer}
             onClick={() => {
-              setHasOpenedDiagnostics(true)
-              setDiagnosticsOpen(true)
+              openDiagnostics()
             }}
           >
             <Activity className="h-3.5 w-3.5" />
@@ -632,7 +521,7 @@ export function TopBar() {
             recoveryEvents={recoveryEvents}
             queueEntries={offlineQueue}
             onClose={() => {
-              setDiagnosticsOpen(false)
+              closeDiagnostics()
             }}
             onRefresh={() => {
               void loadDiagnostics()
@@ -654,39 +543,6 @@ export function TopBar() {
         </Suspense>
       ) : null}
     </>
-  )
-}
-
-function selectDiagnosticsMessages(messages: LxmfMessageRecord[]): LxmfMessageRecord[] {
-  const outbound = messages
-    .filter(message => message.direction === 'out')
-    .sort((left, right) => right.timestamp - left.timestamp)
-  const priority = outbound.filter(message => isActionableStatus(message.receipt_status))
-  const selected: LxmfMessageRecord[] = []
-  const seen = new Set<string>()
-  for (const message of [...priority, ...outbound]) {
-    if (seen.has(message.id)) {
-      continue
-    }
-    seen.add(message.id)
-    selected.push(message)
-    if (selected.length >= 6) {
-      break
-    }
-  }
-  return selected
-}
-
-function isActionableStatus(status: string | null): boolean {
-  if (!status) {
-    return true
-  }
-  const normalized = status.trim().toLowerCase()
-  return (
-    normalized.startsWith('failed') ||
-    normalized.startsWith('retrying') ||
-    normalized.startsWith('sending') ||
-    normalized.startsWith('queued')
   )
 }
 
@@ -769,14 +625,4 @@ function isSameRuntimeTarget(
     normalizeProfile(left.profile) === normalizeProfile(right.profile) &&
     normalizeRpcEndpoint(left.rpc) === normalizeRpcEndpoint(right.rpc)
   )
-}
-
-function shortenValue(value: string | null): string {
-  if (!value) {
-    return '—'
-  }
-  if (value.length <= 20) {
-    return value
-  }
-  return `${value.slice(0, 10)}...${value.slice(-8)}`
 }

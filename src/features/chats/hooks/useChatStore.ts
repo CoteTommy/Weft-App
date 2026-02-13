@@ -290,6 +290,7 @@ export function useChatStore({
         pinned: false,
         muted: false,
         lastActivity: 'new',
+        lastActivityAtMs: Date.now(),
         messages: [],
       }
       draftThreadsRef.current.set(threadId, draft)

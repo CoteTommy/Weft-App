@@ -1,5 +1,6 @@
 import { PREFERENCES_UPDATED_EVENT } from '@app/config/events'
 import { DEFAULT_MAIN_ROUTE } from '@app/config/routes'
+import { readStoredJson, type StorageWriteResult, writeStoredJson } from '@shared/runtime/storage'
 
 export type ConnectivityMode = 'automatic' | 'local_only' | 'lan_shared' | 'custom'
 export type MotionPreference = 'smooth' | 'snappy' | 'off'
@@ -25,6 +26,7 @@ export interface WeftPreferences {
 }
 
 const PREFERENCES_KEY = 'weft.preferences.v1'
+let volatilePreferences: WeftPreferences | null = null
 
 export { PREFERENCES_UPDATED_EVENT }
 
@@ -45,22 +47,23 @@ const DEFAULT_PREFERENCES: WeftPreferences = {
 }
 
 export function getWeftPreferences(): WeftPreferences {
+  if (volatilePreferences) {
+    return { ...volatilePreferences }
+  }
   if (typeof window === 'undefined') {
     return { ...DEFAULT_PREFERENCES }
   }
-  const raw = window.localStorage.getItem(PREFERENCES_KEY)
-  if (!raw) {
+  const parsed = readStoredJson<Partial<WeftPreferences>>(PREFERENCES_KEY)
+  if (!parsed) {
+    volatilePreferences = { ...DEFAULT_PREFERENCES }
     return { ...DEFAULT_PREFERENCES }
   }
-  try {
-    const parsed = JSON.parse(raw) as Partial<WeftPreferences>
-    return {
-      ...DEFAULT_PREFERENCES,
-      ...sanitizePreferences(parsed),
-    }
-  } catch {
-    return { ...DEFAULT_PREFERENCES }
+  const next = {
+    ...DEFAULT_PREFERENCES,
+    ...sanitizePreferences(parsed),
   }
+  volatilePreferences = next
+  return { ...next }
 }
 
 export function updateWeftPreferences(patch: Partial<WeftPreferences>): WeftPreferences {
@@ -109,11 +112,16 @@ export function consumePendingLaunchRoute(): string | null {
 }
 
 function persist(value: WeftPreferences): void {
+  volatilePreferences = { ...value }
   if (typeof window === 'undefined') {
     return
   }
-  window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify(value))
+  void persistWeftPreferences(value)
   window.dispatchEvent(new Event(PREFERENCES_UPDATED_EVENT))
+}
+
+export function persistWeftPreferences(value: WeftPreferences): StorageWriteResult {
+  return writeStoredJson(PREFERENCES_KEY, value)
 }
 
 function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPreferences> {

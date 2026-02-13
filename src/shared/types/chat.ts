@@ -48,6 +48,7 @@ export interface ChatThread {
   pinned: boolean
   muted: boolean
   lastActivity: string
+  lastActivityAtMs: number
   messages: ChatMessage[]
 }
 

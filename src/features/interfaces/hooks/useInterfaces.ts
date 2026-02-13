@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
-
+import { useAsyncResource } from '@shared/runtime/useAsyncResource'
 import type { InterfaceItem, InterfaceMetrics } from '@shared/types/interfaces'
 
 import { fetchInterfaceSnapshot } from '../services/interfacesService'
@@ -13,36 +12,19 @@ interface UseInterfacesState {
 }
 
 export function useInterfaces(): UseInterfacesState {
-  const [interfaces, setInterfaces] = useState<InterfaceItem[]>([])
-  const [metrics, setMetrics] = useState<InterfaceMetrics>({
-    total: 0,
-    enabled: 0,
-    disabled: 0,
-    byType: {},
+  const { data, loading, error, refresh } = useAsyncResource(fetchInterfaceSnapshot, {
+    interfaces: [] as InterfaceItem[],
+    metrics: {
+      total: 0,
+      enabled: 0,
+      disabled: 0,
+      byType: {} as InterfaceMetrics['byType'],
+    },
   })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const refresh = useCallback(async () => {
-    try {
-      setError(null)
-      const snapshot = await fetchInterfaceSnapshot()
-      setInterfaces(snapshot.interfaces)
-      setMetrics(snapshot.metrics)
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
 
   return {
-    interfaces,
-    metrics,
+    interfaces: data.interfaces,
+    metrics: data.metrics,
     loading,
     error,
     refresh,

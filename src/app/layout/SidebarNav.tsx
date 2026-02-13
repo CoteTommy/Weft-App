@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 
 import clsx from 'clsx'
 
 import { APP_ROUTES, getRoutePrefetchLoader, getSidebarNavItems } from '@app/config/routes'
+import { useRuntimeHealth } from '@app/state/RuntimeHealthProvider'
 import { useChatsState } from '@features/chats/state/ChatsProvider'
 import { getWeftPreferences, PREFERENCES_UPDATED_EVENT } from '@shared/runtime/preferences'
 import {
@@ -12,7 +13,6 @@ import {
   resolveDisplayName,
   shortHash,
 } from '@shared/utils/identity'
-import { getLxmfProfile, probeLxmf } from '@lib/lxmf-api'
 
 const prefetchedRoutes = new Set<string>()
 
@@ -30,46 +30,34 @@ function prefetchRouteModule(route: string) {
 
 export function SidebarNav() {
   const { threads } = useChatsState()
-  const [displayName, setDisplayName] = useState(() => getStoredDisplayName() ?? 'Loading...')
-  const [identityHint, setIdentityHint] = useState<string | null>(null)
+  const { snapshot, refresh } = useRuntimeHealth()
   const [commandCenterEnabled, setCommandCenterEnabled] = useState(
     () => getWeftPreferences().commandCenterEnabled
   )
   const totalUnread = threads.reduce((sum, thread) => sum + (thread.muted ? 0 : thread.unread), 0)
   const renderedNavItems = getSidebarNavItems(commandCenterEnabled)
 
-  const refreshIdentity = useCallback(async () => {
-    try {
-      const [probe, profile] = await Promise.all([probeLxmf(), getLxmfProfile().catch(() => null)])
-      setDisplayName(
-        resolveDisplayName(probe.profile, probe.rpc.identity_hash, profile?.displayName ?? null)
+  const displayName = snapshot
+    ? resolveDisplayName(
+        snapshot.probe.profile,
+        snapshot.probe.rpc.identity_hash,
+        snapshot.profile?.displayName ?? null
       )
-      const identityHash = probe.rpc.identity_hash?.trim()
-      setIdentityHint(identityHash ? shortHash(identityHash, 8) : probe.profile)
-    } catch {
-      setDisplayName(current => (current === 'Loading...' ? 'Unknown' : current))
-      setIdentityHint(null)
-    }
-  }, [])
+    : (getStoredDisplayName() ?? 'Loading...')
+  const identityHint = snapshot?.probe.rpc.identity_hash?.trim()
+    ? shortHash(snapshot.probe.rpc.identity_hash, 8)
+    : (snapshot?.probe.profile ?? null)
 
   useEffect(() => {
     const onDisplayNameUpdate = () => {
-      void refreshIdentity()
+      void refresh()
     }
-    const timeoutId = window.setTimeout(() => {
-      void refreshIdentity()
-    }, 0)
-    const intervalId = window.setInterval(() => {
-      void refreshIdentity()
-    }, 20_000)
     window.addEventListener(DISPLAY_NAME_UPDATED_EVENT, onDisplayNameUpdate)
 
     return () => {
-      window.clearTimeout(timeoutId)
-      window.clearInterval(intervalId)
       window.removeEventListener(DISPLAY_NAME_UPDATED_EVENT, onDisplayNameUpdate)
     }
-  }, [refreshIdentity])
+  }, [refresh])
 
   useEffect(() => {
     const syncPreferences = () => {

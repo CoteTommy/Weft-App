@@ -2,7 +2,11 @@ import { describe, expect, test } from 'bun:test'
 
 import type { ChatMessage, ChatThread } from '@shared/types/chat'
 
-import { reduceReceiptUpdate, reduceRuntimeMessage } from '../state/chatThreadsReducer'
+import {
+  reduceHydratedThreads,
+  reduceReceiptUpdate,
+  reduceRuntimeMessage,
+} from '../state/chatThreadsReducer'
 
 function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -26,12 +30,23 @@ function makeThread(overrides: Partial<ChatThread> = {}): ChatThread {
     pinned: false,
     muted: false,
     lastActivity: 'now',
+    lastActivityAtMs: Date.now(),
     messages: [makeMessage()],
     ...overrides,
   }
 }
 
 describe('chat threads domain reducer', () => {
+  test('orders threads by pin, recency, then id', () => {
+    const unordered = [
+      makeThread({ id: 'c', pinned: false, lastActivityAtMs: 100 }),
+      makeThread({ id: 'b', pinned: true, lastActivityAtMs: 50 }),
+      makeThread({ id: 'a', pinned: false, lastActivityAtMs: 100 }),
+    ]
+    const next = reduceHydratedThreads(unordered, [])
+    expect(next.map(thread => thread.id)).toEqual(['b', 'a', 'c'])
+  })
+
   test('upserts runtime message into existing thread', () => {
     const base = [makeThread()]
     const incoming = makeMessage({ id: 'm-2', body: 'updated' })
@@ -51,6 +66,28 @@ describe('chat threads domain reducer', () => {
     expect(next[0].messages).toHaveLength(2)
     expect(next[0].preview).toBe('updated')
     expect(next[0].unread).toBe(2)
+  })
+
+  test('runtime message reorders thread when newer activity arrives', () => {
+    const base = [
+      makeThread({ id: 'older', lastActivityAtMs: 100 }),
+      makeThread({ id: 'newer', lastActivityAtMs: 200 }),
+    ]
+    const incoming = makeMessage({ id: 'm-2', body: 'fresh' })
+    const next = reduceRuntimeMessage(base, {
+      applyThreadMetadata: thread => thread,
+      derivedThread: makeThread({
+        id: 'older',
+        lastActivity: 'just now',
+        lastActivityAtMs: 500,
+        messages: [incoming],
+      }),
+      mergedMessage: incoming,
+      unread: 1,
+    })
+
+    expect(next.map(thread => thread.id)).toEqual(['older', 'newer'])
+    expect(next[0].lastActivityAtMs).toBe(500)
   })
 
   test('applies receipt updates to outbound messages', () => {

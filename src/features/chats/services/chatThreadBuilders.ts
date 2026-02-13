@@ -47,6 +47,7 @@ export function buildThreads(
         pinned: false,
         muted: false,
         lastActivity: formatRelativeFromNow(lastTimestampMs),
+        lastActivityAtMs: lastTimestampMs,
         messages,
       } satisfies ChatThread,
     }

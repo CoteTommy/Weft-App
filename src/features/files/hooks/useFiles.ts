@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
-
+import { useAsyncResource } from '@shared/runtime/useAsyncResource'
 import type { FileItem } from '@shared/types/files'
 
 import { fetchFiles } from '../services/filesService'
@@ -12,25 +11,7 @@ interface UseFilesState {
 }
 
 export function useFiles(): UseFilesState {
-  const [files, setFiles] = useState<FileItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const refresh = useCallback(async () => {
-    try {
-      setError(null)
-      const items = await fetchFiles()
-      setFiles(items)
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
+  const { data: files, loading, error, refresh } = useAsyncResource<FileItem[]>(fetchFiles, [])
 
   return {
     files,

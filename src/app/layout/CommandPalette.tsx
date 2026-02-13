@@ -36,6 +36,7 @@ export function CommandPalette() {
     () => getWeftPreferences().commandCenterEnabled
   )
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
 
   const focusSearch = () => {
     window.dispatchEvent(new Event(FOCUS_SEARCH_EVENT))
@@ -212,6 +213,43 @@ export function CommandPalette() {
   }, [open])
 
   useEffect(() => {
+    if (!open) {
+      return
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') {
+        return
+      }
+      const root = dialogRef.current
+      if (!root) {
+        return
+      }
+      const focusable = getFocusableElements(root)
+      if (focusable.length === 0) {
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement
+      if (event.shiftKey) {
+        if (active === first || !root.contains(active)) {
+          event.preventDefault()
+          last.focus()
+        }
+        return
+      }
+      if (active === last || !root.contains(active)) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  useEffect(() => {
     const syncPreferences = () => {
       setCommandCenterEnabled(getWeftPreferences().commandCenterEnabled)
     }
@@ -312,10 +350,17 @@ export function CommandPalette() {
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/30 p-4" onClick={() => setOpen(false)}>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="command-palette-title"
         className="mx-auto mt-[10vh] w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_-35px_rgba(15,23,42,0.6)]"
         onClick={event => event.stopPropagation()}
       >
         <div className="border-b border-slate-100 p-3">
+          <h2 id="command-palette-title" className="sr-only">
+            Command palette
+          </h2>
           <input
             ref={inputRef}
             value={query}
@@ -371,5 +416,19 @@ export function CommandPalette() {
         </div>
       </div>
     </div>
+  )
+}
+
+function getFocusableElements(root: HTMLElement): HTMLElement[] {
+  const selector = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(',')
+  return [...root.querySelectorAll<HTMLElement>(selector)].filter(
+    element => !element.hasAttribute('disabled') && !element.getAttribute('aria-hidden')
   )
 }

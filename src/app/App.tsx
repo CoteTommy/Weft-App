@@ -10,6 +10,7 @@ import { prefetchRouteChunks } from '@app/routing/prefetch'
 import { DeepLinkBridge } from '@app/runtime/DeepLinkBridge'
 import { transitionForMotionPreference } from '@app/runtime/motion'
 import { NotificationCenterProvider } from '@app/state/NotificationCenterProvider'
+import { RuntimeHealthProvider } from '@app/state/RuntimeHealthProvider'
 import { ChatsStateLayout } from '@features/chats/state/ChatsProvider'
 import {
   getWeftPreferences,
@@ -59,45 +60,47 @@ export default function App() {
       reducedMotion={motionPreference === 'off' ? 'always' : 'user'}
       transition={transitionForMotionPreference(motionPreference)}
     >
-      <NotificationCenterProvider>
-        <DeepLinkBridge onboardingCompleted={onboardingCompleted} />
-        <Suspense fallback={<AppRouteFallback />}>
-          <Routes>
-            <Route
-              path={APP_ROUTES.welcome}
-              element={
-                onboardingCompleted ? <Navigate to={lastMainRoute} replace /> : <WelcomePage />
-              }
-            />
-            <Route
-              element={
-                onboardingCompleted ? (
-                  <ChatsStateLayout />
-                ) : (
-                  <Navigate to={APP_ROUTES.welcome} replace />
-                )
-              }
-            >
-              <Route element={<AppShell />}>
-                <Route index element={<Navigate to={lastMainRoute} replace />} />
-                {MAIN_ROUTES.map(route => (
-                  <Route
-                    key={route.path}
-                    path={route.path}
-                    element={route.element({ commandCenterEnabled })}
-                  />
-                ))}
+      <RuntimeHealthProvider>
+        <NotificationCenterProvider>
+          <DeepLinkBridge onboardingCompleted={onboardingCompleted} />
+          <Suspense fallback={<AppRouteFallback />}>
+            <Routes>
+              <Route
+                path={APP_ROUTES.welcome}
+                element={
+                  onboardingCompleted ? <Navigate to={lastMainRoute} replace /> : <WelcomePage />
+                }
+              />
+              <Route
+                element={
+                  onboardingCompleted ? (
+                    <ChatsStateLayout />
+                  ) : (
+                    <Navigate to={APP_ROUTES.welcome} replace />
+                  )
+                }
+              >
+                <Route element={<AppShell />}>
+                  <Route index element={<Navigate to={lastMainRoute} replace />} />
+                  {MAIN_ROUTES.map(route => (
+                    <Route
+                      key={route.path}
+                      path={route.path}
+                      element={route.element({ commandCenterEnabled })}
+                    />
+                  ))}
+                </Route>
               </Route>
-            </Route>
-            <Route
-              path="*"
-              element={
-                <Navigate to={onboardingCompleted ? lastMainRoute : APP_ROUTES.welcome} replace />
-              }
-            />
-          </Routes>
-        </Suspense>
-      </NotificationCenterProvider>
+              <Route
+                path="*"
+                element={
+                  <Navigate to={onboardingCompleted ? lastMainRoute : APP_ROUTES.welcome} replace />
+                }
+              />
+            </Routes>
+          </Suspense>
+        </NotificationCenterProvider>
+      </RuntimeHealthProvider>
     </MotionConfig>
   )
 }

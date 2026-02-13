@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
-
+import { useAsyncResource } from '@shared/runtime/useAsyncResource'
 import type { PersonItem } from '@shared/types/people'
 
 import { fetchPeople } from '../services/peopleService'
@@ -12,25 +11,7 @@ interface UsePeopleState {
 }
 
 export function usePeople(): UsePeopleState {
-  const [people, setPeople] = useState<PersonItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const refresh = useCallback(async () => {
-    try {
-      setError(null)
-      const items = await fetchPeople()
-      setPeople(items)
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
+  const { data: people, loading, error, refresh } = useAsyncResource<PersonItem[]>(fetchPeople, [])
 
   return {
     people,

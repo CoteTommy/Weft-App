@@ -50,7 +50,12 @@ export default defineConfig([
         ? {
             'tailwindcss/classnames-order': 'warn',
             'tailwindcss/no-unnecessary-arbitrary-value': 'warn',
-            'tailwindcss/no-custom-classname': 'off',
+            'tailwindcss/no-custom-classname': [
+              'warn',
+              {
+                whitelist: ['ui-transition', 'font-heading', 'motion-gpu'],
+              },
+            ],
           }
         : {}),
     },

@@ -5,6 +5,7 @@ import {
   extractFilesFromMessages,
   extractMapPointsFromMessages,
   type ParsedMapPoint,
+  type PayloadParseMessageRecord,
 } from './payloadParseCore'
 
 export type { ParsedMapPoint } from './payloadParseCore'
@@ -14,7 +15,7 @@ type ParseJobKind = 'map_points' | 'file_items'
 interface ParseWorkerRequest {
   id: number
   kind: ParseJobKind
-  messages: LxmfMessageRecord[]
+  messages: PayloadParseMessageRecord[]
 }
 
 interface ParseWorkerSuccessResponse {
@@ -45,24 +46,26 @@ const pending = new Map<
 export async function parseMapPointsOffThread(
   messages: LxmfMessageRecord[]
 ): Promise<ParsedMapPoint[]> {
+  const slimmed = toPayloadParseMessages(messages)
   try {
-    const parsed = await runParseJob('map_points', messages)
+    const parsed = await runParseJob('map_points', slimmed)
     return parsed as ParsedMapPoint[]
   } catch {
-    return extractMapPointsFromMessages(messages)
+    return extractMapPointsFromMessages(slimmed)
   }
 }
 
 export async function parseFileItemsOffThread(messages: LxmfMessageRecord[]): Promise<FileItem[]> {
+  const slimmed = toPayloadParseMessages(messages)
   try {
-    const parsed = await runParseJob('file_items', messages)
+    const parsed = await runParseJob('file_items', slimmed)
     return parsed as FileItem[]
   } catch {
-    return extractFilesFromMessages(messages)
+    return extractFilesFromMessages(slimmed)
   }
 }
 
-function runParseJob(kind: ParseJobKind, messages: LxmfMessageRecord[]): Promise<unknown> {
+function runParseJob(kind: ParseJobKind, messages: PayloadParseMessageRecord[]): Promise<unknown> {
   const instance = getWorker()
   if (!instance) {
     return Promise.reject(new Error('worker unavailable'))
@@ -78,6 +81,19 @@ function runParseJob(kind: ParseJobKind, messages: LxmfMessageRecord[]): Promise
       reject(error instanceof Error ? error : new Error(String(error)))
     }
   })
+}
+
+function toPayloadParseMessages(messages: LxmfMessageRecord[]): PayloadParseMessageRecord[] {
+  return messages.map(message => ({
+    id: message.id,
+    source: message.source,
+    destination: message.destination,
+    title: message.title,
+    content: message.content,
+    timestamp: message.timestamp,
+    direction: message.direction,
+    fields: message.fields,
+  }))
 }
 
 function getWorker(): Worker | null {

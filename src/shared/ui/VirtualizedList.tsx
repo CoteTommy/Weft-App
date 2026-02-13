@@ -1,4 +1,6 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useRef } from 'react'
+
+import { useVirtualizer } from '@tanstack/react-virtual'
 
 interface VirtualizedListProps<T> {
   items: T[]
@@ -20,60 +22,46 @@ export function VirtualizedList<T>({
   renderItem,
 }: VirtualizedListProps<T>) {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const [scrollTop, setScrollTop] = useState(0)
-  const [viewportHeight, setViewportHeight] = useState(0)
   const safeEstimate = Math.max(estimateItemHeight, 1)
   const safeOverscan = Math.max(overscan, 0)
 
-  const setContainerRef = useCallback((node: HTMLDivElement | null) => {
-    containerRef.current = node
-    setViewportHeight(node?.clientHeight ?? 0)
-  }, [])
-
-  useEffect(() => {
-    const node = containerRef.current
-    if (!node) {
-      return
-    }
-    if (typeof ResizeObserver === 'undefined') {
-      return
-    }
-    const resizeObserver = new ResizeObserver(() => {
-      setViewportHeight(node.clientHeight)
-    })
-    resizeObserver.observe(node)
-    return () => {
-      resizeObserver.disconnect()
-    }
-  }, [])
-
-  const visibleCount = Math.max(1, Math.ceil(viewportHeight / safeEstimate))
-  const startIndex = Math.max(0, Math.floor(scrollTop / safeEstimate) - safeOverscan)
-  const endIndex = Math.min(items.length, startIndex + visibleCount + safeOverscan * 2)
-  const topPadding = startIndex * safeEstimate
-  const bottomPadding = Math.max(0, (items.length - endIndex) * safeEstimate)
-
-  const visibleItems = useMemo(
-    () => items.slice(startIndex, endIndex),
-    [endIndex, items, startIndex]
-  )
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => safeEstimate,
+    overscan: safeOverscan,
+  })
+  const virtualItems = virtualizer.getVirtualItems()
 
   return (
-    <div
-      ref={setContainerRef}
-      className={className}
-      onScroll={event => setScrollTop(event.currentTarget.scrollTop)}
-    >
+    <div ref={containerRef} className={className}>
       <div
         className={listClassName}
         style={{
-          paddingTop: `${topPadding}px`,
-          paddingBottom: `${bottomPadding}px`,
+          height: `${virtualizer.getTotalSize()}px`,
+          position: 'relative',
+          width: '100%',
         }}
       >
-        {visibleItems.map((item, index) => {
-          const absoluteIndex = startIndex + index
-          return <div key={getKey(item, absoluteIndex)}>{renderItem(item, absoluteIndex)}</div>
+        {virtualItems.map(virtualItem => {
+          const item = items[virtualItem.index]
+          return (
+            <div
+              key={getKey(item, virtualItem.index)}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              {renderItem(item, virtualItem.index)}
+            </div>
+          )
         })}
       </div>
     </div>

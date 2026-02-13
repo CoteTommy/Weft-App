@@ -1,14 +1,16 @@
 /// <reference lib="webworker" />
-import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
-
-import { extractFilesFromMessages, extractMapPointsFromMessages } from './payloadParseCore'
+import {
+  extractFilesFromMessages,
+  extractMapPointsFromMessages,
+  type PayloadParseMessageRecord,
+} from './payloadParseCore'
 
 type ParseJobKind = 'map_points' | 'file_items'
 
 interface ParseWorkerRequest {
   id: number
   kind: ParseJobKind
-  messages: LxmfMessageRecord[]
+  messages: PayloadParseMessageRecord[]
 }
 
 interface ParseWorkerSuccessResponse {

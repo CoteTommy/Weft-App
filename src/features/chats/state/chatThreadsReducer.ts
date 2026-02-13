@@ -130,10 +130,14 @@ export function reduceRuntimeMessage(
 
   const existing = threads[index]
   const messages = upsertThreadMessages(existing.messages, mergedMessage)
+  const derivedLastActivityAtMs = normalizeThreadLastActivityAtMs(derivedThread)
+  const existingLastActivityAtMs = normalizeThreadLastActivityAtMs(existing)
+  const nextLastActivityAtMs = Math.max(existingLastActivityAtMs, derivedLastActivityAtMs)
   const updatedThread = applyThreadMetadata({
     ...existing,
     preview: previewFromMessage(messages[messages.length - 1]),
     lastActivity: derivedThread.lastActivity,
+    lastActivityAtMs: nextLastActivityAtMs,
     messages,
     unread: unread ?? existing.unread,
   })
@@ -193,7 +197,22 @@ export function appendDeliveryTraceEntry(
 }
 
 function orderThreads(threads: ChatThread[]): ChatThread[] {
-  return [...threads].sort((left, right) => Number(right.pinned) - Number(left.pinned))
+  return [...threads].sort((left, right) => {
+    const pinned = Number(right.pinned) - Number(left.pinned)
+    if (pinned !== 0) {
+      return pinned
+    }
+    const byActivity =
+      normalizeThreadLastActivityAtMs(right) - normalizeThreadLastActivityAtMs(left)
+    if (byActivity !== 0) {
+      return byActivity
+    }
+    return left.id.localeCompare(right.id)
+  })
+}
+
+function normalizeThreadLastActivityAtMs(thread: ChatThread): number {
+  return Number.isFinite(thread.lastActivityAtMs) ? thread.lastActivityAtMs : 0
 }
 
 function upsertThreadMessages(messages: ChatMessage[], incoming: ChatMessage): ChatMessage[] {
