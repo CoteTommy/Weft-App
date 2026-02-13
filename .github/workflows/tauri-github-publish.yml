@@ -22,14 +22,19 @@ jobs:
         include:
           - platform: 'macos-latest' # Arm based macs (M1 and above).
             args: '--target aarch64-apple-darwin'
+            artifact: 'macos-aarch64'
           - platform: 'macos-latest' # Intel based macs.
             args: '--target x86_64-apple-darwin'
+            artifact: 'macos-x64'
           - platform: 'ubuntu-22.04'
             args: '--config src-tauri/tauri.linux.conf.json'
+            artifact: 'linux-x64'
           - platform: 'ubuntu-22.04-arm'
             args: '--config src-tauri/tauri.linux.conf.json'
+            artifact: 'linux-arm64'
           - platform: 'windows-latest'
             args: '--config src-tauri/tauri.windows.conf.json'
+            artifact: 'windows-msi-x64'
 
     runs-on: ${{ matrix.platform }}
 
@@ -100,7 +105,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: weft-desktop-${{ matrix.platform }}
+          name: weft-desktop-${{ matrix.artifact }}
           path: |
             src-tauri/target/**/release/bundle/**
           if-no-files-found: warn
