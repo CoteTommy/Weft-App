@@ -13,6 +13,7 @@ import { AnnouncesPage } from '../features/announces/pages/AnnouncesPage'
 import { InterfacesPage } from '../features/interfaces/pages/InterfacesPage'
 import { NetworkPage } from '../features/network/pages/NetworkPage'
 import { MapPage } from '../features/map/pages/MapPage'
+import { CommandCenterPage } from '../features/command-center/pages/CommandCenterPage'
 import { DeepLinkBridge } from './runtime/DeepLinkBridge'
 import { NotificationCenterProvider } from './state/NotificationCenterProvider'
 import {
@@ -61,6 +62,7 @@ export default function App() {
               <Route path="/people" element={<PeoplePage />} />
               <Route path="/map" element={<MapPage />} />
               <Route path="/network" element={<NetworkPage />} />
+              <Route path="/command-center" element={<CommandCenterPage />} />
               <Route path="/interfaces" element={<InterfacesPage />} />
               <Route path="/announces" element={<AnnouncesPage />} />
               <Route path="/files" element={<FilesPage />} />

@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import {
   Activity,
   Bell,
+  Command,
   Folder,
   MapPin,
   MessageSquare,
@@ -25,6 +26,7 @@ const navItems = [
   { to: '/people', label: 'People', icon: Users },
   { to: '/map', label: 'Map', icon: MapPin },
   { to: '/network', label: 'Network', icon: Activity },
+  { to: '/command-center', label: 'Command Center', icon: Command },
   { to: '/interfaces', label: 'Interfaces', icon: Route },
   { to: '/announces', label: 'Announces', icon: Bell },
   { to: '/files', label: 'Files', icon: Folder },
