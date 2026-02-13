@@ -64,6 +64,7 @@ pub(crate) struct DesktopShellPreferencePatch {
 #[derive(Default)]
 pub(crate) struct DesktopShellState {
     prefs: Mutex<DesktopShellPreferences>,
+    mute_menu_item: Mutex<Option<MenuItem<tauri::Wry>>>,
 }
 
 impl DesktopShellState {
@@ -83,6 +84,7 @@ impl DesktopShellState {
         if let Ok(mut guard) = self.prefs.lock() {
             *guard = parsed;
         }
+        self.sync_tray_menu_label();
         Ok(())
     }
 
@@ -110,7 +112,29 @@ impl DesktopShellState {
         let next = guard.clone();
         drop(guard);
         persist_desktop_shell_preferences(app, &next)?;
+        self.sync_tray_menu_label();
         Ok(next)
+    }
+
+    pub(crate) fn set_mute_menu_item(&self, item: MenuItem<tauri::Wry>) {
+        if let Ok(mut guard) = self.mute_menu_item.lock() {
+            *guard = Some(item);
+        }
+        self.sync_tray_menu_label();
+    }
+
+    fn sync_tray_menu_label(&self) {
+        let muted = self.snapshot().notifications_muted;
+        let label = if muted {
+            "Unmute Notifications"
+        } else {
+            "Mute Notifications"
+        };
+        if let Ok(guard) = self.mute_menu_item.lock() {
+            if let Some(item) = guard.as_ref() {
+                let _ = item.set_text(label);
+            }
+        }
     }
 }
 
@@ -339,6 +363,7 @@ fn setup_status_tray(
         ],
     )
     .map_err(|err| format!("tray menu build failed: {err}"))?;
+    desktop_shell.set_mute_menu_item(mute_notifications_item.clone());
 
     let mut tray_builder = TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&menu)
