@@ -3,6 +3,8 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
 
+import { OPEN_THREAD_EVENT } from '@app/config/events'
+import { APP_ROUTES } from '@app/config/routes'
 import {
   getWeftPreferences,
   type MotionPreference,
@@ -16,8 +18,6 @@ import {
   setDesktopShellPreferences,
   subscribeTrayActions,
 } from '@lib/desktop-shell-api'
-import { OPEN_THREAD_EVENT } from '@app/config/events'
-import { APP_ROUTES } from '@app/config/routes'
 
 import { CommandPalette } from './CommandPalette'
 import { NotificationToasts } from './NotificationToasts'
@@ -210,13 +210,13 @@ export function AppShell() {
   }, [])
 
   return (
-    <div className="relative h-screen overflow-hidden bg-[var(--app-bg)] text-slate-900 motion-gpu">
+    <div className="motion-gpu relative h-screen overflow-hidden bg-[var(--app-bg)] text-slate-900">
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[1500px] gap-4 px-3 py-4 sm:px-4 lg:px-6 lg:py-6">
         <SidebarNav />
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <TopBar />
           <motion.div
-            className="min-h-0 flex-1 overflow-hidden motion-gpu"
+            className="motion-gpu min-h-0 flex-1 overflow-hidden"
             initial={false}
             animate={reduceMotion ? undefined : pageMotion}
           >

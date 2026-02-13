@@ -3,8 +3,8 @@ import { NavLink } from 'react-router-dom'
 import clsx from 'clsx'
 import { BellOff, Pin } from 'lucide-react'
 
-import type { ChatThread } from '@shared/types/chat'
 import { APP_ROUTES } from '@app/config/routes'
+import type { ChatThread } from '@shared/types/chat'
 
 interface ThreadListProps {
   threads: ChatThread[]

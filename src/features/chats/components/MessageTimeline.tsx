@@ -247,7 +247,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
                 onPointerLeave={clearHoldTimer}
                 onClick={() => openDetails(message)}
                 className={clsx(
-                  'max-w-[80%] rounded-2xl px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300',
+                  'max-w-[80%] rounded-2xl px-4 py-3 text-left transition focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:outline-none',
                   message.sender === 'self'
                     ? 'bg-blue-600 text-white hover:bg-blue-500'
                     : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50'
@@ -304,7 +304,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
             </div>
 
             <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="whitespace-pre-wrap break-words text-sm text-slate-800">
+              <p className="text-sm break-words whitespace-pre-wrap text-slate-800">
                 {selectedMessage.body}
               </p>
             </div>
@@ -490,7 +490,7 @@ function DetailRow({ label, value, mono = false }: DetailRowProps) {
   return (
     <p>
       <span className="font-semibold text-slate-700">{label}:</span>{' '}
-      <span className={clsx(mono ? 'break-all font-mono text-[11px]' : '')}>{value}</span>
+      <span className={clsx(mono ? 'font-mono text-[11px] break-all' : '')}>{value}</span>
     </p>
   )
 }

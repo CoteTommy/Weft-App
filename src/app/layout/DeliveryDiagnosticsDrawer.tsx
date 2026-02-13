@@ -175,7 +175,7 @@ export function DeliveryDiagnosticsDrawer({
                 ) : null}
 
                 <section className="rounded-2xl border border-slate-200 bg-slate-50/75 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  <p className="text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
                     Runtime
                   </p>
                   <div className="mt-2 space-y-1.5 text-xs text-slate-700">
@@ -214,7 +214,7 @@ export function DeliveryDiagnosticsDrawer({
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <p className="text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
                       Auto Recovery
                     </p>
                     <ShieldCheck className="h-4 w-4 text-slate-400" />
@@ -248,7 +248,7 @@ export function DeliveryDiagnosticsDrawer({
                 </section>
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  <p className="text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
                     Delivery traces
                   </p>
                   {!snapshot || snapshot.outboundMessages.length === 0 ? (
@@ -297,7 +297,7 @@ export function DeliveryDiagnosticsDrawer({
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <p className="text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
                       Offline queue
                     </p>
                     {queueEntries.length > 0 ? (

@@ -3,9 +3,16 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
-import tailwindcss from 'eslint-plugin-tailwindcss'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
+
+let tailwindcss
+try {
+  const tailwindModule = await import('eslint-plugin-tailwindcss')
+  tailwindcss = tailwindModule.default || tailwindModule
+} catch {
+  tailwindcss = null
+}
 
 export default defineConfig([
   globalIgnores(['dist', 'src-tauri/target', 'src-tauri/gen']),
@@ -23,7 +30,7 @@ export default defineConfig([
     },
     plugins: {
       'simple-import-sort': simpleImportSort,
-      tailwindcss,
+      ...(tailwindcss ? { tailwindcss } : {}),
     },
     rules: {
       'simple-import-sort/imports': [
@@ -39,8 +46,13 @@ export default defineConfig([
       ],
       'simple-import-sort/exports': 'error',
       'no-duplicate-imports': ['error', { allowSeparateTypeImports: false }],
-      'tailwindcss/classnames-order': 'warn',
-      'tailwindcss/no-custom-classname': 'off',
+      ...(tailwindcss
+        ? {
+            'tailwindcss/classnames-order': 'warn',
+            'tailwindcss/no-unnecessary-arbitrary-value': 'warn',
+            'tailwindcss/no-custom-classname': 'off',
+          }
+        : {}),
     },
   },
 ])

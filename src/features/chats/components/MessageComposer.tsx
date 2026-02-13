@@ -198,13 +198,13 @@ export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageC
           <input
             value={paperTitle}
             onChange={event => setPaperTitle(event.target.value)}
-            className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs text-slate-700 outline-none transition focus:border-amber-300"
+            className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs text-slate-700 transition outline-none focus:border-amber-300"
             placeholder="Paper title (optional)"
           />
           <input
             value={paperCategory}
             onChange={event => setPaperCategory(event.target.value)}
-            className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs text-slate-700 outline-none transition focus:border-amber-300"
+            className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs text-slate-700 transition outline-none focus:border-amber-300"
             placeholder="Paper category (optional)"
           />
         </div>
@@ -212,7 +212,7 @@ export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageC
       <div className="flex items-center gap-2">
         <input
           ref={textInputRef}
-          className="h-11 flex-1 rounded-xl border border-transparent px-3 text-sm text-slate-800 outline-none transition focus:border-blue-200 focus:bg-blue-50/50"
+          className="h-11 flex-1 rounded-xl border border-transparent px-3 text-sm text-slate-800 transition outline-none focus:border-blue-200 focus:bg-blue-50/50"
           placeholder="Type a message..."
           value={text}
           onChange={event => {

@@ -1,13 +1,13 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
+import { APP_ROUTES } from '@app/config/routes'
 import { FOCUS_NEW_CHAT_EVENT, FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 import { ListSkeleton } from '@shared/ui/ListSkeleton'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
 import { VirtualizedList } from '@shared/ui/VirtualizedList'
 import { parseLxmfContactReference } from '@shared/utils/contactReference'
-import { APP_ROUTES } from '@app/config/routes'
 
 import { ThreadListRow } from '../components/ThreadList'
 import { useChatsState } from '../state/ChatsProvider'
@@ -122,7 +122,7 @@ export function ChatsPage() {
               setDestinationInput(event.target.value)
               setComposeError(null)
             }}
-            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
             placeholder="Destination hash or lxma:// link"
           />
           <div className="flex items-center gap-2">
@@ -132,7 +132,7 @@ export function ChatsPage() {
                 setNameInput(event.target.value)
                 setComposeError(null)
               }}
-              className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+              className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
               placeholder="Optional display name"
             />
             <button
@@ -148,7 +148,7 @@ export function ChatsPage() {
           ref={searchInputRef}
           value={query}
           onChange={event => setQuery(event.target.value)}
-          className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+          className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
           placeholder="Search chats by name, destination, or latest message"
         />
         {error ? (

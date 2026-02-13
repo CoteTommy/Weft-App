@@ -1,4 +1,4 @@
-import { APP_ROUTES, ROUTES_TO_PREFETCH, getRoutePrefetchLoader } from '@app/config/routes'
+import { APP_ROUTES, getRoutePrefetchLoader,ROUTES_TO_PREFETCH } from '@app/config/routes'
 
 export function prefetchRouteChunks(commandCenterEnabled: boolean) {
   const fallback = () => {

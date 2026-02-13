@@ -3,8 +3,8 @@ import { NavLink } from 'react-router-dom'
 
 import clsx from 'clsx'
 
-import { useChatsState } from '@features/chats/state/ChatsProvider'
 import { APP_ROUTES, getRoutePrefetchLoader, getSidebarNavItems } from '@app/config/routes'
+import { useChatsState } from '@features/chats/state/ChatsProvider'
 import { getWeftPreferences, PREFERENCES_UPDATED_EVENT } from '@shared/runtime/preferences'
 import {
   DISPLAY_NAME_UPDATED_EVENT,
@@ -84,8 +84,8 @@ export function SidebarNav() {
   return (
     <aside className="hidden w-64 shrink-0 rounded-3xl border border-slate-200/80 bg-white/80 p-4 shadow-[0_16px_50px_-35px_rgba(29,58,113,0.5)] backdrop-blur lg:flex lg:flex-col">
       <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Weft</p>
-        <h2 className="mt-2 font-heading text-2xl text-slate-900">Chat</h2>
+        <p className="text-xs font-semibold tracking-[0.2em] text-blue-600 uppercase">Weft</p>
+        <h2 className="font-heading mt-2 text-2xl text-slate-900">Chat</h2>
       </div>
 
       <nav className="space-y-1.5">

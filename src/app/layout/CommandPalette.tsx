@@ -320,7 +320,7 @@ export function CommandPalette() {
             ref={inputRef}
             value={query}
             onChange={event => setQuery(event.target.value)}
-            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
             placeholder="Type a command or jump to a thread..."
           />
           <p className="mt-2 text-[11px] text-slate-500">

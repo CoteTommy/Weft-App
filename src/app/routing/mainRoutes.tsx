@@ -1,13 +1,14 @@
 import { lazy, type ReactElement } from 'react'
 import { Navigate } from 'react-router-dom'
 
+/* eslint-disable react-refresh/only-export-components */
 import {
   APP_ROUTES,
   FALLBACK_MAIN_ROUTE,
-  KNOWN_MAIN_ROUTES,
-  SETTINGS_ADVANCED_ROUTE,
   isMainRouteAllowed,
+  KNOWN_MAIN_ROUTES,
   sanitizeMainRoute,
+  SETTINGS_ADVANCED_ROUTE,
 } from '@app/config/routes'
 
 export type MainRouteContext = {
@@ -108,4 +109,4 @@ export const MAIN_ROUTES: MainRouteEntry[] = [
   },
 ]
 
-export { KNOWN_MAIN_ROUTES, FALLBACK_MAIN_ROUTE, sanitizeMainRoute }
+export { FALLBACK_MAIN_ROUTE, KNOWN_MAIN_ROUTES, sanitizeMainRoute }

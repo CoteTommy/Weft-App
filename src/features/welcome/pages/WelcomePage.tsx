@@ -72,10 +72,10 @@ export function WelcomePage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-8">
       <section className="w-full rounded-3xl border border-white/60 bg-white/85 p-8 shadow-[0_30px_90px_-50px_rgba(22,45,83,0.4)] backdrop-blur">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
+        <p className="text-xs font-semibold tracking-[0.18em] text-blue-600 uppercase">
           Weft Desktop
         </p>
-        <h1 className="mt-3 font-heading text-4xl text-slate-900">Welcome to Weft</h1>
+        <h1 className="font-heading mt-3 text-4xl text-slate-900">Welcome to Weft</h1>
         <p className="mt-3 max-w-xl text-sm text-slate-600">
           Private chat over resilient mesh networking. This quick setup gets your identity and
           connection profile ready.
@@ -104,7 +104,7 @@ export function WelcomePage() {
               id="displayName"
               value={displayName}
               onChange={event => setDisplayName(event.target.value)}
-              className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+              className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-800 transition outline-none focus:border-blue-300"
               placeholder="e.g. Alex"
             />
             <p className="mt-2 text-xs text-slate-500">
@@ -138,7 +138,7 @@ export function WelcomePage() {
             ))}
 
             <div className="rounded-2xl border border-slate-200 bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
                 Advanced
               </p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -147,7 +147,7 @@ export function WelcomePage() {
                   <input
                     value={profileDraft}
                     onChange={event => setProfileDraft(event.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+                    className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
                     placeholder="leave blank for active profile"
                   />
                 </label>
@@ -156,7 +156,7 @@ export function WelcomePage() {
                   <input
                     value={rpcDraft}
                     onChange={event => setRpcDraft(event.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+                    className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
                     placeholder="127.0.0.1:4242"
                   />
                 </label>
@@ -167,7 +167,7 @@ export function WelcomePage() {
                   <input
                     value={transportDraft}
                     onChange={event => setTransportDraft(event.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+                    className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
                     placeholder="127.0.0.1:0"
                   />
                 </label>

@@ -143,7 +143,7 @@ export function CommandCenterPage() {
             </div>
 
             <div className="mb-3 rounded-2xl border border-slate-200 bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <p className="text-xs font-semibold tracking-[0.14em] text-slate-500 uppercase">
                 Quick controls
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -209,13 +209,13 @@ export function CommandCenterPage() {
                 })()
               }}
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <p className="text-xs font-semibold tracking-[0.14em] text-slate-500 uppercase">
                 Raw command dispatch
               </p>
               <input
                 value={destination}
                 onChange={event => setDestination(event.target.value)}
-                className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                 placeholder="Destination hash"
               />
               <div className="flex flex-wrap gap-1.5">
@@ -244,26 +244,26 @@ export function CommandCenterPage() {
               <input
                 value={commandsText}
                 onChange={event => setCommandsText(event.target.value)}
-                className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                 placeholder="Commands (comma separated), e.g. join,status"
               />
               <input
                 value={commandsHexText}
                 onChange={event => setCommandsHexText(event.target.value)}
-                className="h-10 rounded-xl border border-slate-200 px-3 font-mono text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                className="h-10 rounded-xl border border-slate-200 px-3 font-mono text-sm text-slate-800 transition outline-none focus:border-blue-300"
                 placeholder="Optional command hex values, e.g. 0a,0b"
               />
               <input
                 value={title}
                 onChange={event => setTitle(event.target.value)}
-                className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                 placeholder="Optional title"
               />
               <textarea
                 value={content}
                 onChange={event => setContent(event.target.value)}
                 rows={3}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                 placeholder="Optional content body"
               />
               <div className="flex items-center justify-between gap-2">
@@ -313,7 +313,7 @@ export function CommandCenterPage() {
                 >
                   <p className="truncate text-sm font-semibold text-slate-900">{entry.label}</p>
                   <p className="truncate text-[11px] text-slate-500">{entry.value}</p>
-                  <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  <p className="mt-0.5 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
                     {entry.hint}
                   </p>
                 </button>
@@ -379,7 +379,7 @@ function SummaryTile({
         tone === 'warn' ? 'border-amber-200' : 'border-slate-200'
       )}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">{label}</p>
       <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
     </div>
   )

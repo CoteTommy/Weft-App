@@ -53,11 +53,11 @@ export function FilesPage() {
         ref={searchInputRef}
         value={query}
         onChange={event => setQuery(event.target.value)}
-        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
         placeholder="Search files, notes, owner, or type"
       />
       <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+        <p className="text-xs font-semibold tracking-wide text-amber-700 uppercase">
           Paper Message
         </p>
         <p className="mt-1 text-xs text-amber-800">
@@ -70,7 +70,7 @@ export function FilesPage() {
             setPaperFeedback(null)
           }}
           rows={2}
-          className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none transition focus:border-amber-300"
+          className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-slate-800 transition outline-none focus:border-amber-300"
           placeholder="lxm://..."
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">

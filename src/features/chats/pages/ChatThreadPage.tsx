@@ -83,7 +83,7 @@ export function ChatThreadPage() {
         <input
           value={threadQuery}
           onChange={event => setThreadQuery(event.target.value)}
-          className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+          className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
           placeholder="Filter threads"
         />
         {loading ? (
@@ -152,7 +152,7 @@ export function ChatThreadPage() {
               ref={messageSearchInputRef}
               value={messageQuery}
               onChange={event => setMessageQuery(event.target.value)}
-              className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+              className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
               placeholder="Search messages in this thread"
             />
             {error ? (

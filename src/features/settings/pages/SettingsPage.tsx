@@ -3,12 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import clsx from 'clsx'
 
+import { APP_ROUTES } from '@app/config/routes'
 import type { ConnectivityMode, MotionPreference } from '@shared/runtime/preferences'
 import type { SettingsSnapshot } from '@shared/types/settings'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
 import { shortHash } from '@shared/utils/identity'
-import { APP_ROUTES } from '@app/config/routes'
 
 import { InteropHealthCard } from '../components/InteropHealthCard'
 import { NotificationToggle } from '../components/NotificationToggle'
@@ -19,6 +19,7 @@ import {
   DEFAULT_NOTIFICATION_SETTINGS,
   SETTINGS_SECTIONS,
 } from '../constants'
+import { useSettings } from '../hooks/useSettings'
 import {
   saveConnectivitySettings,
   saveDesktopShellSettings,
@@ -28,7 +29,6 @@ import {
   saveOutboundPropagationNode,
   savePerformanceSettings,
 } from '../services/settingsService'
-import { useSettings } from '../hooks/useSettings'
 import type { BackupPayload, SettingsConfigPayload } from '../types'
 import { buildConfigPayload, mergeNotificationSettings, parseSettingsSection } from '../utils'
 
@@ -241,7 +241,7 @@ export function SettingsPage() {
                       <input
                         value={displayNameDraft}
                         onChange={event => setDisplayNameDraft(event.target.value)}
-                        className="h-10 min-w-[220px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                        className="h-10 min-w-[220px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                         placeholder="Set your LXMF display name"
                       />
                       <button
@@ -320,7 +320,7 @@ export function SettingsPage() {
                           onChange={event =>
                             setConnectivityMode(event.target.value as ConnectivityMode)
                           }
-                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                         >
                           {CONNECTIVITY_OPTIONS.map(option => (
                             <option key={option.value} value={option.value}>
@@ -334,7 +334,7 @@ export function SettingsPage() {
                         <input
                           value={profileDraft}
                           onChange={event => setProfileDraft(event.target.value)}
-                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                         />
                       </label>
                     </div>
@@ -344,7 +344,7 @@ export function SettingsPage() {
                         <input
                           value={rpcDraft}
                           onChange={event => setRpcDraft(event.target.value)}
-                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                           placeholder="127.0.0.1:4242"
                         />
                       </label>
@@ -353,7 +353,7 @@ export function SettingsPage() {
                         <input
                           value={transportDraft}
                           onChange={event => setTransportDraft(event.target.value)}
-                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                           placeholder="127.0.0.1:0"
                         />
                       </label>
@@ -531,7 +531,7 @@ export function SettingsPage() {
                       value={configPayload}
                       onChange={event => setConfigPayload(event.target.value)}
                       rows={8}
-                      className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 outline-none transition focus:border-blue-300"
+                      className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 transition outline-none focus:border-blue-300"
                     />
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <button
@@ -859,7 +859,7 @@ export function SettingsPage() {
                               `Motion quality set to ${next}.`
                             )
                           }}
-                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
                         >
                           <option value="smooth">Smooth</option>
                           <option value="snappy">Snappy</option>

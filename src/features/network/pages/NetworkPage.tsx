@@ -68,7 +68,7 @@ export function NetworkPage() {
         ref={searchInputRef}
         value={query}
         onChange={event => setQuery(event.target.value)}
-        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
         placeholder="Search peers by name, hash, trust, or status"
       />
 
@@ -130,7 +130,7 @@ interface SummaryTileProps {
 function SummaryTile({ label, value }: SummaryTileProps) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{label}</p>
       <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
     </div>
   )

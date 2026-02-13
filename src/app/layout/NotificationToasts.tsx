@@ -4,8 +4,8 @@ import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { BellRing, CircleAlert, MessageSquare, X } from 'lucide-react'
 
-import { useChatsState } from '@features/chats/state/ChatsProvider'
 import { OPEN_THREAD_EVENT } from '@app/config/events'
+import { useChatsState } from '@features/chats/state/ChatsProvider'
 import type { AppNotification } from '@shared/runtime/notifications'
 import { formatRelativeFromNow } from '@shared/utils/time'
 
@@ -79,7 +79,7 @@ export function NotificationToasts() {
   }
 
   return (
-    <div className="pointer-events-none absolute bottom-4 right-4 z-40 w-[min(340px,calc(100vw-2rem))] space-y-2">
+    <div className="pointer-events-none absolute right-4 bottom-4 z-40 w-[min(340px,calc(100vw-2rem))] space-y-2">
       <AnimatePresence initial={false}>
         {sortedToasts.map(toast => (
           <ToastCard
@@ -142,7 +142,7 @@ function ToastCard({ toast, onClose, onOpen, onReply, onMuteThread }: ToastCardP
       animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
       exit={reduceMotion ? undefined : { opacity: 0, y: 14, scale: 0.985 }}
       transition={{ type: 'spring', stiffness: 320, damping: 30, mass: 0.65 }}
-      className="pointer-events-auto motion-gpu overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.65)] backdrop-blur"
+      className="motion-gpu pointer-events-auto overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.65)] backdrop-blur"
     >
       <div className="flex items-start gap-2.5">
         <div

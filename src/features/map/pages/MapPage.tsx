@@ -6,8 +6,8 @@ import { Panel } from '@shared/ui/Panel'
 import { parseLxmfContactReference } from '@shared/utils/contactReference'
 import { matchesQuery } from '@shared/utils/search'
 
-import { sendLocationToDestination } from '../services/mapService'
 import { useMapPoints } from '../hooks/useMapPoints'
+import { sendLocationToDestination } from '../services/mapService'
 
 export function MapPage() {
   const { points, loading, error, refresh } = useMapPoints()
@@ -62,7 +62,7 @@ export function MapPage() {
           ref={searchInputRef}
           value={query}
           onChange={event => setQuery(event.target.value)}
-          className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+          className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
           placeholder="Search points by label, source, or coordinates"
         />
         {loading ? <p className="text-sm text-slate-500">Loading map points...</p> : null}
@@ -179,7 +179,7 @@ export function MapPage() {
             })()
           }}
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Share your location
           </p>
           <input
@@ -188,13 +188,13 @@ export function MapPage() {
               setDestinationInput(event.target.value)
               setShareFeedback(null)
             }}
-            className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+            className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
             placeholder="Destination hash or lxma:// link"
           />
           <input
             value={locationLabel}
             onChange={event => setLocationLabel(event.target.value)}
-            className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+            className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
             placeholder="Location label"
           />
           <button

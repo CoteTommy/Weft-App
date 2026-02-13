@@ -16,8 +16,9 @@ import {
   WifiOff,
 } from 'lucide-react'
 
-import { useChatsState } from '@features/chats/state/ChatsProvider'
+import { OPEN_THREAD_EVENT } from '@app/config/events'
 import { SETTINGS_CONNECTIVITY_ROUTE } from '@app/config/routes'
+import { useChatsState } from '@features/chats/state/ChatsProvider'
 import { publishAppNotification } from '@shared/runtime/notifications'
 import {
   getRuntimeConnectionOptions,
@@ -43,7 +44,6 @@ import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
 import type { DeliveryDiagnosticsSnapshot, RecoveryEvent } from './DeliveryDiagnosticsDrawer'
-import { OPEN_THREAD_EVENT } from '@app/config/events'
 
 const DeliveryDiagnosticsDrawer = lazy(() =>
   import('./DeliveryDiagnosticsDrawer').then(module => ({
@@ -454,10 +454,10 @@ export function TopBar() {
                   animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
                   exit={reduceMotion ? undefined : { opacity: 0, y: -6, scale: 0.985 }}
                   transition={{ duration: 0.14 }}
-                  className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(360px,92vw)] motion-gpu overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_45px_-28px_rgba(15,23,42,0.55)]"
+                  className="motion-gpu absolute top-[calc(100%+0.5rem)] right-0 z-30 w-[min(360px,92vw)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_45px_-28px_rgba(15,23,42,0.55)]"
                 >
                   <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    <p className="text-xs font-semibold tracking-[0.14em] text-slate-500 uppercase">
                       Inbox
                     </p>
                     <div className="flex items-center gap-1">

@@ -21,8 +21,13 @@ import type {
 import { DISPLAY_NAME_UPDATED_EVENT, getStoredDisplayName, shortHash } from '@shared/utils/identity'
 import type { LxmfMessageRecord, LxmfRpcEvent } from '@lib/lxmf-payloads'
 
+import { useChatIncomingNotifications } from '../hooks/useChatIncomingNotifications'
+import { useChatOfflineQueue } from '../hooks/useChatOfflineQueue'
+import { useChatQueueRetryScheduler } from '../hooks/useChatQueueRetryScheduler'
+import { useChatRuntimeEventPump } from '../hooks/useChatRuntimeEventPump'
 import { buildThreads, fetchChatThreads, postChatMessage } from '../services/chatService'
 import { deriveReasonCode, deriveReceiptStatus } from '../services/chatThreadBuilders'
+import { CHAT_REFRESH_DEBOUNCE_MS, type ChatsState, type IncomingNotificationItem } from '../types'
 import { selectThreadById } from './chatSelectors'
 import {
   appendDeliveryTraceEntry,
@@ -56,11 +61,6 @@ import {
   persistThreadPreferences,
   resolveThreadPreference,
 } from './threadPreferences'
-import { CHAT_REFRESH_DEBOUNCE_MS, type ChatsState, type IncomingNotificationItem } from '../types'
-import { useChatIncomingNotifications } from '../hooks/useChatIncomingNotifications'
-import { useChatOfflineQueue } from '../hooks/useChatOfflineQueue'
-import { useChatQueueRetryScheduler } from '../hooks/useChatQueueRetryScheduler'
-import { useChatRuntimeEventPump } from '../hooks/useChatRuntimeEventPump'
 
 const ChatsContext = createContext<ChatsState | undefined>(undefined)
 

@@ -1,5 +1,5 @@
-import { DEFAULT_MAIN_ROUTE } from '@app/config/routes'
 import { PREFERENCES_UPDATED_EVENT } from '@app/config/events'
+import { DEFAULT_MAIN_ROUTE } from '@app/config/routes'
 
 export type ConnectivityMode = 'automatic' | 'local_only' | 'lan_shared' | 'custom'
 export type MotionPreference = 'smooth' | 'snappy' | 'off'

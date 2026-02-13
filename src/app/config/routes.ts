@@ -1,5 +1,3 @@
-import type { ComponentType, SVGProps } from 'react'
-
 import {
   Activity,
   Bell,
@@ -11,6 +9,7 @@ import {
   Settings,
   Users,
 } from 'lucide-react'
+import type { ComponentType, SVGProps } from 'react'
 
 import { isCommandCenterEnabled } from './features'
 

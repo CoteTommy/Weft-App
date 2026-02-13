@@ -41,7 +41,7 @@ export function OutboundPropagationRelayCard({
         <input
           value={propagationPeerDraft}
           onChange={event => onPropagationPeerDraftChange(event.target.value)}
-          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
           placeholder="2331bf796ca1a72451dbaedb05286cb8"
         />
       </label>
@@ -72,7 +72,7 @@ export function OutboundPropagationRelayCard({
       </div>
 
       <div className="mt-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
           Known propagation nodes
         </p>
         {settings.connectivity.propagationNodes.length ? (

@@ -145,7 +145,7 @@ function Detail({
       <p
         className={clsx(
           'mt-0.5 text-xs text-slate-700',
-          mono ? 'break-all font-mono' : '',
+          mono ? 'font-mono break-all' : '',
           warn ? 'text-amber-800' : ''
         )}
       >

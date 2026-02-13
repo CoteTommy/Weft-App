@@ -73,7 +73,7 @@ export function PeoplePage() {
         ref={searchInputRef}
         value={query}
         onChange={event => setQuery(event.target.value)}
-        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+        className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
         placeholder="Search peers by name, hash, or trust"
       />
       <form
@@ -98,7 +98,7 @@ export function PeoplePage() {
             setDestinationInput(event.target.value)
             setCreateError(null)
           }}
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
           placeholder="Add contact from hash or lxma:// link"
         />
         <div className="flex items-center gap-2">
@@ -108,7 +108,7 @@ export function PeoplePage() {
               setNameInput(event.target.value)
               setCreateError(null)
             }}
-            className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+            className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition outline-none focus:border-blue-300"
             placeholder="Optional display name"
           />
           <button
