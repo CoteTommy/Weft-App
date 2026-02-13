@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ThreadList } from '../components/ThreadList'
+import { ThreadListRow } from '../components/ThreadList'
 import { useChatsState } from '../state/ChatsProvider'
-import { filterThreads } from '../utils/filterThreads'
+import { filterThreadIndex, indexThreads } from '../utils/filterThreads'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
+import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
 import { parseLxmfContactReference } from '../../../shared/utils/contactReference'
 
 export function ChatsPage() {
@@ -15,7 +16,12 @@ export function ChatsPage() {
   const [destinationInput, setDestinationInput] = useState('')
   const [nameInput, setNameInput] = useState('')
   const [composeError, setComposeError] = useState<string | null>(null)
-  const filteredThreads = useMemo(() => filterThreads(threads, query), [query, threads])
+  const deferredQuery = useDeferredValue(query)
+  const indexedThreads = useMemo(() => indexThreads(threads), [threads])
+  const filteredThreads = useMemo(
+    () => filterThreadIndex(indexedThreads, deferredQuery),
+    [deferredQuery, indexedThreads],
+  )
   const primaryThread = filteredThreads[0] ?? threads[0]
 
   useEffect(() => {
@@ -128,9 +134,18 @@ export function ChatsPage() {
           filteredThreads.length === 0 ? (
             <p className="text-sm text-slate-500">No chats match your search.</p>
           ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-              <ThreadList threads={filteredThreads} />
-            </div>
+            <VirtualizedList
+              items={filteredThreads}
+              estimateItemHeight={98}
+              className="min-h-0 flex-1 overflow-y-auto pr-1"
+              listClassName="pb-1"
+              getKey={(thread) => thread.id}
+              renderItem={(thread) => (
+                <div className="py-1">
+                  <ThreadListRow thread={thread} />
+                </div>
+              )}
+            />
           )
         ) : null}
       </Panel>

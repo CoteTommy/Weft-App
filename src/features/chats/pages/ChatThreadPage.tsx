@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { Bell, BellOff, Pin, PinOff } from 'lucide-react'
 import { Navigate, useParams } from 'react-router-dom'
 import { MessageComposer } from '../components/MessageComposer'
 import { MessageTimeline } from '../components/MessageTimeline'
-import { ThreadList } from '../components/ThreadList'
+import { ThreadListRow } from '../components/ThreadList'
 import { useChatsState } from '../state/ChatsProvider'
-import { filterThreads } from '../utils/filterThreads'
+import { filterThreadIndex, indexThreads } from '../utils/filterThreads'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 import { matchesQuery } from '../../../shared/utils/search'
+import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
 
 export function ChatThreadPage() {
   const { chatId } = useParams()
@@ -16,9 +17,12 @@ export function ChatThreadPage() {
     useChatsState()
   const [threadQuery, setThreadQuery] = useState('')
   const [messageQuery, setMessageQuery] = useState('')
+  const deferredThreadQuery = useDeferredValue(threadQuery)
+  const deferredMessageQuery = useDeferredValue(messageQuery)
+  const indexedThreads = useMemo(() => indexThreads(threads), [threads])
   const filteredThreads = useMemo(
-    () => filterThreads(threads, threadQuery),
-    [threadQuery, threads],
+    () => filterThreadIndex(indexedThreads, deferredThreadQuery),
+    [deferredThreadQuery, indexedThreads],
   )
   const thread = useMemo(() => threads.find((candidate) => candidate.id === chatId), [chatId, threads])
   const filteredMessages = useMemo(() => {
@@ -26,14 +30,14 @@ export function ChatThreadPage() {
       return []
     }
     return thread.messages.filter((message) =>
-      matchesQuery(messageQuery, [
+      matchesQuery(deferredMessageQuery, [
         message.author,
         message.body,
         message.sentAt,
         message.status,
       ]),
     )
-  }, [messageQuery, thread])
+  }, [deferredMessageQuery, thread])
 
   useEffect(() => {
     if (thread && thread.unread > 0) {
@@ -58,9 +62,18 @@ export function ChatThreadPage() {
         {!loading && filteredThreads.length === 0 ? (
           <p className="text-sm text-slate-500">No matching threads.</p>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            <ThreadList threads={filteredThreads} compact />
-          </div>
+          <VirtualizedList
+            items={filteredThreads}
+            estimateItemHeight={92}
+            className="min-h-0 flex-1 overflow-y-auto pr-1"
+            listClassName="pb-1"
+            getKey={(threadItem) => threadItem.id}
+            renderItem={(threadItem) => (
+              <div className="py-1">
+                <ThreadListRow thread={threadItem} compact />
+              </div>
+            )}
+          />
         )}
       </Panel>
 

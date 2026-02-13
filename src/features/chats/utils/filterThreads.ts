@@ -1,12 +1,26 @@
 import type { ChatThread } from '../../../shared/types/chat'
+import {
+  filterIndexedItems,
+  indexSearchItems,
+  type IndexedSearchItem,
+} from '../../../shared/utils/search'
+
+export function indexThreads(threads: ChatThread[]): IndexedSearchItem<ChatThread>[] {
+  return indexSearchItems(threads, (thread) => [
+    thread.name,
+    thread.destination,
+    thread.preview,
+    thread.lastActivity,
+  ])
+}
+
+export function filterThreadIndex(
+  indexedThreads: IndexedSearchItem<ChatThread>[],
+  query: string,
+): ChatThread[] {
+  return filterIndexedItems(indexedThreads, query)
+}
 
 export function filterThreads(threads: ChatThread[], query: string): ChatThread[] {
-  const normalized = query.trim().toLowerCase()
-  if (!normalized) {
-    return threads
-  }
-  return threads.filter((thread) => {
-    const haystack = `${thread.name} ${thread.destination} ${thread.preview}`.toLowerCase()
-    return haystack.includes(normalized)
-  })
+  return filterThreadIndex(indexThreads(threads), query)
 }

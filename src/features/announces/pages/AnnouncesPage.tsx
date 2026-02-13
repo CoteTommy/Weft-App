@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
+import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
 import type { AnnouncePriorityLabel } from '../../../shared/types/announces'
 import type { LxmfSendMessageOptions } from '../../../lib/lxmf-api'
 import { sendLxmfMessage } from '../../../lib/lxmf-api'
 import { shortHash } from '../../../shared/utils/identity'
-import { matchesQuery } from '../../../shared/utils/search'
+import { filterIndexedItems, indexSearchItems } from '../../../shared/utils/search'
 import {
   buildNewChatHref,
   parseLxmfContactReference,
@@ -26,20 +27,23 @@ export function AnnouncesPage() {
   const [sendingReply, setSendingReply] = useState(false)
   const [joiningHub, setJoiningHub] = useState(false)
   const [replyFeedback, setReplyFeedback] = useState<string | null>(null)
-  const filteredAnnounces = useMemo(
+  const deferredQuery = useDeferredValue(query)
+  const indexedAnnounces = useMemo(
     () =>
-      announces.filter((announce) =>
-        matchesQuery(query, [
-          announce.title,
-          announce.body,
-          announce.audience,
-          announce.source,
-          announce.capabilities.join(' '),
-          announce.priority,
-          announce.postedAt,
-        ]),
-      ),
-    [announces, query],
+      indexSearchItems(announces, (announce) => [
+        announce.title,
+        announce.body,
+        announce.audience,
+        announce.source,
+        announce.capabilities.join(' '),
+        announce.priority,
+        announce.postedAt,
+      ]),
+    [announces],
+  )
+  const filteredAnnounces = useMemo(
+    () => filterIndexedItems(indexedAnnounces, deferredQuery),
+    [deferredQuery, indexedAnnounces],
   )
   const canSendToSource = Boolean(selectedAnnounce?.source.trim())
 
@@ -161,10 +165,15 @@ export function AnnouncesPage() {
           <p className="text-sm text-slate-500">No announcements match your search.</p>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <ul className="space-y-2">
-            {filteredAnnounces.map((announce) => (
-              <li key={announce.id}>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <VirtualizedList
+            items={filteredAnnounces}
+            estimateItemHeight={106}
+            className="min-h-0 flex-1 overflow-y-auto pr-1"
+            listClassName="pb-1"
+            getKey={(announce) => announce.id}
+            renderItem={(announce) => (
+              <div className="py-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -194,9 +203,9 @@ export function AnnouncesPage() {
                     </div>
                   </div>
                 </button>
-              </li>
-            ))}
-          </ul>
+              </div>
+            )}
+          />
           {!loading && hasMore ? (
             <div className="mt-3 flex justify-center">
               <button

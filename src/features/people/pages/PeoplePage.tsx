@@ -1,14 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useDeferredValue, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { Link, useNavigate } from 'react-router-dom'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
+import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
 import type { PersonTrust } from '../../../shared/types/people'
 import {
   buildNewChatHref,
   parseLxmfContactReference,
 } from '../../../shared/utils/contactReference'
-import { matchesQuery } from '../../../shared/utils/search'
+import { filterIndexedItems, indexSearchItems } from '../../../shared/utils/search'
 import { usePeople } from '../state/usePeople'
 
 export function PeoplePage() {
@@ -18,12 +19,20 @@ export function PeoplePage() {
   const [destinationInput, setDestinationInput] = useState('')
   const [nameInput, setNameInput] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
-  const filteredPeople = useMemo(
+  const deferredQuery = useDeferredValue(query)
+  const indexedPeople = useMemo(
     () =>
-      people.filter((person) =>
-        matchesQuery(query, [person.name, person.id, person.lastSeen, person.trust]),
-      ),
-    [people, query],
+      indexSearchItems(people, (person) => [
+        person.name,
+        person.id,
+        person.lastSeen,
+        person.trust,
+      ]),
+    [people],
+  )
+  const filteredPeople = useMemo(
+    () => filterIndexedItems(indexedPeople, deferredQuery),
+    [deferredQuery, indexedPeople],
   )
 
   return (
@@ -101,31 +110,34 @@ export function PeoplePage() {
         <p className="text-sm text-slate-500">No peers match your search.</p>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-        <ul className="space-y-2">
-          {filteredPeople.map((person) => (
-            <li key={person.id}>
-              <Link
-                to={buildNewChatHref(person.id, person.name)}
-                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300 hover:bg-slate-50/70"
+      <VirtualizedList
+        items={filteredPeople}
+        estimateItemHeight={82}
+        className="min-h-0 flex-1 overflow-y-auto pr-1"
+        listClassName="pb-1"
+        getKey={(person) => person.id}
+        renderItem={(person) => (
+          <div className="py-1">
+            <Link
+              to={buildNewChatHref(person.id, person.name)}
+              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300 hover:bg-slate-50/70"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">{person.name}</p>
+                <p className="mt-0.5 text-xs text-slate-500">Last seen {person.lastSeen}</p>
+              </div>
+              <span
+                className={clsx(
+                  'rounded-full px-2 py-1 text-xs font-medium',
+                  trustBadgeClasses(person.trust),
+                )}
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">{person.name}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">Last seen {person.lastSeen}</p>
-                </div>
-                <span
-                  className={clsx(
-                    'rounded-full px-2 py-1 text-xs font-medium',
-                    trustBadgeClasses(person.trust),
-                  )}
-                >
-                  {person.trust}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
+                {person.trust}
+              </span>
+            </Link>
+          </div>
+        )}
+      />
     </Panel>
   )
 }
