@@ -10,6 +10,7 @@ import { DeepLinkBridge } from '@app/runtime/DeepLinkBridge'
 import { transitionForMotionPreference } from '@app/runtime/motion'
 import { NotificationCenterProvider } from '@app/state/NotificationCenterProvider'
 import { ChatsStateLayout } from '@features/chats/state/ChatsProvider'
+import { APP_ROUTES } from '@app/config/routes'
 import {
   getWeftPreferences,
   hasCompletedOnboarding,
@@ -63,14 +64,18 @@ export default function App() {
         <Suspense fallback={<AppRouteFallback />}>
           <Routes>
             <Route
-              path="/welcome"
+              path={APP_ROUTES.welcome}
               element={
                 onboardingCompleted ? <Navigate to={lastMainRoute} replace /> : <WelcomePage />
               }
             />
             <Route
               element={
-                onboardingCompleted ? <ChatsStateLayout /> : <Navigate to="/welcome" replace />
+                onboardingCompleted ? (
+                  <ChatsStateLayout />
+                ) : (
+                  <Navigate to={APP_ROUTES.welcome} replace />
+                )
               }
             >
               <Route element={<AppShell />}>
@@ -86,7 +91,9 @@ export default function App() {
             </Route>
             <Route
               path="*"
-              element={<Navigate to={onboardingCompleted ? lastMainRoute : '/welcome'} replace />}
+              element={
+                <Navigate to={onboardingCompleted ? lastMainRoute : APP_ROUTES.welcome} replace />
+              }
             />
           </Routes>
         </Suspense>

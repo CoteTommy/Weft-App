@@ -2,19 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 
 import clsx from 'clsx'
-import {
-  Activity,
-  Bell,
-  Command,
-  Folder,
-  MapPin,
-  MessageSquare,
-  Route,
-  Settings,
-  Users,
-} from 'lucide-react'
 
 import { useChatsState } from '@features/chats/state/ChatsProvider'
+import { APP_ROUTES, getRoutePrefetchLoader, getSidebarNavItems } from '@app/config/routes'
 import { getWeftPreferences, PREFERENCES_UPDATED_EVENT } from '@shared/runtime/preferences'
 import {
   DISPLAY_NAME_UPDATED_EVENT,
@@ -24,56 +14,18 @@ import {
 } from '@shared/utils/identity'
 import { getLxmfProfile, probeLxmf } from '@lib/lxmf-api'
 
-const navItems = [
-  { to: '/chats', label: 'Chats', icon: MessageSquare },
-  { to: '/people', label: 'People', icon: Users },
-  { to: '/map', label: 'Map', icon: MapPin },
-  { to: '/network', label: 'Network', icon: Activity },
-  { to: '/interfaces', label: 'Interfaces', icon: Route },
-  { to: '/announces', label: 'Announces', icon: Bell },
-  { to: '/files', label: 'Files', icon: Folder },
-  { to: '/settings', label: 'Settings', icon: Settings },
-]
-
 const prefetchedRoutes = new Set<string>()
 
 function prefetchRouteModule(route: string) {
   if (prefetchedRoutes.has(route)) {
     return
   }
-  prefetchedRoutes.add(route)
-  switch (route) {
-    case '/chats':
-      void import('../../features/chats/pages/ChatsPage')
-      break
-    case '/people':
-      void import('../../features/people/pages/PeoplePage')
-      break
-    case '/map':
-      void import('../../features/map/pages/MapPage')
-      break
-    case '/network':
-      void import('../../features/network/pages/NetworkPage')
-      break
-    case '/command-center':
-      void import('../../features/command-center/pages/CommandCenterPage')
-      break
-    case '/interfaces':
-      void import('../../features/interfaces/pages/InterfacesPage')
-      break
-    case '/announces':
-      void import('../../features/announces/pages/AnnouncesPage')
-      break
-    case '/files':
-      void import('../../features/files/pages/FilesPage')
-      break
-    case '/settings':
-      void import('../../features/settings/pages/SettingsPage')
-      break
-    default:
-      prefetchedRoutes.delete(route)
-      break
+  const loader = getRoutePrefetchLoader(route)
+  if (!loader) {
+    return
   }
+  prefetchedRoutes.add(route)
+  void loader()
 }
 
 export function SidebarNav() {
@@ -84,13 +36,7 @@ export function SidebarNav() {
     () => getWeftPreferences().commandCenterEnabled
   )
   const totalUnread = threads.reduce((sum, thread) => sum + (thread.muted ? 0 : thread.unread), 0)
-  const renderedNavItems = commandCenterEnabled
-    ? [
-        ...navItems.slice(0, 4),
-        { to: '/command-center', label: 'Command Center', icon: Command },
-        ...navItems.slice(4),
-      ]
-    : navItems
+  const renderedNavItems = getSidebarNavItems(commandCenterEnabled)
 
   const refreshIdentity = useCallback(async () => {
     try {
@@ -164,7 +110,7 @@ export function SidebarNav() {
           >
             <item.icon className="h-4 w-4" />
             <span>{item.label}</span>
-            {item.to === '/chats' && totalUnread > 0 ? (
+            {item.to === APP_ROUTES.chats && totalUnread > 0 ? (
               <span className="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold text-current">
                 {totalUnread}
               </span>

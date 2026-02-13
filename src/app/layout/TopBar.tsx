@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 
 import { useChatsState } from '@features/chats/state/ChatsProvider'
+import { SETTINGS_CONNECTIVITY_ROUTE } from '@app/config/routes'
 import { publishAppNotification } from '@shared/runtime/notifications'
 import {
   getRuntimeConnectionOptions,
@@ -42,6 +43,7 @@ import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
 import type { DeliveryDiagnosticsSnapshot, RecoveryEvent } from './DeliveryDiagnosticsDrawer'
+import { OPEN_THREAD_EVENT } from '@app/config/events'
 
 const DeliveryDiagnosticsDrawer = lazy(() =>
   import('./DeliveryDiagnosticsDrawer').then(module => ({
@@ -513,7 +515,7 @@ export function TopBar() {
                                   markRead(notification.id)
                                   if (notification.threadId) {
                                     window.dispatchEvent(
-                                      new CustomEvent('weft:open-thread', {
+                                      new CustomEvent(OPEN_THREAD_EVENT, {
                                         detail: { threadId: notification.threadId },
                                       })
                                     )
@@ -587,7 +589,7 @@ export function TopBar() {
             <button
               type="button"
               onClick={() => {
-                void navigate('/settings?section=connectivity')
+                void navigate(SETTINGS_CONNECTIVITY_ROUTE)
               }}
               className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
             >
@@ -636,7 +638,7 @@ export function TopBar() {
               void loadDiagnostics()
             }}
             onOpenConnectivity={() => {
-              void navigate('/settings?section=connectivity')
+              void navigate(SETTINGS_CONNECTIVITY_ROUTE)
             }}
             onRunRecovery={() => {
               void runAutoRecoveryNow()

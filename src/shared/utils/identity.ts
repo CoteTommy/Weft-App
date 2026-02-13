@@ -1,3 +1,5 @@
+import { DISPLAY_NAME_UPDATED_EVENT } from '@app/config/events'
+
 export function shortHash(value: string, visible: number = 6): string {
   const trimmed = value.trim()
   if (trimmed.length <= visible * 2) {
@@ -7,7 +9,8 @@ export function shortHash(value: string, visible: number = 6): string {
 }
 
 const DISPLAY_NAME_KEY = 'weft.display_name'
-export const DISPLAY_NAME_UPDATED_EVENT = 'weft:display-name-updated'
+
+export { DISPLAY_NAME_UPDATED_EVENT }
 
 export function getStoredDisplayName(): string | null {
   if (typeof window === 'undefined') {

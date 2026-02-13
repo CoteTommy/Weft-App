@@ -8,6 +8,7 @@ import type { SettingsSnapshot } from '@shared/types/settings'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
 import { shortHash } from '@shared/utils/identity'
+import { APP_ROUTES } from '@app/config/routes'
 
 import { InteropHealthCard } from '../components/InteropHealthCard'
 import { NotificationToggle } from '../components/NotificationToggle'
@@ -754,10 +755,10 @@ export function SettingsPage() {
                       setSearchParams(next, { replace: true })
                     }}
                     onOpenChats={() => {
-                      void navigate('/chats')
+                      void navigate(APP_ROUTES.chats)
                     }}
                     onOpenNetwork={() => {
-                      void navigate('/network')
+                      void navigate(APP_ROUTES.network)
                     }}
                   />
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">

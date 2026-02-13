@@ -1,3 +1,6 @@
+import { DEFAULT_MAIN_ROUTE } from '@app/config/routes'
+import { PREFERENCES_UPDATED_EVENT } from '@app/config/events'
+
 export type ConnectivityMode = 'automatic' | 'local_only' | 'lan_shared' | 'custom'
 export type MotionPreference = 'smooth' | 'snappy' | 'off'
 
@@ -22,7 +25,8 @@ export interface WeftPreferences {
 }
 
 const PREFERENCES_KEY = 'weft.preferences.v1'
-export const PREFERENCES_UPDATED_EVENT = 'weft:preferences-updated'
+
+export { PREFERENCES_UPDATED_EVENT }
 
 const DEFAULT_PREFERENCES: WeftPreferences = {
   onboardingCompleted: false,
@@ -37,7 +41,7 @@ const DEFAULT_PREFERENCES: WeftPreferences = {
   motionPreference: 'snappy',
   performanceHudEnabled: false,
   commandCenterEnabled: false,
-  lastMainRoute: '/chats',
+  lastMainRoute: DEFAULT_MAIN_ROUTE,
 }
 
 export function getWeftPreferences(): WeftPreferences {

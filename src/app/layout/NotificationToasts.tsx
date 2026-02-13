@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { BellRing, CircleAlert, MessageSquare, X } from 'lucide-react'
 
 import { useChatsState } from '@features/chats/state/ChatsProvider'
+import { OPEN_THREAD_EVENT } from '@app/config/events'
 import type { AppNotification } from '@shared/runtime/notifications'
 import { formatRelativeFromNow } from '@shared/utils/time'
 
@@ -71,7 +72,7 @@ export function NotificationToasts() {
       return
     }
     window.dispatchEvent(
-      new CustomEvent('weft:open-thread', {
+      new CustomEvent(OPEN_THREAD_EVENT, {
         detail: { threadId: id },
       })
     )

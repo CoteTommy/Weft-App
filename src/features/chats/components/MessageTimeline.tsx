@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import clsx from 'clsx'
 
+import { APP_ROUTES } from '@app/config/routes'
 import type { ChatMessage } from '@shared/types/chat'
 import { getLxmfMessageDeliveryTrace } from '@lib/lxmf-api'
 
@@ -403,24 +404,31 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
 
             {selectedMessage.sender === 'self' &&
             selectedMessage.status === 'failed' &&
-            failureGuidance ? (
-              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                <p className="font-semibold">{failureGuidance.title}</p>
-                <p className="mt-1">{failureGuidance.body}</p>
-                {failureGuidance.actionPath ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void navigate(failureGuidance.actionPath as '/settings' | '/network')
-                      closeModal()
-                    }}
-                    className="mt-2 rounded-lg border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100"
-                  >
-                    {failureGuidance.actionLabel}
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
+            failureGuidance
+              ? // Local narrowing is required so navigate only receives a guaranteed path.
+                (() => {
+                  const actionPath = failureGuidance.actionPath
+
+                  return (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                      <p className="font-semibold">{failureGuidance.title}</p>
+                      <p className="mt-1">{failureGuidance.body}</p>
+                      {actionPath ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigate(actionPath)
+                            closeModal()
+                          }}
+                          className="mt-2 rounded-lg border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100"
+                        >
+                          {failureGuidance.actionLabel}
+                        </button>
+                      ) : null}
+                    </div>
+                  )
+                })()
+              : null}
 
             <div className="mt-3 flex items-center gap-2">
               {selectedMessage.sender === 'self' && selectedMessage.status === 'failed' ? (
@@ -519,7 +527,7 @@ function buildFailureGuidance(reasonCode: string | undefined): {
       title: 'No relay selected',
       body: 'This message requires propagated delivery. Select an outbound propagation relay first.',
       actionLabel: 'Open settings',
-      actionPath: '/settings',
+      actionPath: APP_ROUTES.settings,
     }
   }
   if (reasonCode === 'no_path') {
@@ -527,7 +535,7 @@ function buildFailureGuidance(reasonCode: string | undefined): {
       title: 'No route to destination',
       body: 'A path to this peer is not known yet. Wait for announces or check network connectivity.',
       actionLabel: 'Open network',
-      actionPath: '/network',
+      actionPath: APP_ROUTES.network,
     }
   }
   if (reasonCode === 'timeout' || reasonCode === 'receipt_timeout') {
@@ -541,7 +549,7 @@ function buildFailureGuidance(reasonCode: string | undefined): {
       title: 'Retries exhausted',
       body: 'All configured retries were used. Check relay selection and connectivity before retrying.',
       actionLabel: 'Open settings',
-      actionPath: '/settings',
+      actionPath: APP_ROUTES.settings,
     }
   }
   return {

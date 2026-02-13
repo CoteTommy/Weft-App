@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import { BellOff, Pin } from 'lucide-react'
 
 import type { ChatThread } from '@shared/types/chat'
+import { APP_ROUTES } from '@app/config/routes'
 
 interface ThreadListProps {
   threads: ChatThread[]
@@ -30,7 +31,7 @@ interface ThreadListRowProps {
 export function ThreadListRow({ thread, compact = false }: ThreadListRowProps) {
   return (
     <NavLink
-      to={`/chats/${thread.id}`}
+      to={`${APP_ROUTES.chats}/${thread.id}`}
       className={({ isActive }) =>
         clsx(
           'flex items-start gap-3 rounded-2xl border px-3 py-2.5 transition',

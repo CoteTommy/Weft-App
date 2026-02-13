@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import clsx from 'clsx'
 
+import { APP_ROUTES } from '@app/config/routes'
 import {
   type ConnectivityMode,
   consumePendingLaunchRoute,
@@ -278,7 +279,7 @@ export function WelcomePage() {
                     }
 
                     const pendingRoute = consumePendingLaunchRoute()
-                    void navigate(pendingRoute ?? '/chats', { replace: true })
+                    void navigate(pendingRoute ?? APP_ROUTES.chats, { replace: true })
                   } catch (setupError) {
                     setError(setupError instanceof Error ? setupError.message : String(setupError))
                   } finally {

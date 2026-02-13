@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 import clsx from 'clsx'
 
+import { APP_ROUTES } from '@app/config/routes'
 import { useChatsState } from '@features/chats/state/ChatsProvider'
 import { publishAppNotification } from '@shared/runtime/notifications'
 import { getWeftPreferences, PREFERENCES_UPDATED_EVENT } from '@shared/runtime/preferences'
@@ -56,17 +57,17 @@ export function CommandPalette() {
       shortcut: '⌘/Ctrl+R',
       keywords: ['reply', 'composer', 'message'],
       run: () => {
-        if (location.pathname.startsWith('/chats/')) {
+        if (location.pathname.startsWith(`${APP_ROUTES.chats}/`)) {
           focusQuickReply()
           return
         }
         const firstThread = threads[0]
         if (firstThread) {
-          void navigate(`/chats/${firstThread.id}`)
+          void navigate(`${APP_ROUTES.chats}/${firstThread.id}`)
           window.setTimeout(() => focusQuickReply(), 90)
           return
         }
-        void navigate('/chats')
+        void navigate(APP_ROUTES.chats)
       },
     }),
     [location.pathname, navigate, threads]
@@ -79,7 +80,7 @@ export function CommandPalette() {
         title: 'Open chats',
         keywords: ['messages', 'threads'],
         run: () => {
-          void navigate('/chats')
+          void navigate(APP_ROUTES.chats)
         },
       },
       {
@@ -87,7 +88,7 @@ export function CommandPalette() {
         title: 'Open people',
         keywords: ['contacts', 'peers'],
         run: () => {
-          void navigate('/people')
+          void navigate(APP_ROUTES.people)
         },
       },
       {
@@ -95,7 +96,7 @@ export function CommandPalette() {
         title: 'Open announces',
         keywords: ['network', 'broadcast'],
         run: () => {
-          void navigate('/announces')
+          void navigate(APP_ROUTES.announces)
         },
       },
       {
@@ -103,7 +104,7 @@ export function CommandPalette() {
         title: 'Open settings',
         keywords: ['preferences', 'config'],
         run: () => {
-          void navigate('/settings')
+          void navigate(APP_ROUTES.settings)
         },
       },
       {
@@ -113,7 +114,7 @@ export function CommandPalette() {
         shortcut: '⌘/Ctrl+N',
         keywords: ['compose', 'contact'],
         run: () => {
-          void navigate('/people')
+          void navigate(APP_ROUTES.people)
           window.setTimeout(() => focusNewChat(), 90)
         },
       },
@@ -163,7 +164,7 @@ export function CommandPalette() {
         title: 'Open command center',
         keywords: ['advanced', 'runtime', 'commands'],
         run: () => {
-          void navigate('/command-center')
+          void navigate(APP_ROUTES.commandCenter)
         },
       })
     }
@@ -173,7 +174,7 @@ export function CommandPalette() {
       subtitle: thread.preview || thread.destination,
       keywords: ['thread', thread.destination, thread.name],
       run: () => {
-        void navigate(`/chats/${thread.id}`)
+        void navigate(`${APP_ROUTES.chats}/${thread.id}`)
       },
     }))
     return [...staticActions, ...threadActions]

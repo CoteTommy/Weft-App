@@ -16,6 +16,8 @@ import {
   setDesktopShellPreferences,
   subscribeTrayActions,
 } from '@lib/desktop-shell-api'
+import { OPEN_THREAD_EVENT } from '@app/config/events'
+import { APP_ROUTES } from '@app/config/routes'
 
 import { CommandPalette } from './CommandPalette'
 import { NotificationToasts } from './NotificationToasts'
@@ -29,7 +31,9 @@ export function AppShell() {
   const reduceMotion = useReducedMotion()
   const pageMotion = useAnimationControls()
   const routeAnimationFrameRef = useRef<number | null>(null)
-  const lastPersistedRouteRef = useRef<string>(getWeftPreferences().lastMainRoute ?? '/chats')
+  const lastPersistedRouteRef = useRef<string>(
+    getWeftPreferences().lastMainRoute ?? APP_ROUTES.chats
+  )
   const desktopMuteSyncRef = useRef<boolean | null>(null)
   const [motionPreference, setMotionPreference] = useState<MotionPreference>(
     () => getWeftPreferences().motionPreference
@@ -42,11 +46,11 @@ export function AppShell() {
       if (!threadId) {
         return
       }
-      void navigate(`/chats/${threadId}`)
+      void navigate(`${APP_ROUTES.chats}/${threadId}`)
     }
-    window.addEventListener('weft:open-thread', handler as EventListener)
+    window.addEventListener(OPEN_THREAD_EVENT, handler as EventListener)
     return () => {
-      window.removeEventListener('weft:open-thread', handler as EventListener)
+      window.removeEventListener(OPEN_THREAD_EVENT, handler as EventListener)
     }
   }, [navigate])
 
@@ -114,7 +118,7 @@ export function AppShell() {
     let disposed = false
     void subscribeTrayActions(event => {
       if (event.action === 'new_message') {
-        void navigate('/chats')
+        void navigate(APP_ROUTES.chats)
         window.setTimeout(() => {
           window.dispatchEvent(new Event(FOCUS_NEW_CHAT_EVENT))
         }, 110)

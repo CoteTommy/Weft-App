@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { listen } from '@tauri-apps/api/event'
 
+import { SINGLE_INSTANCE_EVENT } from '@app/config/events'
 import { setPendingLaunchRoute } from '@shared/runtime/preferences'
 import { buildNewChatHref, parseLxmfContactReference } from '@shared/utils/contactReference'
 
@@ -48,7 +49,7 @@ export function DeepLinkBridge({ onboardingCompleted }: DeepLinkBridgeProps) {
         unlisten = await deepLink.onOpenUrl(urls => {
           routeFromUrls(urls)
         })
-        unlistenSingleInstance = await listen<unknown>('weft://single-instance', event => {
+        unlistenSingleInstance = await listen<unknown>(SINGLE_INSTANCE_EVENT, event => {
           const urls = extractUrlsFromSingleInstancePayload(event.payload)
           if (urls.length > 0) {
             routeFromUrls(urls)

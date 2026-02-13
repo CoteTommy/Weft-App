@@ -1,11 +1,19 @@
+import { APP_ROUTES, ROUTES_TO_PREFETCH, getRoutePrefetchLoader } from '@app/config/routes'
+
 export function prefetchRouteChunks(commandCenterEnabled: boolean) {
   const fallback = () => {
-    void import('@features/chats/pages/ChatsPage')
-    void import('@features/chats/pages/ChatThreadPage')
-    void import('@features/settings/pages/SettingsPage')
-    void import('@features/people/pages/PeoplePage')
+    for (const route of ROUTES_TO_PREFETCH) {
+      const loader = getRoutePrefetchLoader(route)
+      if (loader) {
+        void loader()
+      }
+    }
+
     if (commandCenterEnabled) {
-      void import('@features/command-center/pages/CommandCenterPage')
+      const loader = getRoutePrefetchLoader(APP_ROUTES.commandCenter)
+      if (loader) {
+        void loader()
+      }
     }
   }
 

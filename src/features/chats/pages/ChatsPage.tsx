@@ -7,6 +7,7 @@ import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
 import { VirtualizedList } from '@shared/ui/VirtualizedList'
 import { parseLxmfContactReference } from '@shared/utils/contactReference'
+import { APP_ROUTES } from '@app/config/routes'
 
 import { ThreadListRow } from '../components/ThreadList'
 import { useChatsState } from '../state/ChatsProvider'
@@ -48,7 +49,7 @@ export function ChatsPage() {
     const displayName = searchParams.get('new_name') ?? undefined
     const threadId = createThread(parsed.value.destinationHash, displayName)
     if (threadId) {
-      void navigate(`/chats/${threadId}`, { replace: true })
+      void navigate(`${APP_ROUTES.chats}/${threadId}`, { replace: true })
     }
   }, [createThread, navigate, searchParams])
 
@@ -110,7 +111,7 @@ export function ChatsPage() {
             if (threadId) {
               setDestinationInput('')
               setNameInput('')
-              void navigate(`/chats/${threadId}`)
+              void navigate(`${APP_ROUTES.chats}/${threadId}`)
             }
           }}
         >
@@ -192,7 +193,7 @@ export function ChatsPage() {
           <p>This screen is focused on clarity for non-technical users.</p>
           <p className="mt-2">You can start by opening your most recent thread.</p>
           <Link
-            to={primaryThread ? `/chats/${primaryThread.id}` : '/people'}
+            to={primaryThread ? `${APP_ROUTES.chats}/${primaryThread.id}` : APP_ROUTES.people}
             className="mt-4 inline-flex rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
           >
             {primaryThread ? 'Open latest chat' : 'Open people'}

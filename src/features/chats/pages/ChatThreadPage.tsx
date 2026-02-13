@@ -3,6 +3,7 @@ import { Navigate, useParams } from 'react-router-dom'
 
 import { Bell, BellOff, Pin, PinOff } from 'lucide-react'
 
+import { APP_ROUTES } from '@app/config/routes'
 import { FOCUS_QUICK_REPLY_EVENT, FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 import { ListSkeleton } from '@shared/ui/ListSkeleton'
 import { PageHeading } from '@shared/ui/PageHeading'
@@ -72,7 +73,7 @@ export function ChatThreadPage() {
   }, [])
 
   if (!loading && !thread) {
-    return <Navigate to="/chats" replace />
+    return <Navigate to={APP_ROUTES.chats} replace />
   }
 
   return (

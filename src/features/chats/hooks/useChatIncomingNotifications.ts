@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 
+import { OPEN_THREAD_EVENT } from '@app/config/events'
 import { getWeftPreferences, PREFERENCES_UPDATED_EVENT } from '@shared/runtime/preferences'
 
 import type { IncomingNotificationItem } from '../types'
@@ -58,7 +59,7 @@ export function useChatIncomingNotifications(): UseChatIncomingNotificationsResu
       notification.onclick = () => {
         window.focus()
         window.dispatchEvent(
-          new CustomEvent('weft:open-thread', {
+          new CustomEvent(OPEN_THREAD_EVENT, {
             detail: { threadId: item.threadId },
           })
         )

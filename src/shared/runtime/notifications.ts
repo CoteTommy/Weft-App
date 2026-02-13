@@ -1,3 +1,5 @@
+import { APP_NOTIFICATION_EVENT } from '@app/config/events'
+
 import { getWeftPreferences } from './preferences'
 
 export type AppNotificationKind = 'message' | 'system' | 'connection'
@@ -20,7 +22,7 @@ export interface AppNotificationInput {
   threadId?: string
 }
 
-export const APP_NOTIFICATION_EVENT = 'weft:app-notification'
+export { APP_NOTIFICATION_EVENT }
 
 const APP_NOTIFICATIONS_KEY = 'weft.notifications.v1'
 const MAX_NOTIFICATIONS = 120

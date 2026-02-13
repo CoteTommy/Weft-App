@@ -1,6 +1,15 @@
 import { lazy, type ReactElement } from 'react'
 import { Navigate } from 'react-router-dom'
 
+import {
+  APP_ROUTES,
+  FALLBACK_MAIN_ROUTE,
+  KNOWN_MAIN_ROUTES,
+  SETTINGS_ADVANCED_ROUTE,
+  isMainRouteAllowed,
+  sanitizeMainRoute,
+} from '@app/config/routes'
+
 export type MainRouteContext = {
   commandCenterEnabled: boolean
 }
@@ -51,77 +60,52 @@ const SettingsPage = lazy(() =>
   }))
 )
 
-export const KNOWN_MAIN_ROUTES = [
-  '/chats',
-  '/people',
-  '/map',
-  '/network',
-  '/command-center',
-  '/interfaces',
-  '/announces',
-  '/files',
-  '/settings',
-]
-
-export const FALLBACK_MAIN_ROUTE = '/chats'
-
 export const MAIN_ROUTES: MainRouteEntry[] = [
   {
-    path: '/chats',
+    path: APP_ROUTES.chats,
     element: () => <ChatsPage />,
   },
   {
-    path: '/chats/:chatId',
+    path: APP_ROUTES.chatThread,
     element: () => <ChatThreadPage />,
   },
   {
-    path: '/people',
+    path: APP_ROUTES.people,
     element: () => <PeoplePage />,
   },
   {
-    path: '/map',
+    path: APP_ROUTES.map,
     element: () => <MapPage />,
   },
   {
-    path: '/network',
+    path: APP_ROUTES.network,
     element: () => <NetworkPage />,
   },
   {
-    path: '/command-center',
-    element: ({ commandCenterEnabled }) =>
-      commandCenterEnabled ? (
-        <CommandCenterPage />
-      ) : (
-        <Navigate to="/settings?section=advanced" replace />
-      ),
+    path: APP_ROUTES.commandCenter,
+    element: ({ commandCenterEnabled }) => {
+      if (isMainRouteAllowed(APP_ROUTES.commandCenter, commandCenterEnabled)) {
+        return <CommandCenterPage />
+      }
+      return <Navigate to={SETTINGS_ADVANCED_ROUTE} replace />
+    },
   },
   {
-    path: '/interfaces',
+    path: APP_ROUTES.interfaces,
     element: () => <InterfacesPage />,
   },
   {
-    path: '/announces',
+    path: APP_ROUTES.announces,
     element: () => <AnnouncesPage />,
   },
   {
-    path: '/files',
+    path: APP_ROUTES.files,
     element: () => <FilesPage />,
   },
   {
-    path: '/settings',
+    path: APP_ROUTES.settings,
     element: () => <SettingsPage />,
   },
 ]
 
-export function sanitizeMainRoute(route: string): string {
-  if (!route || !route.startsWith('/')) {
-    return FALLBACK_MAIN_ROUTE
-  }
-
-  const basePath = route.split('?')[0]
-  if (!KNOWN_MAIN_ROUTES.includes(basePath) && !basePath.startsWith('/chats/')) {
-    return FALLBACK_MAIN_ROUTE
-  }
-
-  return route
-}
+export { KNOWN_MAIN_ROUTES, FALLBACK_MAIN_ROUTE, sanitizeMainRoute }
