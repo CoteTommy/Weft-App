@@ -36,20 +36,14 @@ export function AppShell() {
       window.cancelAnimationFrame(routeAnimationFrameRef.current)
     }
     pageMotion.set({
-      opacity: 0.985,
-      y: 4,
-      scale: 0.998,
+      opacity: 0.97,
     })
     routeAnimationFrameRef.current = window.requestAnimationFrame(() => {
       void pageMotion.start({
         opacity: 1,
-        y: 0,
-        scale: 1,
         transition: {
-          type: 'spring',
-          stiffness: 290,
-          damping: 30,
-          mass: 0.72,
+          duration: 0.14,
+          ease: [0.22, 1, 0.36, 1],
         },
       })
     })
