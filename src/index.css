@@ -3,6 +3,9 @@
 
 :root {
   --app-bg: #edf3fb;
+  --motion-duration-fast: 140ms;
+  --motion-duration-medium: 200ms;
+  --motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 * {
@@ -27,7 +30,28 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.motion-gpu {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+.ui-transition {
+  transition-property: transform, opacity, background-color, border-color, color, box-shadow;
+  transition-duration: var(--motion-duration-fast);
+  transition-timing-function: var(--motion-ease-standard);
+}
+
 .font-heading {
   font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif;
   letter-spacing: -0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }

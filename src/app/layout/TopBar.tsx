@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Activity,
   Bell,
@@ -63,6 +64,7 @@ interface DiagnosticsMessageSnapshot {
 
 export function TopBar() {
   const navigate = useNavigate()
+  const reduceMotion = useReducedMotion()
   const [probing, setProbing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
@@ -294,8 +296,15 @@ export function TopBar() {
               </span>
             ) : null}
           </button>
-          {notificationMenuOpen ? (
-            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(360px,92vw)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_45px_-28px_rgba(15,23,42,0.55)]">
+          <AnimatePresence>
+            {notificationMenuOpen ? (
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.98 }}
+                animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -6, scale: 0.985 }}
+                transition={{ duration: 0.14 }}
+                className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(360px,92vw)] motion-gpu overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_45px_-28px_rgba(15,23,42,0.55)]"
+              >
               <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Inbox
@@ -386,8 +395,9 @@ export function TopBar() {
                   </div>
                 </div>
               )}
-            </div>
-          ) : null}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
         <div className="relative" ref={diagnosticsRef}>
           <button
@@ -404,8 +414,15 @@ export function TopBar() {
             <Activity className="h-3.5 w-3.5" />
             Diagnostics
           </button>
-          {diagnosticsOpen ? (
-            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(420px,94vw)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_45px_-28px_rgba(15,23,42,0.55)]">
+          <AnimatePresence>
+            {diagnosticsOpen ? (
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.985 }}
+                animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -6, scale: 0.985 }}
+                transition={{ duration: 0.14 }}
+                className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(420px,94vw)] motion-gpu overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_45px_-28px_rgba(15,23,42,0.55)]"
+              >
               <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Runtime diagnostics
@@ -533,8 +550,9 @@ export function TopBar() {
                   {diagnosticsLoading ? 'Loading diagnostics...' : 'No diagnostics loaded.'}
                 </div>
               )}
-            </div>
-          ) : null}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
         <span
           className={clsx(

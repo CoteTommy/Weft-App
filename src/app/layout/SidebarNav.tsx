@@ -90,7 +90,7 @@ export function SidebarNav() {
             to={item.to}
             className={({ isActive }) =>
               clsx(
-                'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition',
+                'ui-transition flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium',
                 isActive
                   ? 'bg-blue-600 text-white shadow-[0_12px_20px_-16px_rgba(37,99,235,0.9)]'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',

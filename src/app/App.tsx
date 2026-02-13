@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { MotionConfig } from 'framer-motion'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './layout/AppShell'
 import { WelcomePage } from '../features/welcome/pages/WelcomePage'
@@ -33,34 +34,36 @@ export default function App() {
   }, [])
 
   return (
-    <NotificationCenterProvider>
-      <DeepLinkBridge onboardingCompleted={onboardingCompleted} />
-      <Routes>
-        <Route
-          path="/welcome"
-          element={onboardingCompleted ? <Navigate to="/chats" replace /> : <WelcomePage />}
-        />
-        <Route
-          element={onboardingCompleted ? <ChatsStateLayout /> : <Navigate to="/welcome" replace />}
-        >
-          <Route element={<AppShell />}>
-            <Route index element={<Navigate to="/chats" replace />} />
-            <Route path="/chats" element={<ChatsPage />} />
-            <Route path="/chats/:chatId" element={<ChatThreadPage />} />
-            <Route path="/people" element={<PeoplePage />} />
-            <Route path="/map" element={<MapPage />} />
-            <Route path="/network" element={<NetworkPage />} />
-            <Route path="/interfaces" element={<InterfacesPage />} />
-            <Route path="/announces" element={<AnnouncesPage />} />
-            <Route path="/files" element={<FilesPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+    <MotionConfig transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}>
+      <NotificationCenterProvider>
+        <DeepLinkBridge onboardingCompleted={onboardingCompleted} />
+        <Routes>
+          <Route
+            path="/welcome"
+            element={onboardingCompleted ? <Navigate to="/chats" replace /> : <WelcomePage />}
+          />
+          <Route
+            element={onboardingCompleted ? <ChatsStateLayout /> : <Navigate to="/welcome" replace />}
+          >
+            <Route element={<AppShell />}>
+              <Route index element={<Navigate to="/chats" replace />} />
+              <Route path="/chats" element={<ChatsPage />} />
+              <Route path="/chats/:chatId" element={<ChatThreadPage />} />
+              <Route path="/people" element={<PeoplePage />} />
+              <Route path="/map" element={<MapPage />} />
+              <Route path="/network" element={<NetworkPage />} />
+              <Route path="/interfaces" element={<InterfacesPage />} />
+              <Route path="/announces" element={<AnnouncesPage />} />
+              <Route path="/files" element={<FilesPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Route>
           </Route>
-        </Route>
-        <Route
-          path="*"
-          element={<Navigate to={onboardingCompleted ? '/chats' : '/welcome'} replace />}
-        />
-      </Routes>
-    </NotificationCenterProvider>
+          <Route
+            path="*"
+            element={<Navigate to={onboardingCompleted ? '/chats' : '/welcome'} replace />}
+          />
+        </Routes>
+      </NotificationCenterProvider>
+    </MotionConfig>
   )
 }

@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { BellRing, CircleAlert, MessageSquare, X } from 'lucide-react'
 import type { AppNotification } from '../../shared/runtime/notifications'
 import { formatRelativeFromNow } from '../../shared/utils/time'
@@ -75,35 +76,37 @@ export function NotificationToasts() {
 
   return (
     <div className="pointer-events-none absolute bottom-4 right-4 z-40 w-[min(340px,calc(100vw-2rem))] space-y-2">
-      {sortedToasts.map((toast) => (
-        <ToastCard
-          key={toast.id}
-          toast={toast}
-          onClose={() => {
-            markRead(toast.id)
-            dismiss(toast.id)
-          }}
-          onOpen={() => {
-            markRead(toast.id)
-            openThread(toast.threadId)
-            dismiss(toast.id)
-          }}
-          onReply={() => {
-            markRead(toast.id)
-            openThread(toast.threadId)
-            dismiss(toast.id)
-          }}
-          onMuteThread={() => {
-            const threadId = toast.threadId?.trim()
-            if (!threadId) {
-              return
-            }
-            setThreadMuted(threadId, true)
-            markRead(toast.id)
-            dismiss(toast.id)
-          }}
-        />
-      ))}
+      <AnimatePresence initial={false}>
+        {sortedToasts.map((toast) => (
+          <ToastCard
+            key={toast.id}
+            toast={toast}
+            onClose={() => {
+              markRead(toast.id)
+              dismiss(toast.id)
+            }}
+            onOpen={() => {
+              markRead(toast.id)
+              openThread(toast.threadId)
+              dismiss(toast.id)
+            }}
+            onReply={() => {
+              markRead(toast.id)
+              openThread(toast.threadId)
+              dismiss(toast.id)
+            }}
+            onMuteThread={() => {
+              const threadId = toast.threadId?.trim()
+              if (!threadId) {
+                return
+              }
+              setThreadMuted(threadId, true)
+              markRead(toast.id)
+              dismiss(toast.id)
+            }}
+          />
+        ))}
+      </AnimatePresence>
     </div>
   )
 }
@@ -117,6 +120,8 @@ interface ToastCardProps {
 }
 
 function ToastCard({ toast, onClose, onOpen, onReply, onMuteThread }: ToastCardProps) {
+  const reduceMotion = useReducedMotion()
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       onClose()
@@ -127,7 +132,14 @@ function ToastCard({ toast, onClose, onOpen, onReply, onMuteThread }: ToastCardP
   }, [onClose])
 
   return (
-    <article className="pointer-events-auto overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.65)] backdrop-blur">
+    <motion.article
+      layout
+      initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.98 }}
+      animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+      exit={reduceMotion ? undefined : { opacity: 0, y: 14, scale: 0.985 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 30, mass: 0.65 }}
+      className="pointer-events-auto motion-gpu overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.65)] backdrop-blur"
+    >
       <div className="flex items-start gap-2.5">
         <div
           className={clsx(
@@ -179,6 +191,6 @@ function ToastCard({ toast, onClose, onOpen, onReply, onMuteThread }: ToastCardP
           </button>
         </div>
       ) : null}
-    </article>
+    </motion.article>
   )
 }
