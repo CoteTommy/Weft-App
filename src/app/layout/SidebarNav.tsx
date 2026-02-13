@@ -36,6 +36,47 @@ const navItems = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
+const prefetchedRoutes = new Set<string>()
+
+function prefetchRouteModule(route: string) {
+  if (prefetchedRoutes.has(route)) {
+    return
+  }
+  prefetchedRoutes.add(route)
+  switch (route) {
+    case '/chats':
+      void import('../../features/chats/pages/ChatsPage')
+      break
+    case '/people':
+      void import('../../features/people/pages/PeoplePage')
+      break
+    case '/map':
+      void import('../../features/map/pages/MapPage')
+      break
+    case '/network':
+      void import('../../features/network/pages/NetworkPage')
+      break
+    case '/command-center':
+      void import('../../features/command-center/pages/CommandCenterPage')
+      break
+    case '/interfaces':
+      void import('../../features/interfaces/pages/InterfacesPage')
+      break
+    case '/announces':
+      void import('../../features/announces/pages/AnnouncesPage')
+      break
+    case '/files':
+      void import('../../features/files/pages/FilesPage')
+      break
+    case '/settings':
+      void import('../../features/settings/pages/SettingsPage')
+      break
+    default:
+      prefetchedRoutes.delete(route)
+      break
+  }
+}
+
 export function SidebarNav() {
   const { threads } = useChatsState()
   const [displayName, setDisplayName] = useState(() => getStoredDisplayName() ?? 'Loading...')
@@ -109,6 +150,12 @@ export function SidebarNav() {
           <NavLink
             key={item.to}
             to={item.to}
+            onMouseEnter={() => {
+              prefetchRouteModule(item.to)
+            }}
+            onFocus={() => {
+              prefetchRouteModule(item.to)
+            }}
             className={({ isActive }) =>
               clsx(
                 'ui-transition flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium',

@@ -37,3 +37,10 @@ reticulum-rs = { path = "../../Reticulum-rs/crates/reticulum", package = "reticu
 
 [dev-dependencies]
 tempfile = "3.17.1"
+
+[profile.release]
+opt-level = "z"
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true

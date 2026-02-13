@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { listen } from '@tauri-apps/api/event'
 import { useNavigate } from 'react-router-dom'
 import { buildNewChatHref, parseLxmfContactReference } from '../../shared/utils/contactReference'
 import { setPendingLaunchRoute } from '../../shared/runtime/preferences'
@@ -38,7 +39,6 @@ export function DeepLinkBridge({ onboardingCompleted }: DeepLinkBridgeProps) {
     void (async () => {
       try {
         const deepLink = await import('@tauri-apps/plugin-deep-link')
-        const tauriEvent = await import('@tauri-apps/api/event')
         const current = await deepLink.getCurrent()
         if (!disposed && current) {
           routeFromUrls(current)
@@ -46,7 +46,7 @@ export function DeepLinkBridge({ onboardingCompleted }: DeepLinkBridgeProps) {
         unlisten = await deepLink.onOpenUrl((urls) => {
           routeFromUrls(urls)
         })
-        unlistenSingleInstance = await tauriEvent.listen<unknown>(
+        unlistenSingleInstance = await listen<unknown>(
           'weft://single-instance',
           (event) => {
             const urls = extractUrlsFromSingleInstancePayload(event.payload)

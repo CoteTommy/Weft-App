@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -36,9 +36,17 @@ import {
   updateWeftPreferences,
 } from '../../shared/runtime/preferences'
 import { formatRelativeFromNow } from '../../shared/utils/time'
-import { DeliveryDiagnosticsDrawer, type DeliveryDiagnosticsSnapshot, type RecoveryEvent } from './DeliveryDiagnosticsDrawer'
+import type { DeliveryDiagnosticsSnapshot, RecoveryEvent } from './DeliveryDiagnosticsDrawer'
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
 import { useChatsState } from '../../features/chats/state/ChatsProvider'
+
+const DeliveryDiagnosticsDrawer = lazy(() =>
+  import('./DeliveryDiagnosticsDrawer').then((module) => ({ default: module.DeliveryDiagnosticsDrawer })),
+)
+
+function preloadDeliveryDiagnosticsDrawer() {
+  void import('./DeliveryDiagnosticsDrawer')
+}
 
 export function TopBar() {
   const navigate = useNavigate()
@@ -48,6 +56,7 @@ export function TopBar() {
   const [isConnected, setIsConnected] = useState(false)
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
+  const [hasOpenedDiagnostics, setHasOpenedDiagnostics] = useState(false)
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [diagnosticsSnapshot, setDiagnosticsSnapshot] = useState<DeliveryDiagnosticsSnapshot | null>(null)
@@ -545,7 +554,10 @@ export function TopBar() {
                 ? 'border-blue-300 bg-blue-50 text-blue-700'
                 : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
             )}
+            onMouseEnter={preloadDeliveryDiagnosticsDrawer}
+            onFocus={preloadDeliveryDiagnosticsDrawer}
             onClick={() => {
+              setHasOpenedDiagnostics(true)
               setDiagnosticsOpen(true)
             }}
           >
@@ -601,35 +613,39 @@ export function TopBar() {
         </div>
       </header>
 
-      <DeliveryDiagnosticsDrawer
-        open={diagnosticsOpen}
-        loading={diagnosticsLoading}
-        error={diagnosticsError}
-        snapshot={diagnosticsSnapshot}
-        runtimeTarget={runtimeTarget}
-        runtimeMismatch={runtimeMismatch}
-        recoveryEvents={recoveryEvents}
-        queueEntries={offlineQueue}
-        onClose={() => {
-          setDiagnosticsOpen(false)
-        }}
-        onRefresh={() => {
-          void loadDiagnostics()
-        }}
-        onOpenConnectivity={() => {
-          void navigate('/settings?section=connectivity')
-        }}
-        onRunRecovery={() => {
-          void runAutoRecoveryNow()
-        }}
-        onQueueRetryNow={(queueId) => {
-          void retryQueueNow(queueId)
-        }}
-        onQueuePause={pauseQueue}
-        onQueueResume={resumeQueue}
-        onQueueRemove={removeQueue}
-        onQueueClear={clearQueue}
-      />
+      {hasOpenedDiagnostics ? (
+        <Suspense fallback={null}>
+          <DeliveryDiagnosticsDrawer
+            open={diagnosticsOpen}
+            loading={diagnosticsLoading}
+            error={diagnosticsError}
+            snapshot={diagnosticsSnapshot}
+            runtimeTarget={runtimeTarget}
+            runtimeMismatch={runtimeMismatch}
+            recoveryEvents={recoveryEvents}
+            queueEntries={offlineQueue}
+            onClose={() => {
+              setDiagnosticsOpen(false)
+            }}
+            onRefresh={() => {
+              void loadDiagnostics()
+            }}
+            onOpenConnectivity={() => {
+              void navigate('/settings?section=connectivity')
+            }}
+            onRunRecovery={() => {
+              void runAutoRecoveryNow()
+            }}
+            onQueueRetryNow={(queueId) => {
+              void retryQueueNow(queueId)
+            }}
+            onQueuePause={pauseQueue}
+            onQueueResume={resumeQueue}
+            onQueueRemove={removeQueue}
+            onQueueClear={clearQueue}
+          />
+        </Suspense>
+      ) : null}
     </>
   )
 }
