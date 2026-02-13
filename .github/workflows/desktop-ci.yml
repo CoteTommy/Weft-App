@@ -51,6 +51,8 @@ jobs:
     needs: frontend
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout LXMF-rs (workspace dependency)
+        run: git clone --depth 1 https://github.com/FreeTAKTeam/LXMF-rs.git ../LXMF-rs
       - name: Checkout Reticulum-rs (workspace patch dependency)
         run: git clone --depth 1 https://github.com/FreeTAKTeam/Reticulum-rs.git ../Reticulum-rs
       - uses: dtolnay/rust-toolchain@stable

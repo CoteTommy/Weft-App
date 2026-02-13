@@ -379,7 +379,7 @@ fn setup_status_tray(
                 ..
             } = event
             {
-                if let Err(err) = toggle_main_window(&tray.app_handle()) {
+                if let Err(err) = toggle_main_window(tray.app_handle()) {
                     log::warn!("tray toggle window failed: {err}");
                 }
             }
@@ -490,7 +490,7 @@ pub fn run() {
                 log::warn!("deep-link register_all failed: {err}");
             }
             if let Some(shell_state) = app.try_state::<DesktopShellState>() {
-                if let Err(err) = shell_state.load_from_disk(&app.handle()) {
+                if let Err(err) = shell_state.load_from_disk(app.handle()) {
                     log::warn!("desktop shell prefs load failed: {err}");
                 }
             }
@@ -526,7 +526,7 @@ pub fn run() {
             let shell_state = app
                 .try_state::<DesktopShellState>()
                 .ok_or_else(|| "desktop shell state missing".to_string())?;
-            if let Err(err) = setup_status_tray(&app.handle(), actor.clone(), &shell_state) {
+            if let Err(err) = setup_status_tray(app.handle(), actor.clone(), &shell_state) {
                 log::warn!("status tray setup failed: {err}");
             }
             if shell_state.snapshot().start_in_tray {
