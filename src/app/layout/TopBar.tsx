@@ -12,6 +12,7 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import {
   daemonStart,
   daemonStatus,
@@ -29,6 +30,7 @@ import type {
   LxmfPropagationNodeListResponse,
 } from '../../lib/lxmf-payloads'
 import { publishAppNotification } from '../../shared/runtime/notifications'
+import { getRuntimeConnectionOptions, PREFERENCES_UPDATED_EVENT } from '../../shared/runtime/preferences'
 import { formatRelativeFromNow } from '../../shared/utils/time'
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
 
@@ -43,6 +45,7 @@ interface DiagnosticsSnapshot {
 }
 
 export function TopBar() {
+  const navigate = useNavigate()
   const [probing, setProbing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
@@ -51,10 +54,13 @@ export function TopBar() {
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [diagnosticsSnapshot, setDiagnosticsSnapshot] = useState<DiagnosticsSnapshot | null>(null)
+  const [runtimeTarget, setRuntimeTarget] = useState(() => getRuntimeConnectionOptions())
+  const [runtimeMismatch, setRuntimeMismatch] = useState<string | null>(null)
   const notificationMenuRef = useRef<HTMLDivElement | null>(null)
   const diagnosticsRef = useRef<HTMLDivElement | null>(null)
   const hasProbedRef = useRef(false)
   const previousConnectedRef = useRef<boolean | null>(null)
+  const previousMismatchRef = useRef<string | null>(null)
   const { notifications, unreadCount, markRead, markAllRead, clearAll } = useNotificationCenter()
 
   const rememberConnectivity = useCallback((connected: boolean) => {
@@ -82,16 +88,27 @@ export function TopBar() {
       setError(null)
       const probe = await probeLxmf()
       const nextConnected = probe.rpc.reachable && probe.local.running
+      const mismatch = buildRuntimeMismatch(runtimeTarget, probe)
       setIsConnected(nextConnected)
+      setRuntimeMismatch(mismatch)
       rememberConnectivity(nextConnected)
+      if (mismatch && mismatch !== previousMismatchRef.current) {
+        publishAppNotification({
+          kind: 'system',
+          title: 'Runtime target mismatch',
+          body: mismatch,
+        })
+      }
+      previousMismatchRef.current = mismatch
     } catch (probeError) {
       setIsConnected(false)
+      setRuntimeMismatch(null)
       setError(probeError instanceof Error ? probeError.message : String(probeError))
       rememberConnectivity(false)
     } finally {
       setProbing(false)
     }
-  }, [rememberConnectivity])
+  }, [rememberConnectivity, runtimeTarget])
 
   const loadDiagnostics = useCallback(async () => {
     try {
@@ -128,6 +145,17 @@ export function TopBar() {
     }, 20_000)
     return () => window.clearInterval(interval)
   }, [refresh])
+
+  useEffect(() => {
+    const syncTarget = () => {
+      setRuntimeTarget(getRuntimeConnectionOptions())
+    }
+    syncTarget()
+    window.addEventListener(PREFERENCES_UPDATED_EVENT, syncTarget)
+    return () => {
+      window.removeEventListener(PREFERENCES_UPDATED_EVENT, syncTarget)
+    }
+  }, [])
 
   const statusText = useMemo(() => {
     if (probing) {
@@ -340,6 +368,8 @@ export function TopBar() {
               {diagnosticsSnapshot ? (
                 <div className="max-h-96 space-y-2 overflow-y-auto p-3 text-xs text-slate-600">
                   <DetailRowInline label="Captured" value={formatRelativeFromNow(diagnosticsSnapshot.capturedAtMs)} />
+                  <DetailRowInline label="Expected profile" value={runtimeTarget.profile ?? 'default'} />
+                  <DetailRowInline label="Expected RPC" value={runtimeTarget.rpc ?? 'auto'} mono />
                   <DetailRowInline label="Profile" value={diagnosticsSnapshot.status.profile} />
                   <DetailRowInline label="Display name" value={diagnosticsSnapshot.profile?.displayName ?? '—'} />
                   <DetailRowInline label="RPC endpoint" value={diagnosticsSnapshot.status.rpc} mono />
@@ -382,6 +412,12 @@ export function TopBar() {
                       {diagnosticsSnapshot.probe.rpc.errors.join(' | ')}
                     </div>
                   ) : null}
+                  {runtimeMismatch ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
+                      <p className="font-semibold">Runtime mismatch detected</p>
+                      <p className="mt-0.5">{runtimeMismatch}</p>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="px-3 py-4 text-xs text-slate-500">
@@ -400,6 +436,18 @@ export function TopBar() {
           {isConnected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
           {statusText}
         </span>
+        {runtimeMismatch ? (
+          <button
+            type="button"
+            onClick={() => {
+              void navigate('/settings?section=connectivity')
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+          >
+            <CircleAlert className="h-3.5 w-3.5" />
+            Resolve runtime target
+          </button>
+        ) : null}
         <button
           className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
           disabled={probing}
@@ -449,4 +497,52 @@ function shortenValue(value: string | null): string {
     return value
   }
   return `${value.slice(0, 10)}...${value.slice(-8)}`
+}
+
+type RuntimeConnectionTarget = ReturnType<typeof getRuntimeConnectionOptions>
+
+function buildRuntimeMismatch(expected: RuntimeConnectionTarget, probe: LxmfProbeReport): string | null {
+  const expectedProfile = normalizeProfile(expected.profile)
+  const actualProfile = normalizeProfile(probe.local.profile)
+  const expectedRpc = normalizeRpcEndpoint(expected.rpc)
+  const localRpc = normalizeRpcEndpoint(probe.local.rpc)
+  const probeRpc = normalizeRpcEndpoint(probe.rpc.endpoint)
+
+  const parts: string[] = []
+  if (expectedProfile !== actualProfile) {
+    parts.push(`profile is "${actualProfile}" (expected "${expectedProfile}")`)
+  }
+  if (expectedRpc && expectedRpc !== localRpc && expectedRpc !== probeRpc) {
+    parts.push(`rpc is "${probe.local.rpc}" (expected "${expected.rpc}")`)
+  }
+  if (parts.length === 0) {
+    return null
+  }
+  return `Runtime ${parts.join(' and ')}. Open Connectivity settings to align profile/RPC.`
+}
+
+function normalizeProfile(value: string | undefined | null): string {
+  const normalized = value?.trim().toLowerCase()
+  if (!normalized || normalized === 'default') {
+    return 'default'
+  }
+  return normalized
+}
+
+function normalizeRpcEndpoint(value: string | undefined | null): string | null {
+  if (!value) {
+    return null
+  }
+  let normalized = value.trim().toLowerCase()
+  if (!normalized) {
+    return null
+  }
+  if (normalized.startsWith('http://')) {
+    normalized = normalized.slice('http://'.length)
+  }
+  if (normalized.startsWith('https://')) {
+    normalized = normalized.slice('https://'.length)
+  }
+  normalized = normalized.replace(/\/+$/, '')
+  return normalized || null
 }
