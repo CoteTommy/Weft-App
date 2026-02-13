@@ -3,25 +3,116 @@ mod commands;
 mod selector;
 
 use actor::{ActorCommand, RuntimeActor};
+use serde::{Deserialize, Serialize};
 use selector::{
     auto_daemon_enabled, default_profile, default_rpc, default_transport, RuntimeSelector,
 };
+use std::fs;
+use std::path::PathBuf;
 use std::sync::{mpsc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, Theme};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 pub(crate) const LXMF_EVENT_CHANNEL: &str = "weft://lxmf-event";
+pub(crate) const TRAY_ACTION_CHANNEL: &str = "weft://tray-action";
 pub(crate) const DEFAULT_EVENT_PUMP_INTERVAL_MS: u64 = 300;
 const TRAY_ICON_ID: &str = "weft-tray";
 const TRAY_MENU_OPEN: &str = "open";
+const TRAY_MENU_NEW_MESSAGE: &str = "new_message";
 const TRAY_MENU_RECONNECT: &str = "reconnect";
+const TRAY_MENU_TOGGLE_NOTIFICATIONS: &str = "toggle_notifications";
 const TRAY_MENU_QUIT: &str = "quit";
+const DESKTOP_SHELL_CONFIG_FILE: &str = "desktop-shell.json";
+#[cfg(target_os = "macos")]
 const TRAY_TEMPLATE_ICON: tauri::image::Image<'_> =
     tauri::include_image!("./icons/tray-template.png");
+#[cfg(not(target_os = "macos"))]
+const TRAY_FALLBACK_ICON: tauri::image::Image<'_> = tauri::include_image!("./icons/32x32.png");
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub(crate) struct DesktopShellPreferences {
+    pub minimize_to_tray_on_close: bool,
+    pub start_in_tray: bool,
+    pub single_instance_focus: bool,
+    pub notifications_muted: bool,
+}
+
+impl Default for DesktopShellPreferences {
+    fn default() -> Self {
+        Self {
+            minimize_to_tray_on_close: true,
+            start_in_tray: false,
+            single_instance_focus: true,
+            notifications_muted: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct DesktopShellPreferencePatch {
+    pub minimize_to_tray_on_close: Option<bool>,
+    pub start_in_tray: Option<bool>,
+    pub single_instance_focus: Option<bool>,
+    pub notifications_muted: Option<bool>,
+}
+
+#[derive(Default)]
+pub(crate) struct DesktopShellState {
+    prefs: Mutex<DesktopShellPreferences>,
+}
+
+impl DesktopShellState {
+    pub(crate) fn snapshot(&self) -> DesktopShellPreferences {
+        self.prefs.lock().map(|value| value.clone()).unwrap_or_default()
+    }
+
+    pub(crate) fn load_from_disk(&self, app: &tauri::AppHandle) -> Result<(), String> {
+        let path = desktop_shell_path(app)?;
+        let payload = match fs::read_to_string(&path) {
+            Ok(value) => value,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(err) => return Err(format!("read desktop shell prefs failed: {err}")),
+        };
+        let parsed: DesktopShellPreferences = serde_json::from_str(&payload)
+            .map_err(|err| format!("parse desktop shell prefs failed: {err}"))?;
+        if let Ok(mut guard) = self.prefs.lock() {
+            *guard = parsed;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn apply_patch(
+        &self,
+        app: &tauri::AppHandle,
+        patch: DesktopShellPreferencePatch,
+    ) -> Result<DesktopShellPreferences, String> {
+        let mut guard = self
+            .prefs
+            .lock()
+            .map_err(|_| "desktop shell prefs lock poisoned".to_string())?;
+        if let Some(value) = patch.minimize_to_tray_on_close {
+            guard.minimize_to_tray_on_close = value;
+        }
+        if let Some(value) = patch.start_in_tray {
+            guard.start_in_tray = value;
+        }
+        if let Some(value) = patch.single_instance_focus {
+            guard.single_instance_focus = value;
+        }
+        if let Some(value) = patch.notifications_muted {
+            guard.notifications_muted = value;
+        }
+        let next = guard.clone();
+        drop(guard);
+        persist_desktop_shell_preferences(app, &next)?;
+        Ok(next)
+    }
+}
 
 #[derive(Default)]
 pub(crate) struct EventPumpControl {
@@ -116,6 +207,42 @@ fn stop_event_pump_locked(slot: &mut Option<EventPumpHandle>) {
     }
 }
 
+fn desktop_shell_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map_err(|err| format!("resolve app config dir failed: {err}"))
+        .map(|dir| dir.join(DESKTOP_SHELL_CONFIG_FILE))
+}
+
+fn persist_desktop_shell_preferences(
+    app: &tauri::AppHandle,
+    prefs: &DesktopShellPreferences,
+) -> Result<(), String> {
+    let path = desktop_shell_path(app)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|err| format!("create prefs dir failed: {err}"))?;
+    }
+    let payload = serde_json::to_string_pretty(prefs)
+        .map_err(|err| format!("serialize desktop shell prefs failed: {err}"))?;
+    fs::write(path, payload).map_err(|err| format!("write desktop shell prefs failed: {err}"))
+}
+
+fn tray_action_payload(action: &str) -> serde_json::Value {
+    serde_json::json!({ "action": action })
+}
+
+pub(crate) fn current_system_appearance(app: &tauri::AppHandle) -> &'static str {
+    let Some(window) = app.get_webview_window("main") else {
+        return "unknown";
+    };
+    match window.theme() {
+        Ok(Theme::Dark) => "dark",
+        Ok(Theme::Light) => "light",
+        Ok(_) => "unknown",
+        Err(_) => "unknown",
+    }
+}
+
 fn show_main_window(app: &tauri::AppHandle) -> Result<(), String> {
     let Some(window) = app.get_webview_window("main") else {
         return Err("main window not found".to_string());
@@ -160,9 +287,22 @@ fn restart_runtime_for_tray(actor: &RuntimeActor) -> Result<(), String> {
         .map(|_| ())
 }
 
-fn setup_status_tray(app: &tauri::AppHandle, actor: RuntimeActor) -> Result<(), String> {
+fn setup_status_tray(
+    app: &tauri::AppHandle,
+    actor: RuntimeActor,
+    desktop_shell: &DesktopShellState,
+) -> Result<(), String> {
+    let initial_prefs = desktop_shell.snapshot();
     let open_item = MenuItem::with_id(app, TRAY_MENU_OPEN, "Open Weft", true, None::<&str>)
         .map_err(|err| format!("tray menu item open failed: {err}"))?;
+    let new_message_item = MenuItem::with_id(
+        app,
+        TRAY_MENU_NEW_MESSAGE,
+        "New Message",
+        true,
+        None::<&str>,
+    )
+    .map_err(|err| format!("tray menu item new message failed: {err}"))?;
     let reconnect_item = MenuItem::with_id(
         app,
         TRAY_MENU_RECONNECT,
@@ -171,12 +311,34 @@ fn setup_status_tray(app: &tauri::AppHandle, actor: RuntimeActor) -> Result<(), 
         None::<&str>,
     )
     .map_err(|err| format!("tray menu item reconnect failed: {err}"))?;
+    let mute_notifications_item = MenuItem::with_id(
+        app,
+        TRAY_MENU_TOGGLE_NOTIFICATIONS,
+        if initial_prefs.notifications_muted {
+            "Unmute Notifications"
+        } else {
+            "Mute Notifications"
+        },
+        true,
+        None::<&str>,
+    )
+    .map_err(|err| format!("tray menu item toggle notifications failed: {err}"))?;
     let separator = PredefinedMenuItem::separator(app)
         .map_err(|err| format!("tray menu separator failed: {err}"))?;
     let quit_item = MenuItem::with_id(app, TRAY_MENU_QUIT, "Quit Weft", true, None::<&str>)
         .map_err(|err| format!("tray menu item quit failed: {err}"))?;
-    let menu = Menu::with_items(app, &[&open_item, &reconnect_item, &separator, &quit_item])
-        .map_err(|err| format!("tray menu build failed: {err}"))?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &open_item,
+            &new_message_item,
+            &reconnect_item,
+            &mute_notifications_item,
+            &separator,
+            &quit_item,
+        ],
+    )
+    .map_err(|err| format!("tray menu build failed: {err}"))?;
 
     let mut tray_builder = TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&menu)
@@ -200,9 +362,39 @@ fn setup_status_tray(app: &tauri::AppHandle, actor: RuntimeActor) -> Result<(), 
                     log::warn!("tray open window failed: {err}");
                 }
             }
+            TRAY_MENU_NEW_MESSAGE => {
+                if let Err(err) = show_main_window(app) {
+                    log::warn!("tray new message open window failed: {err}");
+                }
+                let _ = app.emit(TRAY_ACTION_CHANNEL, tray_action_payload("new_message"));
+            }
             TRAY_MENU_RECONNECT => {
                 if let Err(err) = restart_runtime_for_tray(&actor) {
                     log::warn!("tray reconnect failed: {err}");
+                }
+            }
+            TRAY_MENU_TOGGLE_NOTIFICATIONS => {
+                let Some(shell) = app.try_state::<DesktopShellState>() else {
+                    log::warn!("tray notifications toggle failed: desktop shell state missing");
+                    return;
+                };
+                match shell.apply_patch(
+                    app,
+                    DesktopShellPreferencePatch {
+                        notifications_muted: Some(!shell.snapshot().notifications_muted),
+                        ..DesktopShellPreferencePatch::default()
+                    },
+                ) {
+                    Ok(next) => {
+                        let _ = app.emit(
+                            TRAY_ACTION_CHANNEL,
+                            serde_json::json!({
+                                "action": "notifications_muted",
+                                "muted": next.notifications_muted
+                            }),
+                        );
+                    }
+                    Err(err) => log::warn!("tray toggle notifications failed: {err}"),
                 }
             }
             TRAY_MENU_QUIT => {
@@ -211,7 +403,14 @@ fn setup_status_tray(app: &tauri::AppHandle, actor: RuntimeActor) -> Result<(), 
             _ => {}
         });
 
-    tray_builder = tray_builder.icon(TRAY_TEMPLATE_ICON);
+    #[cfg(target_os = "macos")]
+    {
+        tray_builder = tray_builder.icon(TRAY_TEMPLATE_ICON);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        tray_builder = tray_builder.icon(TRAY_FALLBACK_ICON);
+    }
     #[cfg(target_os = "macos")]
     {
         tray_builder = tray_builder.icon_as_template(true);
@@ -228,10 +427,16 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             log::info!("secondary instance forwarded args={argv:?} cwd={cwd}");
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
+            let should_focus = app
+                .try_state::<DesktopShellState>()
+                .map(|state| state.snapshot().single_instance_focus)
+                .unwrap_or(true);
+            if should_focus {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                }
             }
             let _ = app.emit(
                 "weft://single-instance",
@@ -244,6 +449,7 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .manage(actor.clone())
         .manage(EventPumpControl::default())
+        .manage(DesktopShellState::default())
         .setup(move |app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -254,6 +460,11 @@ pub fn run() {
             }
             if let Err(err) = app.deep_link().register_all() {
                 log::warn!("deep-link register_all failed: {err}");
+            }
+            if let Some(shell_state) = app.try_state::<DesktopShellState>() {
+                if let Err(err) = shell_state.load_from_disk(&app.handle()) {
+                    log::warn!("desktop shell prefs load failed: {err}");
+                }
             }
 
             if auto_daemon_enabled() {
@@ -284,8 +495,16 @@ pub fn run() {
                     }
                 }
             }
-            if let Err(err) = setup_status_tray(&app.handle(), actor.clone()) {
+            let shell_state = app
+                .try_state::<DesktopShellState>()
+                .ok_or_else(|| "desktop shell state missing".to_string())?;
+            if let Err(err) = setup_status_tray(&app.handle(), actor.clone(), &shell_state) {
                 log::warn!("status tray setup failed: {err}");
+            }
+            if shell_state.snapshot().start_in_tray {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
             }
             Ok(())
         })
@@ -294,8 +513,15 @@ pub fn run() {
                 return;
             }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+                let minimize_to_tray = window
+                    .app_handle()
+                    .try_state::<DesktopShellState>()
+                    .map(|state| state.snapshot().minimize_to_tray_on_close)
+                    .unwrap_or(true);
+                if minimize_to_tray {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -322,7 +548,9 @@ pub fn run() {
             commands::lxmf_set_display_name,
             commands::lxmf_send_message,
             commands::lxmf_send_rich_message,
-            commands::lxmf_send_command
+            commands::lxmf_send_command,
+            commands::desktop_get_shell_preferences,
+            commands::desktop_set_shell_preferences
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

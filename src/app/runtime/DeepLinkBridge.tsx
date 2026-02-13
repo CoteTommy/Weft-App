@@ -18,6 +18,7 @@ export function DeepLinkBridge({ onboardingCompleted }: DeepLinkBridgeProps) {
     }
 
     let unlisten: Unlisten | null = null
+    let unlistenSingleInstance: Unlisten | null = null
     let disposed = false
     const routeFromUrls = (urls: string[]) => {
       for (const url of urls) {
@@ -37,6 +38,7 @@ export function DeepLinkBridge({ onboardingCompleted }: DeepLinkBridgeProps) {
     void (async () => {
       try {
         const deepLink = await import('@tauri-apps/plugin-deep-link')
+        const tauriEvent = await import('@tauri-apps/api/event')
         const current = await deepLink.getCurrent()
         if (!disposed && current) {
           routeFromUrls(current)
@@ -44,6 +46,15 @@ export function DeepLinkBridge({ onboardingCompleted }: DeepLinkBridgeProps) {
         unlisten = await deepLink.onOpenUrl((urls) => {
           routeFromUrls(urls)
         })
+        unlistenSingleInstance = await tauriEvent.listen<unknown>(
+          'weft://single-instance',
+          (event) => {
+            const urls = extractUrlsFromSingleInstancePayload(event.payload)
+            if (urls.length > 0) {
+              routeFromUrls(urls)
+            }
+          },
+        )
       } catch {
         // Deep-link support is optional in non-Tauri contexts.
       }
@@ -53,6 +64,9 @@ export function DeepLinkBridge({ onboardingCompleted }: DeepLinkBridgeProps) {
       disposed = true
       if (unlisten) {
         unlisten()
+      }
+      if (unlistenSingleInstance) {
+        unlistenSingleInstance()
       }
     }
   }, [navigate, onboardingCompleted])
@@ -82,4 +96,26 @@ function readNameHint(url: string): string | undefined {
 
 function isTauriRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
+function extractUrlsFromSingleInstancePayload(payload: unknown): string[] {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return []
+  }
+  const record = payload as Record<string, unknown>
+  const argv = Array.isArray(record.argv) ? record.argv : []
+  const urls: string[] = []
+  for (const arg of argv) {
+    if (typeof arg !== 'string') {
+      continue
+    }
+    const candidate = arg.trim()
+    if (!candidate) {
+      continue
+    }
+    if (candidate.toLowerCase().startsWith('lxma://')) {
+      urls.push(candidate)
+    }
+  }
+  return urls
 }

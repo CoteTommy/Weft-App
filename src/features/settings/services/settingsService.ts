@@ -9,6 +9,10 @@ import {
   setLxmfOutboundPropagationNode,
   setLxmfDisplayName,
 } from '../../../lib/lxmf-api'
+import {
+  getDesktopShellPreferences,
+  setDesktopShellPreferences,
+} from '../../../lib/desktop-shell-api'
 import type { SettingsSnapshot } from '../../../shared/types/settings'
 import {
   type MotionPreference,
@@ -21,14 +25,23 @@ import { buildInteropSnapshot } from './interopHealth'
 
 export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
   const preferences = getWeftPreferences()
-  const [status, probe, profile, propagationNodes, outboundPropagationNode, messages] = await Promise.all([
-    daemonStatus(),
-    probeLxmf(),
-    getLxmfProfile().catch(() => null),
-    listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
-    getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
-    listLxmfMessages().catch(() => ({ messages: [], meta: null })),
-  ])
+  const [status, probe, profile, propagationNodes, outboundPropagationNode, messages, desktop] =
+    await Promise.all([
+      daemonStatus(),
+      probeLxmf(),
+      getLxmfProfile().catch(() => null),
+      listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
+      getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
+      listLxmfMessages().catch(() => ({ messages: [], meta: null })),
+      getDesktopShellPreferences().catch(() => ({
+        minimizeToTrayOnClose: true,
+        startInTray: false,
+        singleInstanceFocus: true,
+        notificationsMuted: !preferences.notificationsEnabled,
+        platform: 'unknown',
+        appearance: 'unknown' as const,
+      })),
+    ])
   const displayName = resolveDisplayName(
     status.profile,
     probe.rpc.identity_hash,
@@ -73,6 +86,7 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       motionPreference: preferences.motionPreference,
       hudEnabled: preferences.performanceHudEnabled,
     },
+    desktop,
     features: {
       commandCenterEnabled: preferences.commandCenterEnabled,
     },
@@ -178,4 +192,26 @@ export function saveFeatureSettings(input: {
   updateWeftPreferences({
     commandCenterEnabled: input.commandCenterEnabled,
   })
+}
+
+export async function saveDesktopShellSettings(input: {
+  minimizeToTrayOnClose?: boolean
+  startInTray?: boolean
+  singleInstanceFocus?: boolean
+  notificationsMuted?: boolean
+}): Promise<SettingsSnapshot['desktop']> {
+  const next = await setDesktopShellPreferences(input)
+  if (typeof input.notificationsMuted === 'boolean') {
+    updateWeftPreferences({
+      notificationsEnabled: !input.notificationsMuted,
+    })
+  }
+  return {
+    minimizeToTrayOnClose: next.minimizeToTrayOnClose,
+    startInTray: next.startInTray,
+    singleInstanceFocus: next.singleInstanceFocus,
+    notificationsMuted: next.notificationsMuted,
+    platform: next.platform,
+    appearance: next.appearance,
+  }
 }

@@ -6,6 +6,7 @@
   --motion-duration-fast: 140ms;
   --motion-duration-medium: 200ms;
   --motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: light;
 }
 
 * {
@@ -28,6 +29,23 @@ body {
   color: #0f172a;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+:root[data-system-appearance='dark'] {
+  --app-bg: #0f172a;
+  color-scheme: dark;
+}
+
+:root[data-system-appearance='dark'] body {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(37, 99, 235, 0.2), transparent 34%),
+    radial-gradient(circle at 84% 12%, rgba(14, 116, 144, 0.18), transparent 30%),
+    linear-gradient(160deg, #0c1424 0%, #111c2d 45%, #152235 100%);
+  color: #e2e8f0;
+}
+
+:root[data-weft-platform='macos'] body {
+  letter-spacing: 0.005em;
 }
 
 .motion-gpu {

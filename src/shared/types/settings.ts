@@ -1,4 +1,5 @@
 import type { ConnectivityMode, MotionPreference } from '../runtime/preferences'
+import type { DesktopAppearance } from '../../lib/desktop-shell-api'
 
 export interface SettingsSnapshot {
   displayName: string
@@ -33,6 +34,14 @@ export interface SettingsSnapshot {
   performance: {
     motionPreference: MotionPreference
     hudEnabled: boolean
+  }
+  desktop: {
+    minimizeToTrayOnClose: boolean
+    startInTray: boolean
+    singleInstanceFocus: boolean
+    notificationsMuted: boolean
+    platform: string
+    appearance: DesktopAppearance
   }
   features: {
     commandCenterEnabled: boolean

@@ -8,6 +8,7 @@ import { PageHeading } from '../../../shared/ui/PageHeading'
 import { shortHash } from '../../../shared/utils/identity'
 import {
   saveConnectivitySettings,
+  saveDesktopShellSettings,
   saveDisplayName,
   saveFeatureSettings,
   saveNotificationSettings,
@@ -43,6 +44,10 @@ export function SettingsPage() {
   )
   const [motionPreference, setMotionPreference] = useState<MotionPreference>('snappy')
   const [performanceHudEnabled, setPerformanceHudEnabled] = useState(false)
+  const [minimizeToTrayOnClose, setMinimizeToTrayOnClose] = useState(true)
+  const [startInTray, setStartInTray] = useState(false)
+  const [singleInstanceFocus, setSingleInstanceFocus] = useState(true)
+  const [notificationsMuted, setNotificationsMuted] = useState(false)
   const [commandCenterEnabled, setCommandCenterEnabled] = useState(false)
   const [configPayload, setConfigPayload] = useState('')
   const [backupWorking, setBackupWorking] = useState(false)
@@ -62,6 +67,10 @@ export function SettingsPage() {
     setNotificationSettings(settings.notifications)
     setMotionPreference(settings.performance.motionPreference)
     setPerformanceHudEnabled(settings.performance.hudEnabled)
+    setMinimizeToTrayOnClose(settings.desktop.minimizeToTrayOnClose)
+    setStartInTray(settings.desktop.startInTray)
+    setSingleInstanceFocus(settings.desktop.singleInstanceFocus)
+    setNotificationsMuted(settings.desktop.notificationsMuted)
     setCommandCenterEnabled(settings.features.commandCenterEnabled)
     setConfigPayload(
       JSON.stringify(
@@ -73,6 +82,7 @@ export function SettingsPage() {
           autoStartDaemon: settings.connectivity.autoStartDaemon,
           notifications: settings.notifications,
           performance: settings.performance,
+          desktop: settings.desktop,
           features: settings.features,
         }),
         null,
@@ -111,6 +121,36 @@ export function SettingsPage() {
     setCommandCenterEnabled(next.commandCenterEnabled)
     saveFeatureSettings(next)
     setSaveFeedback(feedback)
+  }
+
+  const updateDesktop = (
+    patch: Partial<SettingsSnapshot['desktop']>,
+    feedback: string,
+  ) => {
+    const localNext = {
+      minimizeToTrayOnClose,
+      startInTray,
+      singleInstanceFocus,
+      notificationsMuted,
+      ...patch,
+    }
+    setMinimizeToTrayOnClose(localNext.minimizeToTrayOnClose)
+    setStartInTray(localNext.startInTray)
+    setSingleInstanceFocus(localNext.singleInstanceFocus)
+    setNotificationsMuted(localNext.notificationsMuted)
+    setSaveFeedback(feedback)
+    void saveDesktopShellSettings(localNext)
+      .then((saved) => {
+        setMinimizeToTrayOnClose(saved.minimizeToTrayOnClose)
+        setStartInTray(saved.startInTray)
+        setSingleInstanceFocus(saved.singleInstanceFocus)
+        setNotificationsMuted(saved.notificationsMuted)
+      })
+      .catch((desktopError) => {
+        setSaveFeedback(
+          desktopError instanceof Error ? desktopError.message : String(desktopError),
+        )
+      })
   }
 
   const activeSection = parseSettingsSection(searchParams.get('section'))
@@ -516,6 +556,13 @@ export function SettingsPage() {
                                   setPerformanceHudEnabled(parsed.performance.hudEnabled)
                                 }
                               }
+                              if (parsed.desktop) {
+                                const savedDesktop = await saveDesktopShellSettings(parsed.desktop)
+                                setMinimizeToTrayOnClose(savedDesktop.minimizeToTrayOnClose)
+                                setStartInTray(savedDesktop.startInTray)
+                                setSingleInstanceFocus(savedDesktop.singleInstanceFocus)
+                                setNotificationsMuted(savedDesktop.notificationsMuted)
+                              }
                               if (parsed.features) {
                                 saveFeatureSettings(parsed.features)
                                 if (typeof parsed.features.commandCenterEnabled === 'boolean') {
@@ -563,6 +610,12 @@ export function SettingsPage() {
                             performance: {
                               motionPreference,
                               hudEnabled: performanceHudEnabled,
+                            },
+                            desktop: {
+                              minimizeToTrayOnClose,
+                              startInTray,
+                              singleInstanceFocus,
+                              notificationsMuted,
                             },
                             features: {
                               commandCenterEnabled,
@@ -633,6 +686,13 @@ export function SettingsPage() {
                                     setPerformanceHudEnabled(parsed.performance.hudEnabled)
                                   }
                                 }
+                                if (parsed.desktop) {
+                                  const savedDesktop = await saveDesktopShellSettings(parsed.desktop)
+                                  setMinimizeToTrayOnClose(savedDesktop.minimizeToTrayOnClose)
+                                  setStartInTray(savedDesktop.startInTray)
+                                  setSingleInstanceFocus(savedDesktop.singleInstanceFocus)
+                                  setNotificationsMuted(savedDesktop.notificationsMuted)
+                                }
                                 if (parsed.features) {
                                   saveFeatureSettings(parsed.features)
                                   if (typeof parsed.features.commandCenterEnabled === 'boolean') {
@@ -680,6 +740,82 @@ export function SettingsPage() {
                       <p>RPC Endpoint: {settings.rpcEndpoint}</p>
                       <p>Profile Path: {settings.profile}</p>
                       <p>Identity Hash: {settings.identityHash ?? 'n/a'}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                    <p className="text-sm font-semibold text-slate-800">Desktop shell</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Tray behavior, startup mode, single-instance handoff, and notification mute.
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={minimizeToTrayOnClose}
+                          onChange={(event) => {
+                            const next = event.target.checked
+                            updateDesktop(
+                              { minimizeToTrayOnClose: next },
+                              next
+                                ? 'Closing window now minimizes to tray.'
+                                : 'Closing window now exits the app.',
+                            )
+                          }}
+                        />
+                        Minimize to tray on close
+                      </label>
+                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={startInTray}
+                          onChange={(event) => {
+                            const next = event.target.checked
+                            updateDesktop(
+                              { startInTray: next },
+                              next
+                                ? 'App will start hidden in tray.'
+                                : 'App will open window on startup.',
+                            )
+                          }}
+                        />
+                        Start in tray
+                      </label>
+                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={singleInstanceFocus}
+                          onChange={(event) => {
+                            const next = event.target.checked
+                            updateDesktop(
+                              { singleInstanceFocus: next },
+                              next
+                                ? 'Secondary launches will focus the existing window.'
+                                : 'Secondary launches will forward payloads without forcing focus.',
+                            )
+                          }}
+                        />
+                        Focus window on second launch
+                      </label>
+                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={notificationsMuted}
+                          onChange={(event) => {
+                            const next = event.target.checked
+                            updateDesktop(
+                              { notificationsMuted: next },
+                              next
+                                ? 'Notifications muted at desktop shell level.'
+                                : 'Notifications unmuted.',
+                            )
+                          }}
+                        />
+                        Tray mute notifications
+                      </label>
+                    </div>
+                    <div className="mt-3 space-y-1 text-xs text-slate-600">
+                      <p>Platform: {settings.desktop.platform}</p>
+                      <p>System appearance: {settings.desktop.appearance}</p>
                     </div>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-white p-3">

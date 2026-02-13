@@ -8,11 +8,17 @@ import { PerformanceHud } from './PerformanceHud'
 import { SidebarNav } from './SidebarNav'
 import { TopBar } from './TopBar'
 import {
+  getDesktopShellPreferences,
+  setDesktopShellPreferences,
+  subscribeTrayActions,
+} from '../../lib/desktop-shell-api'
+import {
   getWeftPreferences,
   PREFERENCES_UPDATED_EVENT,
   updateWeftPreferences,
   type MotionPreference,
 } from '../../shared/runtime/preferences'
+import { FOCUS_NEW_CHAT_EVENT } from '../../shared/runtime/shortcuts'
 import { isRestorableMainRoute } from '../../shared/runtime/sessionRestore'
 
 export function AppShell() {
@@ -22,6 +28,7 @@ export function AppShell() {
   const pageMotion = useAnimationControls()
   const routeAnimationFrameRef = useRef<number | null>(null)
   const lastPersistedRouteRef = useRef<string>(getWeftPreferences().lastMainRoute ?? '/chats')
+  const desktopMuteSyncRef = useRef<boolean | null>(null)
   const [motionPreference, setMotionPreference] = useState<MotionPreference>(
     () => getWeftPreferences().motionPreference,
   )
@@ -96,6 +103,105 @@ export function AppShell() {
       lastMainRoute: route,
     })
   }, [location.pathname, location.search])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
+      return
+    }
+    let unlisten: (() => void) | null = null
+    let disposed = false
+    void subscribeTrayActions((event) => {
+      if (event.action === 'new_message') {
+        void navigate('/chats')
+        window.setTimeout(() => {
+          window.dispatchEvent(new Event(FOCUS_NEW_CHAT_EVENT))
+        }, 110)
+        return
+      }
+      if (event.action === 'notifications_muted' && typeof event.muted === 'boolean') {
+        const nextNotificationsEnabled = !event.muted
+        desktopMuteSyncRef.current = event.muted
+        if (getWeftPreferences().notificationsEnabled !== nextNotificationsEnabled) {
+          updateWeftPreferences({
+            notificationsEnabled: nextNotificationsEnabled,
+          })
+        }
+      }
+    })
+      .then((stop) => {
+        if (disposed) {
+          stop()
+          return
+        }
+        unlisten = stop
+      })
+      .catch(() => {
+        // No-op in non-Tauri preview contexts.
+      })
+    return () => {
+      disposed = true
+      unlisten?.()
+    }
+  }, [navigate])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
+      return
+    }
+    const applyPlatformAndAppearance = (platform: string, appearance: string) => {
+      document.documentElement.dataset.weftPlatform = platform
+      document.documentElement.dataset.systemAppearance = appearance
+    }
+
+    let media: MediaQueryList | null = null
+    const onMediaChange = (event: MediaQueryListEvent) => {
+      const appearance = event.matches ? 'dark' : 'light'
+      document.documentElement.dataset.systemAppearance = appearance
+    }
+
+    media = window.matchMedia('(prefers-color-scheme: dark)')
+    const fallbackAppearance = media.matches ? 'dark' : 'light'
+    applyPlatformAndAppearance('unknown', fallbackAppearance)
+    void getDesktopShellPreferences()
+      .then((prefs) => {
+        applyPlatformAndAppearance(prefs.platform, prefs.appearance)
+      })
+      .catch(() => {
+        applyPlatformAndAppearance('unknown', fallbackAppearance)
+      })
+
+    document.documentElement.dataset.prefersColorScheme = fallbackAppearance
+    media.addEventListener('change', onMediaChange)
+
+    return () => {
+      media?.removeEventListener('change', onMediaChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
+      return
+    }
+    const syncDesktopMuteState = () => {
+      const preferences = getWeftPreferences()
+      const muted = !preferences.notificationsEnabled
+      if (desktopMuteSyncRef.current === muted) {
+        return
+      }
+      desktopMuteSyncRef.current = muted
+      void setDesktopShellPreferences({
+        notificationsMuted: muted,
+      }).catch(() => {
+        desktopMuteSyncRef.current = null
+        // Ignore sync failures; tray toggle still works.
+      })
+    }
+    syncDesktopMuteState()
+    window.addEventListener(PREFERENCES_UPDATED_EVENT, syncDesktopMuteState)
+    return () => {
+      window.removeEventListener(PREFERENCES_UPDATED_EVENT, syncDesktopMuteState)
+    }
+  }, [])
 
   return (
     <div className="relative h-screen overflow-hidden bg-[var(--app-bg)] text-slate-900 motion-gpu">

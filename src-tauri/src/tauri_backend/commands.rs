@@ -2,7 +2,10 @@ use super::actor::{
     clean_required_arg, parse_command_entries, rpc_actor_call, ActorCommand, RuntimeActor,
 };
 use super::selector::{clean_arg, default_transport, RuntimeSelector};
-use super::{EventPumpControl, DEFAULT_EVENT_PUMP_INTERVAL_MS};
+use super::{
+    current_system_appearance, DesktopShellPreferencePatch, DesktopShellState, EventPumpControl,
+    TRAY_ACTION_CHANNEL, DEFAULT_EVENT_PUMP_INTERVAL_MS,
+};
 use base64::Engine as _;
 use lxmf::cli::profile::{load_profile_settings, save_profile_settings};
 use lxmf::constants::{FIELD_FILE_ATTACHMENTS, FIELD_TELEMETRY};
@@ -13,7 +16,7 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
 pub(crate) fn daemon_probe(
@@ -351,6 +354,60 @@ pub(crate) fn lxmf_set_display_name(
         "display_name": settings.display_name,
         "rpc": settings.rpc,
         "managed": settings.managed,
+    }))
+}
+
+#[tauri::command]
+pub(crate) fn desktop_get_shell_preferences(
+    app: AppHandle,
+    desktop_shell: State<'_, DesktopShellState>,
+) -> Result<Value, String> {
+    let prefs = desktop_shell.snapshot();
+    Ok(json!({
+        "minimize_to_tray_on_close": prefs.minimize_to_tray_on_close,
+        "start_in_tray": prefs.start_in_tray,
+        "single_instance_focus": prefs.single_instance_focus,
+        "notifications_muted": prefs.notifications_muted,
+        "platform": std::env::consts::OS,
+        "appearance": current_system_appearance(&app),
+    }))
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn desktop_set_shell_preferences(
+    app: AppHandle,
+    desktop_shell: State<'_, DesktopShellState>,
+    minimize_to_tray_on_close: Option<bool>,
+    start_in_tray: Option<bool>,
+    single_instance_focus: Option<bool>,
+    notifications_muted: Option<bool>,
+) -> Result<Value, String> {
+    let next = desktop_shell.apply_patch(
+        &app,
+        DesktopShellPreferencePatch {
+            minimize_to_tray_on_close,
+            start_in_tray,
+            single_instance_focus,
+            notifications_muted,
+        },
+    )?;
+    if notifications_muted.is_some() {
+        let _ = app.emit(
+            TRAY_ACTION_CHANNEL,
+            json!({
+                "action": "notifications_muted",
+                "muted": next.notifications_muted,
+            }),
+        );
+    }
+    Ok(json!({
+        "minimize_to_tray_on_close": next.minimize_to_tray_on_close,
+        "start_in_tray": next.start_in_tray,
+        "single_instance_focus": next.single_instance_focus,
+        "notifications_muted": next.notifications_muted,
+        "platform": std::env::consts::OS,
+        "appearance": current_system_appearance(&app),
     }))
 }
 
