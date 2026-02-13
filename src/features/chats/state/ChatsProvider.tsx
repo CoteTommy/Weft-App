@@ -53,6 +53,19 @@ import {
   syncQueueFromThreads,
   type OfflineQueueEntry,
 } from './offlineQueue'
+import { selectThreadById } from './chatSelectors'
+import {
+  appendDeliveryTraceEntry,
+  reduceCreateDraftThread,
+  reduceHydratedThreads,
+  reduceMarkAllThreadsRead,
+  reduceMarkThreadRead,
+  reduceReceiptUpdate,
+  reduceRewriteSelfAuthors,
+  reduceRuntimeMessage,
+  reduceSetThreadMuted,
+  reduceSetThreadPinned,
+} from './chatThreadsReducer'
 import {
   getStoredThreadPreferences,
   persistThreadPreferences,
@@ -169,30 +182,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
 
   const rewriteSelfAuthors = useCallback((nextAuthor: string) => {
     const normalizedAuthor = nextAuthor.trim() || 'You'
-    setThreads((previous) => {
-      let changed = false
-      const updated = previous.map((thread) => {
-        let threadChanged = false
-        const messages = thread.messages.map((message) => {
-          if (message.sender !== 'self' || message.author === normalizedAuthor) {
-            return message
-          }
-          changed = true
-          threadChanged = true
-          return {
-            ...message,
-            author: normalizedAuthor,
-          }
-        })
-        return threadChanged
-          ? {
-              ...thread,
-              messages,
-            }
-          : thread
-      })
-      return changed ? updated : previous
-    })
+    setThreads((previous) => reduceRewriteSelfAuthors(previous, normalizedAuthor))
   }, [])
 
   const refresh = useCallback(async () => {
@@ -280,7 +270,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       }
 
       const draftThreads = [...draftThreadsRef.current.values()].map(applyThreadMetadata)
-      setThreads(orderThreads([...draftThreads, ...hydratedThreads]))
+      setThreads(reduceHydratedThreads(hydratedThreads, draftThreads))
       if (pendingNotifications.length > 0) {
         for (const item of pendingNotifications) {
           publishAppNotification({
@@ -420,16 +410,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       return
     }
     unreadCountsRef.current.set(id, 0)
-    setThreads((previous) =>
-      previous.map((thread) =>
-        thread.id === id && thread.unread > 0
-          ? {
-              ...thread,
-              unread: 0,
-            }
-          : thread,
-      ),
-    )
+    setThreads((previous) => reduceMarkThreadRead(previous, id))
   }, [])
 
   const markAllRead = useCallback(() => {
@@ -443,16 +424,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     if (!hasUnread) {
       return
     }
-    setThreads((previous) =>
-      previous.map((thread) =>
-        thread.unread > 0
-          ? {
-              ...thread,
-              unread: 0,
-            }
-          : thread,
-      ),
-    )
+    setThreads((previous) => reduceMarkAllThreadsRead(previous))
   }, [])
 
   const sendMessage = useCallback(
@@ -495,7 +467,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     }
 
     setError(null)
-    const existing = threads.find((thread) => thread.id === threadId)
+    const existing = selectThreadById(threads, threadId)
     if (existing) {
       return existing.id
     }
@@ -517,12 +489,9 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     draftThreadsRef.current.set(threadId, draft)
     knownMessageIdsRef.current.set(threadId, new Set())
     unreadCountsRef.current.set(threadId, 0)
-    setThreads((previous) => {
-      if (previous.some((thread) => thread.id === threadId)) {
-        return previous
-      }
-      return orderThreads([applyThreadMetadata(draft), ...previous])
-    })
+    setThreads((previous) =>
+      reduceCreateDraftThread(previous, applyThreadMetadata(draft)),
+    )
     return threadId
   }, [applyThreadMetadata, threads])
 
@@ -547,18 +516,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         threadPreferencesRef.current.set(id, next)
       }
       persistThreadPreferences(threadPreferencesRef.current)
-      setThreads((previous) =>
-        orderThreads(
-          previous.map((thread) =>
-            thread.id === id
-              ? {
-                  ...thread,
-                  pinned: nextPinned,
-                }
-              : thread,
-          ),
-        ),
-      )
+      setThreads((previous) => reduceSetThreadPinned(previous, id, nextPinned))
     },
     [],
   )
@@ -583,16 +541,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       threadPreferencesRef.current.set(id, next)
     }
     persistThreadPreferences(threadPreferencesRef.current)
-    setThreads((previous) =>
-      previous.map((thread) =>
-        thread.id === id
-          ? {
-              ...thread,
-              muted: nextMuted,
-            }
-          : thread,
-      ),
-    )
+    setThreads((previous) => reduceSetThreadMuted(previous, id, nextMuted))
   }, [])
 
   const applyMessageEvent = useCallback(
@@ -654,32 +603,14 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       }
 
       const preference = resolveThreadPreference(threadPreferencesRef.current, threadId)
-      setThreads((previous) => {
-        const index = previous.findIndex((thread) => thread.id === threadId)
-        if (index < 0) {
-          const nextUnread = unreadCountsRef.current.get(threadId) ?? 0
-          return orderThreads([
-            applyThreadMetadata({
-              ...derivedThread,
-              unread: nextUnread,
-            }),
-            ...previous,
-          ])
-        }
-
-        const existing = previous[index]
-        const messages = upsertThreadMessages(existing.messages, mergedMessage)
-        const updatedThread = applyThreadMetadata({
-          ...existing,
-          preview: previewFromMessage(messages[messages.length - 1]),
-          lastActivity: derivedThread.lastActivity,
-          messages,
-          unread: unreadCountsRef.current.get(threadId) ?? existing.unread,
-        })
-        const next = [...previous]
-        next[index] = updatedThread
-        return orderThreads(next)
-      })
+      setThreads((previous) =>
+        reduceRuntimeMessage(previous, {
+          applyThreadMetadata,
+          derivedThread,
+          mergedMessage,
+          unread: unreadCountsRef.current.get(threadId),
+        }),
+      )
 
       if (isIncoming && hasLoadedRef.current && !preference.muted) {
         publishAppNotification({
@@ -711,39 +642,9 @@ export function ChatsProvider({ children }: PropsWithChildren) {
 
       let found = false
       setThreads((previous) => {
-        const next = previous.map((thread) => {
-          let changed = false
-          const messages = thread.messages.map((message) => {
-            if (message.id !== receipt.messageId) {
-              return message
-            }
-            found = true
-            changed = true
-            const statusDetail = receipt.status ?? message.statusDetail
-            const reasonCode = receipt.reasonCode ?? deriveReasonCode(statusDetail)
-            const status = deriveReceiptStatus('out', statusDetail ?? null) ?? message.status
-            return {
-              ...message,
-              status,
-              statusDetail,
-              statusReasonCode: reasonCode,
-              deliveryTrace: appendDeliveryTraceEntry(
-                message,
-                statusDetail,
-                reasonCode,
-              ),
-            }
-          })
-          if (!changed) {
-            return thread
-          }
-          return {
-            ...thread,
-            preview: previewFromMessage(messages[messages.length - 1]),
-            messages,
-          }
-        })
-        return next
+        const next = reduceReceiptUpdate(previous, receipt)
+        found = next.found
+        return next.threads
       })
 
       if (!found) {
@@ -953,59 +854,6 @@ export function ChatsStateLayout() {
       <Outlet />
     </ChatsProvider>
   )
-}
-
-function orderThreads(threads: ChatThread[]): ChatThread[] {
-  return [...threads].sort((left, right) => Number(right.pinned) - Number(left.pinned))
-}
-
-function upsertThreadMessages(
-  messages: ChatMessage[],
-  incoming: ChatMessage,
-): ChatMessage[] {
-  const index = messages.findIndex((message) => message.id === incoming.id)
-  if (index < 0) {
-    return [...messages, incoming]
-  }
-  const next = [...messages]
-  next[index] = {
-    ...messages[index],
-    ...incoming,
-  }
-  return next
-}
-
-function previewFromMessage(message: ChatMessage | undefined): string {
-  if (!message) {
-    return 'No messages yet'
-  }
-  const body = message.body.trim()
-  if (body.length > 0) {
-    return body
-  }
-  if (message.attachments.length > 0) {
-    return message.attachments.length === 1
-      ? `Attachment: ${message.attachments[0].name}`
-      : `${message.attachments.length} attachments`
-  }
-  if (message.paper?.title) {
-    return `Paper: ${message.paper.title}`
-  }
-  return 'No messages yet'
-}
-
-function appendDeliveryTraceEntry(
-  message: ChatMessage,
-  statusDetail: string | undefined,
-  reasonCode?: string,
-): ChatMessage['deliveryTrace'] {
-  if (!statusDetail) {
-    return message.deliveryTrace
-  }
-  const existing = message.deliveryTrace ?? []
-  const timestamp = Math.floor(Date.now() / 1000)
-  const next = [...existing, { status: statusDetail, timestamp, reasonCode }]
-  return next.slice(-32)
 }
 
 function extractEventMessageRecord(event: LxmfRpcEvent): LxmfMessageRecord | null {

@@ -31,6 +31,11 @@ jobs:
           else
             echo "Skipping event-payload schema mirror check: upstream schema not found"
           fi
+          if [ -f ../LXMF-rs/docs/fixtures/contract-v2/payload-domains.json ]; then
+            diff -u ../LXMF-rs/docs/fixtures/contract-v2/payload-domains.json docs/fixtures/contract-v2/payload-domains.json
+          else
+            echo "Skipping payload-domain fixture mirror check: upstream fixture not found"
+          fi
       - uses: oven-sh/setup-bun@v2
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
