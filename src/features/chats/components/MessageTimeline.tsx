@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { useNavigate } from 'react-router-dom'
 import { getLxmfMessageDeliveryTrace } from '../../../lib/lxmf-api'
 import type { ChatMessage } from '../../../shared/types/chat'
 
@@ -9,6 +10,7 @@ interface MessageTimelineProps {
 }
 
 export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
+  const navigate = useNavigate()
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   const [fetchedDeliveryTrace, setFetchedDeliveryTrace] = useState<
@@ -35,6 +37,25 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
     }
     return fetchedDeliveryTrace
   }, [fetchedDeliveryTrace, selectedMessage])
+  const selectedReasonCode = useMemo(() => {
+    if (!selectedMessage) {
+      return undefined
+    }
+    if (selectedMessage.statusReasonCode) {
+      return selectedMessage.statusReasonCode
+    }
+    for (let index = deliveryTrace.length - 1; index >= 0; index -= 1) {
+      const value = deliveryTrace[index]?.reasonCode
+      if (value) {
+        return value
+      }
+    }
+    return undefined
+  }, [deliveryTrace, selectedMessage])
+  const failureGuidance = useMemo(
+    () => buildFailureGuidance(selectedReasonCode),
+    [selectedReasonCode],
+  )
   const latestMessageId = messages[messages.length - 1]?.id ?? null
 
   const closeModal = useCallback(() => {
@@ -298,6 +319,25 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
               </div>
             ) : null}
 
+            {selectedMessage.sender === 'self' && selectedMessage.status === 'failed' && failureGuidance ? (
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <p className="font-semibold">{failureGuidance.title}</p>
+                <p className="mt-1">{failureGuidance.body}</p>
+                {failureGuidance.actionPath ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigate(failureGuidance.actionPath as '/settings' | '/network')
+                      closeModal()
+                    }}
+                    className="mt-2 rounded-lg border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100"
+                  >
+                    {failureGuidance.actionLabel}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="mt-3 flex items-center gap-2">
               {selectedMessage.sender === 'self' && selectedMessage.status === 'failed' ? (
                 <button
@@ -375,6 +415,54 @@ function renderStatus(status: ChatMessage['status']): string {
       return 'Failed'
     default:
       return ''
+  }
+}
+
+function buildFailureGuidance(reasonCode: string | undefined): {
+  title: string
+  body: string
+  actionLabel?: string
+  actionPath?: string
+} | null {
+  if (!reasonCode) {
+    return {
+      title: 'Delivery failed',
+      body: 'Retry now or keep Weft online while routes and announcements converge.',
+    }
+  }
+  if (reasonCode === 'relay_unset') {
+    return {
+      title: 'No relay selected',
+      body: 'This message requires propagated delivery. Select an outbound propagation relay first.',
+      actionLabel: 'Open settings',
+      actionPath: '/settings',
+    }
+  }
+  if (reasonCode === 'no_path') {
+    return {
+      title: 'No route to destination',
+      body: 'A path to this peer is not known yet. Wait for announces or check network connectivity.',
+      actionLabel: 'Open network',
+      actionPath: '/network',
+    }
+  }
+  if (reasonCode === 'timeout' || reasonCode === 'receipt_timeout') {
+    return {
+      title: 'Delivery timed out',
+      body: 'The recipient might be offline or out of range. Keep the app running and retry shortly.',
+    }
+  }
+  if (reasonCode === 'retry_budget_exhausted') {
+    return {
+      title: 'Retries exhausted',
+      body: 'All configured retries were used. Check relay selection and connectivity before retrying.',
+      actionLabel: 'Open settings',
+      actionPath: '/settings',
+    }
+  }
+  return {
+    title: 'Delivery failed',
+    body: `Backend reason: ${reasonCode}`,
   }
 }
 
