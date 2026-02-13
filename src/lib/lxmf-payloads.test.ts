@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   parseLxmfAnnounceList,
+  parseLxmfMessageList,
   parseLxmfMessageDeliveryTrace,
   parseLxmfRpcEventOrNull,
 } from './lxmf-payloads'
@@ -54,6 +55,11 @@ describe('lxmf payload parsers', () => {
           reason_code: 'timeout',
         },
       ],
+      meta: {
+        contract_version: 'v2',
+        profile: 'weft2',
+        rpc_endpoint: '127.0.0.1:4245',
+      },
     })
     expect(parsed.message_id).toBe('lxmf-123')
     expect(parsed.transitions.map((entry) => entry.status)).toEqual([
@@ -61,6 +67,22 @@ describe('lxmf payload parsers', () => {
       'retrying: propagated relay',
     ])
     expect(parsed.transitions[1].reason_code).toBe('timeout')
+    expect(parsed.meta?.profile).toBe('weft2')
+  })
+
+  test('parses message list metadata', () => {
+    const parsed = parseLxmfMessageList({
+      messages: [],
+      meta: {
+        contract_version: 'v2',
+        profile: 'weft2',
+        rpc_endpoint: '127.0.0.1:4245',
+      },
+    })
+
+    expect(parsed.messages).toHaveLength(0)
+    expect(parsed.meta?.contract_version).toBe('v2')
+    expect(parsed.meta?.rpc_endpoint).toBe('127.0.0.1:4245')
   })
 
   test('parses rpc event payload from tauri pump', () => {

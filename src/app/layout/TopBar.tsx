@@ -118,9 +118,9 @@ export function TopBar() {
         daemonStatus(),
         probeLxmf(),
         getLxmfProfile().catch(() => null),
-        getLxmfOutboundPropagationNode().catch(() => ({ peer: null })),
-        listLxmfPropagationNodes().catch(() => ({ nodes: [] })),
-        listLxmfInterfaces().catch(() => ({ interfaces: [] })),
+        getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
+        listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
+        listLxmfInterfaces().catch(() => ({ interfaces: [], meta: null })),
       ])
       setDiagnosticsSnapshot({
         capturedAtMs: Date.now(),

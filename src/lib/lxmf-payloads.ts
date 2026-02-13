@@ -138,14 +138,17 @@ export interface LxmfContractMeta {
 
 export interface LxmfMessageListResponse {
   messages: LxmfMessageRecord[]
+  meta: LxmfContractMeta | null
 }
 
 export interface LxmfPeerListResponse {
   peers: LxmfPeerRecord[]
+  meta: LxmfContractMeta | null
 }
 
 export interface LxmfInterfaceListResponse {
   interfaces: LxmfInterfaceRecord[]
+  meta: LxmfContractMeta | null
 }
 
 export interface LxmfAnnounceRecord {
@@ -187,10 +190,12 @@ export interface LxmfPropagationNodeRecord {
 
 export interface LxmfPropagationNodeListResponse {
   nodes: LxmfPropagationNodeRecord[]
+  meta: LxmfContractMeta | null
 }
 
 export interface LxmfOutboundPropagationNodeResponse {
   peer: string | null
+  meta: LxmfContractMeta | null
 }
 
 export interface LxmfDeliveryTraceEntry {
@@ -202,6 +207,7 @@ export interface LxmfDeliveryTraceEntry {
 export interface LxmfMessageDeliveryTraceResponse {
   message_id: string
   transitions: LxmfDeliveryTraceEntry[]
+  meta: LxmfContractMeta | null
 }
 
 export function parseLxmfMessageList(value: unknown): LxmfMessageListResponse {
@@ -211,6 +217,7 @@ export function parseLxmfMessageList(value: unknown): LxmfMessageListResponse {
   }
   return {
     messages: rawList.map((entry, index) => parseMessageRecord(entry, `messages[${index}]`)),
+    meta: readMetaField(value, 'messages.meta'),
   }
 }
 
@@ -221,6 +228,7 @@ export function parseLxmfPeerList(value: unknown): LxmfPeerListResponse {
   }
   return {
     peers: rawList.map((entry, index) => parsePeerRecord(entry, `peers[${index}]`)),
+    meta: readMetaField(value, 'peers.meta'),
   }
 }
 
@@ -233,6 +241,7 @@ export function parseLxmfInterfaceList(value: unknown): LxmfInterfaceListRespons
     interfaces: rawList.map((entry, index) =>
       parseInterfaceRecord(entry, `interfaces[${index}]`),
     ),
+    meta: readMetaField(value, 'interfaces.meta'),
   }
 }
 
@@ -276,6 +285,7 @@ export function parseLxmfPropagationNodeList(
     nodes: rawList.map((entry, index) =>
       parsePropagationNodeRecord(entry, `nodes[${index}]`),
     ),
+    meta: readMetaField(value, 'nodes.meta'),
   }
 }
 
@@ -285,6 +295,7 @@ export function parseLxmfOutboundPropagationNode(
   const root = asObject(value, 'outbound_propagation_node')
   return {
     peer: asNullableString(root.peer, 'outbound_propagation_node.peer'),
+    meta: asNullableContractMeta(root.meta, 'outbound_propagation_node.meta'),
   }
 }
 
@@ -309,6 +320,7 @@ export function parseLxmfMessageDeliveryTrace(
         ),
       }
     }),
+    meta: asNullableContractMeta(root.meta, 'message_delivery_trace.meta'),
   }
 }
 
@@ -498,6 +510,14 @@ function asNullableObject(value: unknown, path: string): Record<string, unknown>
     return null
   }
   return asObject(value, path)
+}
+
+function readMetaField(value: unknown, path: string): LxmfContractMeta | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null
+  }
+  const record = value as Record<string, unknown>
+  return asNullableContractMeta(record.meta, path)
 }
 
 function asNullableContractMeta(value: unknown, path: string): LxmfContractMeta | null {

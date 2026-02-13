@@ -22,8 +22,8 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
     daemonStatus(),
     probeLxmf(),
     getLxmfProfile().catch(() => null),
-    listLxmfPropagationNodes().catch(() => ({ nodes: [] })),
-    getLxmfOutboundPropagationNode().catch(() => ({ peer: null })),
+    listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
+    getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
   ])
   const displayName = resolveDisplayName(
     status.profile,
