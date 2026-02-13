@@ -9,11 +9,17 @@ use selector::{
 use std::sync::{mpsc, Mutex};
 use std::thread;
 use std::time::Duration;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 pub(crate) const LXMF_EVENT_CHANNEL: &str = "weft://lxmf-event";
 pub(crate) const DEFAULT_EVENT_PUMP_INTERVAL_MS: u64 = 300;
+const TRAY_ICON_ID: &str = "weft-tray";
+const TRAY_MENU_OPEN: &str = "open";
+const TRAY_MENU_RECONNECT: &str = "reconnect";
+const TRAY_MENU_QUIT: &str = "quit";
 
 #[derive(Default)]
 pub(crate) struct EventPumpControl {
@@ -108,6 +114,114 @@ fn stop_event_pump_locked(slot: &mut Option<EventPumpHandle>) {
     }
 }
 
+fn show_main_window(app: &tauri::AppHandle) -> Result<(), String> {
+    let Some(window) = app.get_webview_window("main") else {
+        return Err("main window not found".to_string());
+    };
+    window
+        .show()
+        .map_err(|err| format!("show window failed: {err}"))?;
+    let _ = window.unminimize();
+    let _ = window.set_focus();
+    Ok(())
+}
+
+fn toggle_main_window(app: &tauri::AppHandle) -> Result<(), String> {
+    let Some(window) = app.get_webview_window("main") else {
+        return Err("main window not found".to_string());
+    };
+    let visible = window
+        .is_visible()
+        .map_err(|err| format!("read window visibility failed: {err}"))?;
+    if visible {
+        window
+            .hide()
+            .map_err(|err| format!("hide window failed: {err}"))?;
+    } else {
+        window
+            .show()
+            .map_err(|err| format!("show window failed: {err}"))?;
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
+fn restart_runtime_for_tray(actor: &RuntimeActor) -> Result<(), String> {
+    let _ = actor.request(ActorCommand::StopAny);
+    let selector = RuntimeSelector::load(default_profile(), default_rpc())?;
+    actor
+        .request(ActorCommand::Start {
+            selector,
+            transport: default_transport(),
+        })
+        .map(|_| ())
+}
+
+fn setup_status_tray(app: &tauri::AppHandle, actor: RuntimeActor) -> Result<(), String> {
+    let open_item = MenuItem::with_id(app, TRAY_MENU_OPEN, "Open Weft", true, None::<&str>)
+        .map_err(|err| format!("tray menu item open failed: {err}"))?;
+    let reconnect_item = MenuItem::with_id(
+        app,
+        TRAY_MENU_RECONNECT,
+        "Reconnect Runtime",
+        true,
+        None::<&str>,
+    )
+    .map_err(|err| format!("tray menu item reconnect failed: {err}"))?;
+    let separator = PredefinedMenuItem::separator(app)
+        .map_err(|err| format!("tray menu separator failed: {err}"))?;
+    let quit_item = MenuItem::with_id(app, TRAY_MENU_QUIT, "Quit Weft", true, None::<&str>)
+        .map_err(|err| format!("tray menu item quit failed: {err}"))?;
+    let menu = Menu::with_items(app, &[&open_item, &reconnect_item, &separator, &quit_item])
+        .map_err(|err| format!("tray menu build failed: {err}"))?;
+
+    let mut tray_builder = TrayIconBuilder::with_id(TRAY_ICON_ID)
+        .menu(&menu)
+        .tooltip("Weft Desktop")
+        .show_menu_on_left_click(false)
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                if let Err(err) = toggle_main_window(&tray.app_handle()) {
+                    log::warn!("tray toggle window failed: {err}");
+                }
+            }
+        })
+        .on_menu_event(move |app, event| match event.id().as_ref() {
+            TRAY_MENU_OPEN => {
+                if let Err(err) = show_main_window(app) {
+                    log::warn!("tray open window failed: {err}");
+                }
+            }
+            TRAY_MENU_RECONNECT => {
+                if let Err(err) = restart_runtime_for_tray(&actor) {
+                    log::warn!("tray reconnect failed: {err}");
+                }
+            }
+            TRAY_MENU_QUIT => {
+                app.exit(0);
+            }
+            _ => {}
+        });
+
+    if let Some(icon) = app.default_window_icon().cloned() {
+        tray_builder = tray_builder.icon(icon);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        tray_builder = tray_builder.icon_as_template(true);
+    }
+    tray_builder
+        .build(app)
+        .map_err(|err| format!("tray build failed: {err}"))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let actor = RuntimeActor::spawn();
@@ -170,7 +284,19 @@ pub fn run() {
                     }
                 }
             }
+            if let Err(err) = setup_status_tray(&app.handle(), actor.clone()) {
+                log::warn!("status tray setup failed: {err}");
+            }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::daemon_probe,
