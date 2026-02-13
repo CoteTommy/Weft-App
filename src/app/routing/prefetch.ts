@@ -9,7 +9,8 @@ export function prefetchRouteChunks(commandCenterEnabled: boolean) {
     }
   }
 
-  const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
+  const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number })
+    .requestIdleCallback
   if (typeof idle === 'function') {
     idle(fallback, { timeout: 1500 })
   } else {

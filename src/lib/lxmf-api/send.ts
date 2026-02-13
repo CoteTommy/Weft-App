@@ -7,7 +7,7 @@ import type {
 } from './types'
 
 export async function sendLxmfMessage(
-  options: LxmfSendMessageOptions,
+  options: LxmfSendMessageOptions
 ): Promise<LxmfSendMessageResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_send_message', options, {
     destination: options.destination,
@@ -29,7 +29,7 @@ export async function sendLxmfMessage(
 }
 
 export async function sendLxmfCommand(
-  options: LxmfSendCommandOptions,
+  options: LxmfSendCommandOptions
 ): Promise<LxmfSendMessageResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_send_command', options, {
     destination: options.destination,
@@ -47,7 +47,7 @@ export async function sendLxmfCommand(
 }
 
 export async function sendLxmfRichMessage(
-  options: LxmfSendRichMessageOptions,
+  options: LxmfSendRichMessageOptions
 ): Promise<LxmfSendMessageResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_send_rich_message', options, {
     destination: options.destination,
@@ -56,7 +56,7 @@ export async function sendLxmfRichMessage(
     source: options.source ?? null,
     id: options.id ?? null,
     attachments:
-      options.attachments?.map((attachment) => ({
+      options.attachments?.map(attachment => ({
         name: attachment.name,
         data_base64: attachment.dataBase64,
         mime: attachment.mime ?? null,
@@ -73,4 +73,3 @@ export async function sendLxmfRichMessage(
   })
   return parseLxmfSendMessageResponse(payload)
 }
-

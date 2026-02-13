@@ -122,14 +122,17 @@ function parseCanonicalAttachments(value: unknown): ChatAttachment[] {
   return out
 }
 
-function mergeAttachments(structured: ChatAttachment[], canonical: ChatAttachment[]): ChatAttachment[] {
+function mergeAttachments(
+  structured: ChatAttachment[],
+  canonical: ChatAttachment[]
+): ChatAttachment[] {
   if (structured.length === 0) {
     return canonical
   }
   if (canonical.length === 0) {
     return structured
   }
-  const seen = new Set(structured.map((attachment) => `${attachment.name}:${attachment.sizeBytes}`))
+  const seen = new Set(structured.map(attachment => `${attachment.name}:${attachment.sizeBytes}`))
   const out = [...structured]
   for (const entry of canonical) {
     const key = `${entry.name}:${entry.sizeBytes}`
@@ -312,4 +315,3 @@ function estimateBase64Size(value: string | undefined): number {
   }
   return Math.max(0, Math.floor((trimmed.length * 3) / 4))
 }
-

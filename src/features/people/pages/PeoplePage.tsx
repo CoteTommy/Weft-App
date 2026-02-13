@@ -9,10 +9,7 @@ import { ListSkeleton } from '@shared/ui/ListSkeleton'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
 import { VirtualizedList } from '@shared/ui/VirtualizedList'
-import {
-  buildNewChatHref,
-  parseLxmfContactReference,
-} from '@shared/utils/contactReference'
+import { buildNewChatHref, parseLxmfContactReference } from '@shared/utils/contactReference'
 import { filterIndexedItems, indexSearchItems } from '@shared/utils/search'
 
 import { usePeople } from '../hooks/usePeople'
@@ -29,16 +26,14 @@ export function PeoplePage() {
   const deferredQuery = useDeferredValue(query)
   const indexedPeople = useMemo(
     () =>
-      indexSearchItems(
-        people,
-        (person) => [person.name, person.id, person.lastSeen, person.trust],
-        { cacheKey: 'people' },
-      ),
-    [people],
+      indexSearchItems(people, person => [person.name, person.id, person.lastSeen, person.trust], {
+        cacheKey: 'people',
+      }),
+    [people]
   )
   const filteredPeople = useMemo(
     () => filterIndexedItems(indexedPeople, deferredQuery),
-    [deferredQuery, indexedPeople],
+    [deferredQuery, indexedPeople]
   )
 
   useEffect(() => {
@@ -77,13 +72,13 @@ export function PeoplePage() {
       <input
         ref={searchInputRef}
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={event => setQuery(event.target.value)}
         className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
         placeholder="Search peers by name, hash, or trust"
       />
       <form
         className="mb-3 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2.5"
-        onSubmit={(event) => {
+        onSubmit={event => {
           event.preventDefault()
           const parsed = parseLxmfContactReference(destinationInput)
           if (!parsed.ok) {
@@ -99,7 +94,7 @@ export function PeoplePage() {
         <input
           ref={destinationInputRef}
           value={destinationInput}
-          onChange={(event) => {
+          onChange={event => {
             setDestinationInput(event.target.value)
             setCreateError(null)
           }}
@@ -109,7 +104,7 @@ export function PeoplePage() {
         <div className="flex items-center gap-2">
           <input
             value={nameInput}
-            onChange={(event) => {
+            onChange={event => {
               setNameInput(event.target.value)
               setCreateError(null)
             }}
@@ -126,9 +121,13 @@ export function PeoplePage() {
         {createError ? <p className="text-xs text-rose-700">{createError}</p> : null}
       </form>
 
-      {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
+      {error ? (
+        <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
+      ) : null}
       {!loading && people.length === 0 ? (
-        <p className="text-sm text-slate-500">No peers discovered yet. Keep Weft connected to the network.</p>
+        <p className="text-sm text-slate-500">
+          No peers discovered yet. Keep Weft connected to the network.
+        </p>
       ) : null}
       {!loading && people.length > 0 && filteredPeople.length === 0 ? (
         <p className="text-sm text-slate-500">No peers match your search.</p>
@@ -144,8 +143,8 @@ export function PeoplePage() {
           estimateItemHeight={82}
           className="min-h-0 flex-1 overflow-y-auto pr-1"
           listClassName="pb-1"
-          getKey={(person) => person.id}
-          renderItem={(person) => (
+          getKey={person => person.id}
+          renderItem={person => (
             <div className="py-1">
               <Link
                 to={buildNewChatHref(person.id, person.name)}
@@ -158,7 +157,7 @@ export function PeoplePage() {
                 <span
                   className={clsx(
                     'rounded-full px-2 py-1 text-xs font-medium',
-                    trustBadgeClasses(person.trust),
+                    trustBadgeClasses(person.trust)
                   )}
                 >
                   {person.trust}

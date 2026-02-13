@@ -20,7 +20,7 @@ export function readComposerSession(threadId: string): ComposerSessionDraft | nu
 
 export function writeComposerSession(
   threadId: string,
-  draft: Omit<ComposerSessionDraft, 'updatedAtMs'>,
+  draft: Omit<ComposerSessionDraft, 'updatedAtMs'>
 ): void {
   const normalizedThreadId = threadId.trim()
   if (!normalizedThreadId || typeof window === 'undefined') {

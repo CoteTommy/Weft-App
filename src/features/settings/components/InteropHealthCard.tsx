@@ -30,7 +30,7 @@ export function InteropHealthCard({
               ? 'bg-emerald-100 text-emerald-700'
               : interop.status === 'warning'
                 ? 'bg-amber-100 text-amber-800'
-                : 'bg-rose-100 text-rose-700',
+                : 'bg-rose-100 text-rose-700'
           )}
         >
           {interop.status === 'healthy'
@@ -52,7 +52,11 @@ export function InteropHealthCard({
           value={interop.receivePath}
           warn={interop.receivePath === 'blocked' || interop.receivePath === 'degraded'}
         />
-        <Detail label="RPC reachable" value={interop.rpcReachable ? 'yes' : 'no'} warn={!interop.rpcReachable} />
+        <Detail
+          label="RPC reachable"
+          value={interop.rpcReachable ? 'yes' : 'no'}
+          warn={!interop.rpcReachable}
+        />
         <Detail
           label="Events reachable"
           value={interop.eventsReachable ? 'yes' : 'no'}
@@ -65,8 +69,16 @@ export function InteropHealthCard({
           value={String(interop.outboundPending)}
           warn={interop.outboundPending > 0}
         />
-        <Detail label="Outbound failed" value={String(interop.outboundFailed)} warn={interop.outboundFailed > 0} />
-        <Detail label="Relay selected" value={interop.relaySelected ? 'yes' : 'no'} warn={!interop.relaySelected} />
+        <Detail
+          label="Outbound failed"
+          value={String(interop.outboundFailed)}
+          warn={interop.outboundFailed > 0}
+        />
+        <Detail
+          label="Relay selected"
+          value={interop.relaySelected ? 'yes' : 'no'}
+          warn={!interop.relaySelected}
+        />
         <Detail
           label="Propagation nodes"
           value={String(interop.propagationNodes)}
@@ -78,7 +90,7 @@ export function InteropHealthCard({
         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
           <p className="text-xs font-semibold text-amber-900">Findings</p>
           <ul className="mt-1 space-y-1 text-xs text-amber-900">
-            {interop.findings.map((finding) => (
+            {interop.findings.map(finding => (
               <li key={finding}>{finding}</li>
             ))}
           </ul>
@@ -130,7 +142,13 @@ function Detail({
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2">
       <p className="text-[11px] text-slate-500">{label}</p>
-      <p className={clsx('mt-0.5 text-xs text-slate-700', mono ? 'break-all font-mono' : '', warn ? 'text-amber-800' : '')}>
+      <p
+        className={clsx(
+          'mt-0.5 text-xs text-slate-700',
+          mono ? 'break-all font-mono' : '',
+          warn ? 'text-amber-800' : ''
+        )}
+      >
         {value}
       </p>
     </div>

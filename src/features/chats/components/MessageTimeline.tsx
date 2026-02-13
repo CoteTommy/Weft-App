@@ -29,8 +29,8 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
   const estimatedMessageHeight = 118
   const overscan = 8
   const selectedMessage = useMemo(
-    () => messages.find((message) => message.id === selectedMessageId) ?? null,
-    [messages, selectedMessageId],
+    () => messages.find(message => message.id === selectedMessageId) ?? null,
+    [messages, selectedMessageId]
   )
   const deliveryTrace = useMemo(() => {
     if (!selectedMessage) {
@@ -62,7 +62,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
   }, [deliveryTrace, selectedMessage])
   const failureGuidance = useMemo(
     () => buildFailureGuidance(selectedReasonCode),
-    [selectedReasonCode],
+    [selectedReasonCode]
   )
   const latestMessageId = messages[messages.length - 1]?.id ?? null
   const visibleCount = Math.max(1, Math.ceil(viewportHeight / estimatedMessageHeight))
@@ -72,7 +72,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
   const bottomPadding = Math.max(0, (messages.length - endIndex) * estimatedMessageHeight)
   const visibleMessages = useMemo(
     () => messages.slice(startIndex, endIndex),
-    [endIndex, messages, startIndex],
+    [endIndex, messages, startIndex]
   )
   const setTimelineContainerRef = useCallback((node: HTMLDivElement | null) => {
     scrollContainerRef.current = node
@@ -122,7 +122,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
         window.clearTimeout(holdTimeoutRef.current)
       }
     },
-    [],
+    []
   )
 
   useEffect(() => {
@@ -176,16 +176,16 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
       }
     })
     void getLxmfMessageDeliveryTrace(selectedMessage.id)
-      .then((trace) => {
+      .then(trace => {
         if (disposed) {
           return
         }
         setFetchedDeliveryTrace(
-          trace.transitions.map((entry) => ({
+          trace.transitions.map(entry => ({
             status: entry.status,
             timestamp: entry.timestamp,
             reasonCode: entry.reason_code,
-          })),
+          }))
         )
       })
       .catch(() => {
@@ -219,7 +219,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
     <>
       <div
         ref={setTimelineContainerRef}
-        onScroll={(event) => {
+        onScroll={event => {
           const node = event.currentTarget
           setScrollTop(node.scrollTop)
           setStickToBottom(node.scrollHeight - node.clientHeight - node.scrollTop <= 96)
@@ -233,7 +233,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
             paddingBottom: `${bottomPadding}px`,
           }}
         >
-          {visibleMessages.map((message) => (
+          {visibleMessages.map(message => (
             <article
               key={message.id}
               className={clsx('flex', message.sender === 'self' ? 'justify-end' : 'justify-start')}
@@ -249,7 +249,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
                   'max-w-[80%] rounded-2xl px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300',
                   message.sender === 'self'
                     ? 'bg-blue-600 text-white hover:bg-blue-500'
-                    : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50',
+                    : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50'
                 )}
               >
                 <p className="text-sm leading-relaxed">{message.body}</p>
@@ -272,7 +272,9 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
                 ) : null}
                 <div className="mt-2 flex items-center justify-end gap-2 text-[11px] opacity-75">
                   <span>{message.sentAt}</span>
-                  {message.sender === 'self' && message.status ? <span>{renderStatus(message.status)}</span> : null}
+                  {message.sender === 'self' && message.status ? (
+                    <span>{renderStatus(message.status)}</span>
+                  ) : null}
                 </div>
               </button>
             </article>
@@ -287,7 +289,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
         >
           <div
             className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            onClick={event => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-base font-semibold text-slate-900">Message details</h3>
@@ -301,19 +303,29 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
             </div>
 
             <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="whitespace-pre-wrap break-words text-sm text-slate-800">{selectedMessage.body}</p>
+              <p className="whitespace-pre-wrap break-words text-sm text-slate-800">
+                {selectedMessage.body}
+              </p>
             </div>
 
             <div className="space-y-1.5 text-xs text-slate-600">
               <DetailRow label="Author" value={selectedMessage.author} />
-              <DetailRow label="Direction" value={selectedMessage.sender === 'self' ? 'Outgoing' : 'Incoming'} />
+              <DetailRow
+                label="Direction"
+                value={selectedMessage.sender === 'self' ? 'Outgoing' : 'Incoming'}
+              />
               <DetailRow label="Time" value={selectedMessage.sentAt} />
-              <DetailRow label="Status" value={selectedMessage.status ? renderStatus(selectedMessage.status) : '—'} />
+              <DetailRow
+                label="Status"
+                value={selectedMessage.status ? renderStatus(selectedMessage.status) : '—'}
+              />
               <DetailRow label="Backend status" value={selectedMessage.statusDetail ?? '—'} />
               <DetailRow label="Reason code" value={selectedMessage.statusReasonCode ?? '—'} />
               <DetailRow
                 label="Delivery trace"
-                value={deliveryTraceLoading ? 'Loading...' : `${deliveryTrace.length} transition(s)`}
+                value={
+                  deliveryTraceLoading ? 'Loading...' : `${deliveryTrace.length} transition(s)`
+                }
               />
               <DetailRow label="Attachments" value={String(selectedMessage.attachments.length)} />
               <DetailRow label="Paper" value={selectedMessage.paper ? 'Yes' : 'No'} />
@@ -372,7 +384,10 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
                 <p className="mb-2 text-xs font-semibold text-slate-700">Delivery trace</p>
                 <ul className="space-y-1.5">
                   {deliveryTrace.map((entry, index) => (
-                    <li key={`${entry.status}:${entry.timestamp}:${index}`} className="text-[11px] text-slate-600">
+                    <li
+                      key={`${entry.status}:${entry.timestamp}:${index}`}
+                      className="text-[11px] text-slate-600"
+                    >
                       <span className="font-semibold text-slate-700">{entry.status}</span>{' '}
                       <span>({formatTraceTimestamp(entry.timestamp)})</span>
                       {entry.reasonCode ? (
@@ -386,7 +401,9 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
               </div>
             ) : null}
 
-            {selectedMessage.sender === 'self' && selectedMessage.status === 'failed' && failureGuidance ? (
+            {selectedMessage.sender === 'self' &&
+            selectedMessage.status === 'failed' &&
+            failureGuidance ? (
               <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                 <p className="font-semibold">{failureGuidance.title}</p>
                 <p className="mt-1">{failureGuidance.body}</p>
@@ -416,7 +433,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
                         setCopyFeedback('Retry queued.')
                       } catch (retryError) {
                         setCopyFeedback(
-                          retryError instanceof Error ? retryError.message : String(retryError),
+                          retryError instanceof Error ? retryError.message : String(retryError)
                         )
                       }
                     })()

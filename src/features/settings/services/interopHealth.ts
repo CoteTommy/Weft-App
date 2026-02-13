@@ -28,7 +28,9 @@ export function buildInteropSnapshot(input: {
   let outboundFailed = 0
 
   for (const message of input.messages) {
-    const direction = String(message.direction || '').trim().toLowerCase()
+    const direction = String(message.direction || '')
+      .trim()
+      .toLowerCase()
     const ts = normalizeTimestamp(message.timestamp)
     if (direction === 'in') {
       if (ts !== null && (lastInboundTs === null || ts > lastInboundTs)) {
@@ -51,8 +53,10 @@ export function buildInteropSnapshot(input: {
 
   const now = Date.now()
   const inboundAgeMs = lastInboundTs ? now - lastInboundTs : null
-  const hasRelayUnsetFailure = input.messages.some((message) => {
-    const direction = String(message.direction || '').trim().toLowerCase()
+  const hasRelayUnsetFailure = input.messages.some(message => {
+    const direction = String(message.direction || '')
+      .trim()
+      .toLowerCase()
     if (direction !== 'out') {
       return false
     }

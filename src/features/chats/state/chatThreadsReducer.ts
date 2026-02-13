@@ -17,19 +17,19 @@ export interface ReceiptReducerInput {
 
 export function reduceHydratedThreads(
   hydratedThreads: ChatThread[],
-  draftThreads: ChatThread[],
+  draftThreads: ChatThread[]
 ): ChatThread[] {
   return orderThreads([...draftThreads, ...hydratedThreads])
 }
 
 export function reduceRewriteSelfAuthors(
   threads: ChatThread[],
-  normalizedAuthor: string,
+  normalizedAuthor: string
 ): ChatThread[] {
   let changed = false
-  const updated = threads.map((thread) => {
+  const updated = threads.map(thread => {
     let threadChanged = false
-    const messages = thread.messages.map((message) => {
+    const messages = thread.messages.map(message => {
       if (message.sender !== 'self' || message.author === normalizedAuthor) {
         return message
       }
@@ -51,29 +51,29 @@ export function reduceRewriteSelfAuthors(
 }
 
 export function reduceMarkThreadRead(threads: ChatThread[], threadId: string): ChatThread[] {
-  return threads.map((thread) =>
+  return threads.map(thread =>
     thread.id === threadId && thread.unread > 0
       ? {
           ...thread,
           unread: 0,
         }
-      : thread,
+      : thread
   )
 }
 
 export function reduceMarkAllThreadsRead(threads: ChatThread[]): ChatThread[] {
-  return threads.map((thread) =>
+  return threads.map(thread =>
     thread.unread > 0
       ? {
           ...thread,
           unread: 0,
         }
-      : thread,
+      : thread
   )
 }
 
 export function reduceCreateDraftThread(threads: ChatThread[], draft: ChatThread): ChatThread[] {
-  if (threads.some((thread) => thread.id === draft.id)) {
+  if (threads.some(thread => thread.id === draft.id)) {
     return threads
   }
   return orderThreads([draft, ...threads])
@@ -82,42 +82,42 @@ export function reduceCreateDraftThread(threads: ChatThread[], draft: ChatThread
 export function reduceSetThreadPinned(
   threads: ChatThread[],
   threadId: string,
-  pinned: boolean,
+  pinned: boolean
 ): ChatThread[] {
   return orderThreads(
-    threads.map((thread) =>
+    threads.map(thread =>
       thread.id === threadId
         ? {
             ...thread,
             pinned,
           }
-        : thread,
-    ),
+        : thread
+    )
   )
 }
 
 export function reduceSetThreadMuted(
   threads: ChatThread[],
   threadId: string,
-  muted: boolean,
+  muted: boolean
 ): ChatThread[] {
-  return threads.map((thread) =>
+  return threads.map(thread =>
     thread.id === threadId
       ? {
           ...thread,
           muted,
         }
-      : thread,
+      : thread
   )
 }
 
 export function reduceRuntimeMessage(
   threads: ChatThread[],
-  input: RuntimeMessageReducerInput,
+  input: RuntimeMessageReducerInput
 ): ChatThread[] {
   const { applyThreadMetadata, derivedThread, mergedMessage, unread } = input
   const threadId = derivedThread.id
-  const index = threads.findIndex((thread) => thread.id === threadId)
+  const index = threads.findIndex(thread => thread.id === threadId)
   if (index < 0) {
     return orderThreads([
       applyThreadMetadata({
@@ -144,12 +144,12 @@ export function reduceRuntimeMessage(
 
 export function reduceReceiptUpdate(
   threads: ChatThread[],
-  receipt: ReceiptReducerInput,
+  receipt: ReceiptReducerInput
 ): { threads: ChatThread[]; found: boolean } {
   let found = false
-  const next = threads.map((thread) => {
+  const next = threads.map(thread => {
     let changed = false
-    const messages = thread.messages.map((message) => {
+    const messages = thread.messages.map(message => {
       if (message.id !== receipt.messageId) {
         return message
       }
@@ -181,7 +181,7 @@ export function reduceReceiptUpdate(
 export function appendDeliveryTraceEntry(
   message: ChatMessage,
   statusDetail: string | undefined,
-  reasonCode?: string,
+  reasonCode?: string
 ): ChatMessage['deliveryTrace'] {
   if (!statusDetail) {
     return message.deliveryTrace
@@ -196,11 +196,8 @@ function orderThreads(threads: ChatThread[]): ChatThread[] {
   return [...threads].sort((left, right) => Number(right.pinned) - Number(left.pinned))
 }
 
-function upsertThreadMessages(
-  messages: ChatMessage[],
-  incoming: ChatMessage,
-): ChatMessage[] {
-  const index = messages.findIndex((message) => message.id === incoming.id)
+function upsertThreadMessages(messages: ChatMessage[], incoming: ChatMessage): ChatMessage[] {
+  const index = messages.findIndex(message => message.id === incoming.id)
   if (index < 0) {
     return [...messages, incoming]
   }

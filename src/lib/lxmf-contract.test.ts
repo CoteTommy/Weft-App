@@ -47,7 +47,7 @@ describe('parseLxmfProbeReport', () => {
         local: {},
         rpc: {},
         events: {},
-      }),
+      })
     ).toThrow('probe.profile must be a string')
   })
 })

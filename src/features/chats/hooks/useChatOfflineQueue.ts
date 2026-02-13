@@ -1,8 +1,21 @@
-import { type Dispatch, type MutableRefObject, type RefObject, type SetStateAction,useEffect, useRef, useState } from 'react'
+import {
+  type Dispatch,
+  type MutableRefObject,
+  type RefObject,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import type { ChatThread } from '@shared/types/chat'
 
-import { getStoredOfflineQueue, type OfflineQueueEntry,persistOfflineQueue, syncQueueFromThreads } from '../state/offlineQueue'
+import {
+  getStoredOfflineQueue,
+  type OfflineQueueEntry,
+  persistOfflineQueue,
+  syncQueueFromThreads,
+} from '../state/offlineQueue'
 
 export type UseChatOfflineQueueParams = {
   threads: ChatThread[]
@@ -20,7 +33,7 @@ export function useChatOfflineQueue({
   ignoredFailedMessageIdsRef,
 }: UseChatOfflineQueueParams): UseChatOfflineQueueResult {
   const [offlineQueue, setOfflineQueue] = useState<OfflineQueueEntry[]>(() =>
-    getStoredOfflineQueue(),
+    getStoredOfflineQueue()
   )
   const offlineQueueRef = useRef<OfflineQueueEntry[]>(offlineQueue)
 
@@ -30,7 +43,9 @@ export function useChatOfflineQueue({
   }, [offlineQueue])
 
   useEffect(() => {
-    setOfflineQueue((previous) => syncQueueFromThreads(previous, threads, ignoredFailedMessageIdsRef.current))
+    setOfflineQueue(previous =>
+      syncQueueFromThreads(previous, threads, ignoredFailedMessageIdsRef.current)
+    )
   }, [threads, ignoredFailedMessageIdsRef])
 
   return {

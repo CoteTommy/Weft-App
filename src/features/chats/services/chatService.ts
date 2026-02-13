@@ -18,14 +18,14 @@ export async function fetchChatThreads() {
   ])
   const selfAuthor = profile?.displayName?.trim() || getStoredDisplayName() || 'You'
   const peerNames = new Map(
-    peersResponse.peers.map((peer) => [peer.peer, peer.name?.trim() || shortHash(peer.peer)]),
+    peersResponse.peers.map(peer => [peer.peer, peer.name?.trim() || shortHash(peer.peer)])
   )
   return buildThreads(messagesResponse.messages, peerNames, selfAuthor)
 }
 
 export async function postChatMessage(
   threadId: string,
-  draft: OutboundMessageDraft,
+  draft: OutboundMessageDraft
 ): Promise<OutboundSendOutcome> {
   const destination = threadId.trim()
   if (!destination) {
@@ -44,7 +44,7 @@ export async function postChatMessage(
     const response = await sendLxmfRichMessage({
       destination,
       content,
-      attachments: attachments.map((attachment) => ({
+      attachments: attachments.map(attachment => ({
         name: attachment.name,
         dataBase64: attachment.dataBase64,
         mime: attachment.mime,

@@ -40,7 +40,7 @@ export function OutboundPropagationRelayCard({
         Relay peer hash
         <input
           value={propagationPeerDraft}
-          onChange={(event) => onPropagationPeerDraftChange(event.target.value)}
+          onChange={event => onPropagationPeerDraftChange(event.target.value)}
           className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
           placeholder="2331bf796ca1a72451dbaedb05286cb8"
         />
@@ -77,7 +77,7 @@ export function OutboundPropagationRelayCard({
         </p>
         {settings.connectivity.propagationNodes.length ? (
           <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-slate-200">
-            {settings.connectivity.propagationNodes.map((node) => {
+            {settings.connectivity.propagationNodes.map(node => {
               const isSelected = propagationPeerDraft.trim().toLowerCase() === node.peer
               return (
                 <button
@@ -88,7 +88,7 @@ export function OutboundPropagationRelayCard({
                     'flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left text-xs transition last:border-b-0',
                     isSelected
                       ? 'bg-blue-50 text-blue-900'
-                      : 'bg-white text-slate-700 hover:bg-slate-50',
+                      : 'bg-white text-slate-700 hover:bg-slate-50'
                   )}
                 >
                   <span className="min-w-0">
@@ -113,4 +113,3 @@ export function OutboundPropagationRelayCard({
     </div>
   )
 }
-

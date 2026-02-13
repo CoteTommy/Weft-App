@@ -98,4 +98,3 @@ export type LxmfEventPumpStatus = {
   running: boolean
   intervalMs?: number
 }
-

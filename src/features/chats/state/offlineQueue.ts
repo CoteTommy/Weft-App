@@ -41,7 +41,7 @@ export function getStoredOfflineQueue(): OfflineQueueEntry[] {
       return []
     }
     return parsed
-      .map((entry) => parseQueueEntry(entry))
+      .map(entry => parseQueueEntry(entry))
       .filter((entry): entry is OfflineQueueEntry => entry !== null)
       .sort((left, right) => left.nextRetryAtMs - right.nextRetryAtMs)
       .slice(0, MAX_QUEUE_ENTRIES)
@@ -56,7 +56,7 @@ export function persistOfflineQueue(entries: OfflineQueueEntry[]): void {
   }
   window.localStorage.setItem(
     OFFLINE_QUEUE_KEY,
-    JSON.stringify(entries.slice(0, MAX_QUEUE_ENTRIES)),
+    JSON.stringify(entries.slice(0, MAX_QUEUE_ENTRIES))
   )
 }
 
@@ -75,9 +75,9 @@ export function getIgnoredFailedMessageIds(): Set<string> {
     }
     return new Set(
       parsed
-        .map((value) => (typeof value === 'string' ? value.trim() : ''))
-        .filter((value) => value.length > 0)
-        .slice(0, MAX_IGNORED_FAILED_IDS),
+        .map(value => (typeof value === 'string' ? value.trim() : ''))
+        .filter(value => value.length > 0)
+        .slice(0, MAX_IGNORED_FAILED_IDS)
     )
   } catch {
     return new Set()
@@ -90,7 +90,7 @@ export function persistIgnoredFailedMessageIds(ids: Set<string>): void {
   }
   window.localStorage.setItem(
     OFFLINE_QUEUE_IGNORED_KEY,
-    JSON.stringify([...ids].slice(0, MAX_IGNORED_FAILED_IDS)),
+    JSON.stringify([...ids].slice(0, MAX_IGNORED_FAILED_IDS))
   )
 }
 
@@ -103,7 +103,7 @@ export function enqueueSendError(
     reason?: string
     reasonCode?: string
     nowMs?: number
-  },
+  }
 ): OfflineQueueEntry[] {
   const threadId = input.threadId.trim()
   const destination = input.destination.trim()
@@ -133,9 +133,9 @@ export function syncQueueFromThreads(
   entries: OfflineQueueEntry[],
   threads: ChatThread[],
   ignoredFailedMessageIds: Set<string> = new Set(),
-  nowMs = Date.now(),
+  nowMs = Date.now()
 ): OfflineQueueEntry[] {
-  const byId = new Map(entries.map((entry) => [entry.id, entry]))
+  const byId = new Map(entries.map(entry => [entry.id, entry]))
   let changed = false
 
   for (const thread of threads) {
@@ -183,9 +183,9 @@ export function syncQueueFromThreads(
 export function markQueueEntrySending(
   entries: OfflineQueueEntry[],
   queueId: string,
-  nowMs = Date.now(),
+  nowMs = Date.now()
 ): OfflineQueueEntry[] {
-  return updateEntry(entries, queueId, (entry) => ({
+  return updateEntry(entries, queueId, entry => ({
     ...entry,
     status: 'sending',
     updatedAtMs: nowMs,
@@ -194,9 +194,9 @@ export function markQueueEntrySending(
 
 export function markQueueEntryDelivered(
   entries: OfflineQueueEntry[],
-  queueId: string,
+  queueId: string
 ): OfflineQueueEntry[] {
-  const next = entries.filter((entry) => entry.id !== queueId)
+  const next = entries.filter(entry => entry.id !== queueId)
   return next.length === entries.length ? entries : next
 }
 
@@ -204,9 +204,9 @@ export function markQueueEntryAttemptFailed(
   entries: OfflineQueueEntry[],
   queueId: string,
   errorMessage: string,
-  nowMs = Date.now(),
+  nowMs = Date.now()
 ): OfflineQueueEntry[] {
-  return updateEntry(entries, queueId, (entry) => {
+  return updateEntry(entries, queueId, entry => {
     const attempts = entry.attempts + 1
     const shouldPause = attempts >= MAX_AUTO_RETRY_ATTEMPTS
     const normalizedError = errorMessage.trim() || entry.lastError
@@ -226,9 +226,9 @@ export function markQueueEntryAttemptFailed(
 export function pauseQueueEntry(
   entries: OfflineQueueEntry[],
   queueId: string,
-  nowMs = Date.now(),
+  nowMs = Date.now()
 ): OfflineQueueEntry[] {
-  return updateEntry(entries, queueId, (entry) => ({
+  return updateEntry(entries, queueId, entry => ({
     ...entry,
     status: 'paused',
     updatedAtMs: nowMs,
@@ -238,9 +238,9 @@ export function pauseQueueEntry(
 export function resumeQueueEntry(
   entries: OfflineQueueEntry[],
   queueId: string,
-  nowMs = Date.now(),
+  nowMs = Date.now()
 ): OfflineQueueEntry[] {
-  return updateEntry(entries, queueId, (entry) => ({
+  return updateEntry(entries, queueId, entry => ({
     ...entry,
     status: 'queued',
     nextRetryAtMs: Math.min(entry.nextRetryAtMs, nowMs + 1_000),
@@ -251,9 +251,9 @@ export function resumeQueueEntry(
 export function retryQueueEntryNow(
   entries: OfflineQueueEntry[],
   queueId: string,
-  nowMs = Date.now(),
+  nowMs = Date.now()
 ): OfflineQueueEntry[] {
-  return updateEntry(entries, queueId, (entry) => ({
+  return updateEntry(entries, queueId, entry => ({
     ...entry,
     status: 'queued',
     nextRetryAtMs: nowMs,
@@ -261,8 +261,11 @@ export function retryQueueEntryNow(
   }))
 }
 
-export function removeQueueEntry(entries: OfflineQueueEntry[], queueId: string): OfflineQueueEntry[] {
-  const next = entries.filter((entry) => entry.id !== queueId)
+export function removeQueueEntry(
+  entries: OfflineQueueEntry[],
+  queueId: string
+): OfflineQueueEntry[] {
+  const next = entries.filter(entry => entry.id !== queueId)
   return next.length === entries.length ? entries : next
 }
 
@@ -272,7 +275,7 @@ export function clearOfflineQueue(): OfflineQueueEntry[] {
 
 export function extendIgnoredFailedMessageIds(
   previous: Set<string>,
-  messageIds: string[],
+  messageIds: string[]
 ): Set<string> {
   if (messageIds.length === 0) {
     return previous
@@ -292,7 +295,10 @@ export function extendIgnoredFailedMessageIds(
   return new Set(trimmed)
 }
 
-export function nextDueQueueEntry(entries: OfflineQueueEntry[], nowMs = Date.now()): OfflineQueueEntry | null {
+export function nextDueQueueEntry(
+  entries: OfflineQueueEntry[],
+  nowMs = Date.now()
+): OfflineQueueEntry | null {
   for (const entry of entries) {
     if (entry.status !== 'queued') {
       continue
@@ -313,7 +319,7 @@ export function retryDelayMs(attempt: number): number {
 }
 
 function draftFromFailedMessage(message: ChatMessage): OutboundMessageDraft | null {
-  const attachmentDrafts = message.attachments.map((attachment) => {
+  const attachmentDrafts = message.attachments.map(attachment => {
     if (!attachment.dataBase64) {
       return null
     }
@@ -324,7 +330,7 @@ function draftFromFailedMessage(message: ChatMessage): OutboundMessageDraft | nu
       dataBase64: attachment.dataBase64,
     }
   })
-  if (attachmentDrafts.some((entry) => entry === null)) {
+  if (attachmentDrafts.some(entry => entry === null)) {
     return null
   }
   const text = message.body.trim()
@@ -349,7 +355,7 @@ function draftFromFailedMessage(message: ChatMessage): OutboundMessageDraft | nu
 function cloneDraft(draft: OutboundMessageDraft): OutboundMessageDraft {
   return {
     text: draft.text,
-    attachments: draft.attachments?.map((attachment) => ({
+    attachments: draft.attachments?.map(attachment => ({
       name: attachment.name,
       mime: attachment.mime,
       sizeBytes: attachment.sizeBytes,
@@ -373,9 +379,9 @@ function limitQueue(entries: OfflineQueueEntry[]): OfflineQueueEntry[] {
 function updateEntry(
   entries: OfflineQueueEntry[],
   queueId: string,
-  mutate: (entry: OfflineQueueEntry) => OfflineQueueEntry,
+  mutate: (entry: OfflineQueueEntry) => OfflineQueueEntry
 ): OfflineQueueEntry[] {
-  const index = entries.findIndex((entry) => entry.id === queueId)
+  const index = entries.findIndex(entry => entry.id === queueId)
   if (index < 0) {
     return entries
   }
@@ -426,35 +432,30 @@ function parseDraft(value: unknown): OutboundMessageDraft | null {
   }
   const record = value as Record<string, unknown>
   const text = typeof record.text === 'string' ? record.text : ''
-  const attachments =
-    Array.isArray(record.attachments)
-      ? record.attachments
-          .map((attachment) => {
-            if (
-              typeof attachment !== 'object' ||
-              attachment === null ||
-              Array.isArray(attachment)
-            ) {
-              return null
-            }
-            const entry = attachment as Record<string, unknown>
-            if (
-              typeof entry.name !== 'string' ||
-              typeof entry.sizeBytes !== 'number' ||
-              !Number.isFinite(entry.sizeBytes) ||
-              typeof entry.dataBase64 !== 'string'
-            ) {
-              return null
-            }
-            return {
-              name: entry.name,
-              sizeBytes: entry.sizeBytes,
-              mime: typeof entry.mime === 'string' ? entry.mime : undefined,
-              dataBase64: entry.dataBase64,
-            }
-          })
-          .filter((entry) => entry !== null)
-      : undefined
+  const attachments = Array.isArray(record.attachments)
+    ? record.attachments
+        .map(attachment => {
+          if (typeof attachment !== 'object' || attachment === null || Array.isArray(attachment)) {
+            return null
+          }
+          const entry = attachment as Record<string, unknown>
+          if (
+            typeof entry.name !== 'string' ||
+            typeof entry.sizeBytes !== 'number' ||
+            !Number.isFinite(entry.sizeBytes) ||
+            typeof entry.dataBase64 !== 'string'
+          ) {
+            return null
+          }
+          return {
+            name: entry.name,
+            sizeBytes: entry.sizeBytes,
+            mime: typeof entry.mime === 'string' ? entry.mime : undefined,
+            dataBase64: entry.dataBase64,
+          }
+        })
+        .filter(entry => entry !== null)
+    : undefined
   const paper =
     record.paper && typeof record.paper === 'object' && !Array.isArray(record.paper)
       ? {

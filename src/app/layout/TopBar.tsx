@@ -44,7 +44,9 @@ import { useNotificationCenter } from '../state/NotificationCenterProvider'
 import type { DeliveryDiagnosticsSnapshot, RecoveryEvent } from './DeliveryDiagnosticsDrawer'
 
 const DeliveryDiagnosticsDrawer = lazy(() =>
-  import('./DeliveryDiagnosticsDrawer').then((module) => ({ default: module.DeliveryDiagnosticsDrawer })),
+  import('./DeliveryDiagnosticsDrawer').then(module => ({
+    default: module.DeliveryDiagnosticsDrawer,
+  }))
 )
 
 function preloadDeliveryDiagnosticsDrawer() {
@@ -62,7 +64,8 @@ export function TopBar() {
   const [hasOpenedDiagnostics, setHasOpenedDiagnostics] = useState(false)
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
-  const [diagnosticsSnapshot, setDiagnosticsSnapshot] = useState<DeliveryDiagnosticsSnapshot | null>(null)
+  const [diagnosticsSnapshot, setDiagnosticsSnapshot] =
+    useState<DeliveryDiagnosticsSnapshot | null>(null)
   const [runtimeTarget, setRuntimeTarget] = useState(() => getRuntimeConnectionOptions())
   const [runtimeMismatch, setRuntimeMismatch] = useState<string | null>(null)
   const [recoveryEvents, setRecoveryEvents] = useState<RecoveryEvent[]>([])
@@ -74,28 +77,21 @@ export function TopBar() {
   const runtimeRecoveryRef = useRef<Set<string>>(new Set())
   const relayRecoveryAtMsRef = useRef(0)
   const { notifications, unreadCount, markRead, markAllRead, clearAll } = useNotificationCenter()
-  const {
-    offlineQueue,
-    retryQueueNow,
-    pauseQueue,
-    resumeQueue,
-    removeQueue,
-    clearQueue,
-  } = useChatsState()
+  const { offlineQueue, retryQueueNow, pauseQueue, resumeQueue, removeQueue, clearQueue } =
+    useChatsState()
 
-  const appendRecoveryEvent = useCallback(
-    (entry: Omit<RecoveryEvent, 'id' | 'atMs'>) => {
-      setRecoveryEvents((previous) => [
+  const appendRecoveryEvent = useCallback((entry: Omit<RecoveryEvent, 'id' | 'atMs'>) => {
+    setRecoveryEvents(previous =>
+      [
         {
           ...entry,
           id: `${entry.category}:${entry.status}:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`,
           atMs: Date.now(),
         },
         ...previous,
-      ].slice(0, 24))
-    },
-    [],
-  )
+      ].slice(0, 24)
+    )
+  }, [])
 
   const rememberConnectivity = useCallback((connected: boolean) => {
     const previous = previousConnectedRef.current
@@ -160,15 +156,12 @@ export function TopBar() {
         appendRecoveryEvent({
           category: mismatch.toLowerCase().includes('profile') ? 'profile' : 'runtime',
           status: 'failed',
-          detail:
-            recoveryError instanceof Error
-              ? recoveryError.message
-              : String(recoveryError),
+          detail: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
         })
         return false
       }
     },
-    [appendRecoveryEvent, runtimeTarget],
+    [appendRecoveryEvent, runtimeTarget]
   )
 
   const attemptRelayRecovery = useCallback(
@@ -178,7 +171,7 @@ export function TopBar() {
         return
       }
       const requiresRelay = offlineQueue.some(
-        (entry) => entry.reasonCode === 'relay_unset' && entry.status !== 'paused',
+        entry => entry.reasonCode === 'relay_unset' && entry.status !== 'paused'
       )
       if (!manual && !requiresRelay) {
         return
@@ -198,7 +191,7 @@ export function TopBar() {
           return
         }
         const candidate = [...propagationNodes.nodes].sort(
-          (left, right) => right.last_seen - left.last_seen,
+          (left, right) => right.last_seen - left.last_seen
         )[0]
         if (!candidate) {
           appendRecoveryEvent({
@@ -227,7 +220,7 @@ export function TopBar() {
         })
       }
     },
-    [appendRecoveryEvent, offlineQueue],
+    [appendRecoveryEvent, offlineQueue]
   )
 
   const refresh = useCallback(async () => {
@@ -302,18 +295,19 @@ export function TopBar() {
     try {
       setDiagnosticsLoading(true)
       setDiagnosticsError(null)
-      const [status, probe, profile, outboundNode, propagationNodes, interfaces, messages] = await Promise.all([
-        daemonStatus(),
-        probeLxmf(),
-        getLxmfProfile().catch(() => null),
-        getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
-        listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
-        listLxmfInterfaces().catch(() => ({ interfaces: [], meta: null })),
-        listLxmfMessages().catch(() => ({ messages: [], meta: null })),
-      ])
+      const [status, probe, profile, outboundNode, propagationNodes, interfaces, messages] =
+        await Promise.all([
+          daemonStatus(),
+          probeLxmf(),
+          getLxmfProfile().catch(() => null),
+          getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
+          listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
+          listLxmfInterfaces().catch(() => ({ interfaces: [], meta: null })),
+          listLxmfMessages().catch(() => ({ messages: [], meta: null })),
+        ])
       const messageCandidates = selectDiagnosticsMessages(messages.messages)
       const traceResults = await Promise.all(
-        messageCandidates.map(async (message) => {
+        messageCandidates.map(async message => {
           const trace = await getLxmfMessageDeliveryTrace(message.id).catch(() => null)
           return {
             id: message.id,
@@ -322,7 +316,7 @@ export function TopBar() {
             receiptStatus: message.receipt_status,
             transitions: trace?.transitions ?? [],
           }
-        }),
+        })
       )
       setDiagnosticsSnapshot({
         capturedAtMs: Date.now(),
@@ -433,13 +427,17 @@ export function TopBar() {
                 'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition',
                 notificationMenuOpen
                   ? 'border-blue-300 bg-blue-50 text-blue-700'
-                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
               )}
               onClick={() => {
-                setNotificationMenuOpen((previous) => !previous)
+                setNotificationMenuOpen(previous => !previous)
               }}
             >
-              {unreadCount > 0 ? <BellRing className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
+              {unreadCount > 0 ? (
+                <BellRing className="h-3.5 w-3.5" />
+              ) : (
+                <Bell className="h-3.5 w-3.5" />
+              )}
               Notifications
               {unreadCount > 0 ? (
                 <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] leading-none text-white">
@@ -484,18 +482,20 @@ export function TopBar() {
                     </div>
                   </div>
                   {recentNotifications.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-sm text-slate-500">No notifications yet.</div>
+                    <div className="px-4 py-6 text-center text-sm text-slate-500">
+                      No notifications yet.
+                    </div>
                   ) : (
                     <div className="max-h-80 overflow-y-auto p-2">
                       <div className="space-y-1.5">
-                        {recentNotifications.map((notification) => (
+                        {recentNotifications.map(notification => (
                           <div
                             key={notification.id}
                             className={clsx(
                               'rounded-xl border px-2.5 py-2 transition',
                               notification.read
                                 ? 'border-slate-100 bg-slate-50/50'
-                                : 'border-blue-100 bg-blue-50/60',
+                                : 'border-blue-100 bg-blue-50/60'
                             )}
                           >
                             <div className="flex items-start gap-2">
@@ -515,7 +515,7 @@ export function TopBar() {
                                     window.dispatchEvent(
                                       new CustomEvent('weft:open-thread', {
                                         detail: { threadId: notification.threadId },
-                                      }),
+                                      })
                                     )
                                     setNotificationMenuOpen(false)
                                   }
@@ -524,7 +524,9 @@ export function TopBar() {
                                 <p className="truncate text-xs font-semibold text-slate-900">
                                   {notification.title}
                                 </p>
-                                <p className="mt-0.5 line-clamp-2 text-xs text-slate-600">{notification.body}</p>
+                                <p className="mt-0.5 line-clamp-2 text-xs text-slate-600">
+                                  {notification.body}
+                                </p>
                                 <p className="mt-1 text-[11px] text-slate-400">
                                   {formatRelativeFromNow(notification.createdAtMs)}
                                 </p>
@@ -555,7 +557,7 @@ export function TopBar() {
               'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition',
               diagnosticsOpen
                 ? 'border-blue-300 bg-blue-50 text-blue-700'
-                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
             )}
             onMouseEnter={preloadDeliveryDiagnosticsDrawer}
             onFocus={preloadDeliveryDiagnosticsDrawer}
@@ -575,7 +577,7 @@ export function TopBar() {
           <span
             className={clsx(
               'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold',
-              isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+              isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
             )}
           >
             {isConnected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
@@ -639,7 +641,7 @@ export function TopBar() {
             onRunRecovery={() => {
               void runAutoRecoveryNow()
             }}
-            onQueueRetryNow={(queueId) => {
+            onQueueRetryNow={queueId => {
               void retryQueueNow(queueId)
             }}
             onQueuePause={pauseQueue}
@@ -655,9 +657,9 @@ export function TopBar() {
 
 function selectDiagnosticsMessages(messages: LxmfMessageRecord[]): LxmfMessageRecord[] {
   const outbound = messages
-    .filter((message) => message.direction === 'out')
+    .filter(message => message.direction === 'out')
     .sort((left, right) => right.timestamp - left.timestamp)
-  const priority = outbound.filter((message) => isActionableStatus(message.receipt_status))
+  const priority = outbound.filter(message => isActionableStatus(message.receipt_status))
   const selected: LxmfMessageRecord[] = []
   const seen = new Set<string>()
   for (const message of [...priority, ...outbound]) {
@@ -688,7 +690,10 @@ function isActionableStatus(status: string | null): boolean {
 
 type RuntimeConnectionTarget = ReturnType<typeof getRuntimeConnectionOptions>
 
-function buildRuntimeMismatch(expected: RuntimeConnectionTarget, probe: LxmfProbeReport): string | null {
+function buildRuntimeMismatch(
+  expected: RuntimeConnectionTarget,
+  probe: LxmfProbeReport
+): string | null {
   const expectedProfile = normalizeProfile(expected.profile)
   const actualProfile = normalizeProfile(probe.local.profile)
   const expectedRpc = normalizeRpcEndpoint(expected.rpc)
@@ -756,7 +761,7 @@ function toPreferenceRpc(value: string): string | undefined {
 
 function isSameRuntimeTarget(
   left: RuntimeConnectionTarget,
-  right: RuntimeConnectionTarget,
+  right: RuntimeConnectionTarget
 ): boolean {
   return (
     normalizeProfile(left.profile) === normalizeProfile(right.profile) &&

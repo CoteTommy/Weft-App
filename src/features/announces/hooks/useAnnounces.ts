@@ -72,7 +72,7 @@ export function useAnnounces(): UseAnnouncesState {
         void refresh()
       }, delayMs)
     },
-    [refresh],
+    [refresh]
   )
 
   const enqueueAnnounce = useCallback((announce: AnnounceItem) => {
@@ -87,7 +87,7 @@ export function useAnnounces(): UseAnnouncesState {
       if (pending.length === 0) {
         return
       }
-      setAnnounces((existing) => mergeAnnounces(existing, pending))
+      setAnnounces(existing => mergeAnnounces(existing, pending))
     }, ANNOUNCE_EVENT_BATCH_MS)
   }, [])
 
@@ -107,8 +107,8 @@ export function useAnnounces(): UseAnnouncesState {
       const page = await fetchAnnouncesPage(cursor)
       nextCursorRef.current = page.nextCursor
       setHasMore(Boolean(page.nextCursor))
-      setAnnounces((previous) => {
-        const seen = new Set(previous.map((entry) => entry.id))
+      setAnnounces(previous => {
+        const seen = new Set(previous.map(entry => entry.id))
         const merged = [...previous]
         for (const item of page.announces) {
           if (!seen.has(item.id)) {
@@ -144,7 +144,7 @@ export function useAnnounces(): UseAnnouncesState {
     void startLxmfEventPump().catch(() => {
       listenerHealthyRef.current = false
     })
-    void subscribeLxmfEvents((event) => {
+    void subscribeLxmfEvents(event => {
       lastEventAtRef.current = Date.now()
       if (event.event_type === 'announce_received') {
         const mapped = mapAnnounceEventPayload(event.payload)
@@ -159,7 +159,7 @@ export function useAnnounces(): UseAnnouncesState {
         scheduleRefresh()
       }
     })
-      .then((stop) => {
+      .then(stop => {
         if (disposed) {
           stop()
           return
@@ -216,7 +216,7 @@ function mergeAnnounces(existing: AnnounceItem[], incoming: AnnounceItem[]): Ann
   }
   let merged = existing
   for (const item of incoming) {
-    merged = [item, ...merged.filter((entry) => entry.id !== item.id)]
+    merged = [item, ...merged.filter(entry => entry.id !== item.id)]
   }
   return merged
 }

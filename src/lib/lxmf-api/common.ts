@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 
 import { getRuntimeConnectionOptions, getRuntimeTransportOption } from '@shared/runtime/preferences'
 
-import { type LxmfDaemonLocalStatus,parseLxmfDaemonLocalStatus } from '../lxmf-contract'
+import { type LxmfDaemonLocalStatus, parseLxmfDaemonLocalStatus } from '../lxmf-contract'
 import type {
   DaemonControlOptions,
   LxmfEventPumpStatus,
@@ -25,7 +25,7 @@ export function resolveProbeOptions(options: ProbeOptions): {
 export async function invokeWithProbe<TPayload = unknown>(
   command: string,
   options: ProbeOptions = {},
-  fields: Record<string, unknown> = {},
+  fields: Record<string, unknown> = {}
 ): Promise<TPayload> {
   const resolved = resolveProbeOptions(options)
   return await invoke<TPayload>(command, {
@@ -37,16 +37,16 @@ export async function invokeWithProbe<TPayload = unknown>(
 
 export async function daemonControlAction(
   tauriCommand: 'daemon_start' | 'daemon_stop' | 'daemon_restart',
-  options: DaemonControlOptions | ProbeOptions,
+  options: DaemonControlOptions | ProbeOptions
 ): Promise<LxmfDaemonLocalStatus> {
   const resolved = resolveProbeOptions(options)
   const payload = await invoke<unknown>(tauriCommand, {
     profile: resolved.profile,
     rpc: resolved.rpc,
-    managed: 'managed' in options ? options.managed ?? null : null,
-    reticulumd: 'reticulumd' in options ? options.reticulumd ?? null : null,
+    managed: 'managed' in options ? (options.managed ?? null) : null,
+    reticulumd: 'reticulumd' in options ? (options.reticulumd ?? null) : null,
     transport:
-      'transport' in options ? options.transport ?? getRuntimeTransportOption() ?? null : null,
+      'transport' in options ? (options.transport ?? getRuntimeTransportOption() ?? null) : null,
   })
   return parseLxmfDaemonLocalStatus(payload)
 }
@@ -97,7 +97,8 @@ export function parseLxmfProfileInfo(value: unknown): LxmfProfileInfo {
   ) {
     throw new Error('profile response.display_name must be a string or null')
   }
-  const displayName = typeof record.display_name === 'string' ? record.display_name.trim() || null : null
+  const displayName =
+    typeof record.display_name === 'string' ? record.display_name.trim() || null : null
   return {
     profile: record.profile,
     displayName,
@@ -137,4 +138,3 @@ function asOptionalNumber(value: unknown, path: string): number | undefined {
   }
   return value
 }
-

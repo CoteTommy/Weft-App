@@ -18,14 +18,10 @@ import type {
   OutboundMessageDraft,
   OutboundSendOutcome,
 } from '@shared/types/chat'
-import {
-  DISPLAY_NAME_UPDATED_EVENT,
-  getStoredDisplayName,
-  shortHash,
-} from '@shared/utils/identity'
+import { DISPLAY_NAME_UPDATED_EVENT, getStoredDisplayName, shortHash } from '@shared/utils/identity'
 import type { LxmfMessageRecord, LxmfRpcEvent } from '@lib/lxmf-payloads'
 
-import { buildThreads,fetchChatThreads, postChatMessage } from '../services/chatService'
+import { buildThreads, fetchChatThreads, postChatMessage } from '../services/chatService'
 import { deriveReasonCode, deriveReceiptStatus } from '../services/chatThreadBuilders'
 import { selectThreadById } from './chatSelectors'
 import {
@@ -60,11 +56,7 @@ import {
   persistThreadPreferences,
   resolveThreadPreference,
 } from './threadPreferences'
-import {
-  CHAT_REFRESH_DEBOUNCE_MS,
-  type ChatsState,
-  type IncomingNotificationItem,
-} from '../types'
+import { CHAT_REFRESH_DEBOUNCE_MS, type ChatsState, type IncomingNotificationItem } from '../types'
 import { useChatIncomingNotifications } from '../hooks/useChatIncomingNotifications'
 import { useChatOfflineQueue } from '../hooks/useChatOfflineQueue'
 import { useChatQueueRetryScheduler } from '../hooks/useChatQueueRetryScheduler'
@@ -106,7 +98,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
 
   const rewriteSelfAuthors = useCallback((nextAuthor: string) => {
     const normalizedAuthor = nextAuthor.trim() || 'You'
-    setThreads((previous) => reduceRewriteSelfAuthors(previous, normalizedAuthor))
+    setThreads(previous => reduceRewriteSelfAuthors(previous, normalizedAuthor))
   }, [])
 
   const refresh = useCallback(async () => {
@@ -120,7 +112,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       const loaded = await fetchChatThreads()
       const pendingNotifications: IncomingNotificationItem[] = []
       const activeIds = new Set([
-        ...loaded.map((thread) => thread.id),
+        ...loaded.map(thread => thread.id),
         ...draftThreadsRef.current.keys(),
       ])
 
@@ -134,12 +126,12 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       for (const thread of loaded) {
         const knownIds = knownMessageIdsRef.current.get(thread.id)
         if (!knownIds) {
-          const seeded = new Set(thread.messages.map((message) => message.id))
+          const seeded = new Set(thread.messages.map(message => message.id))
           knownMessageIdsRef.current.set(thread.id, seeded)
           if (!hasLoadedRef.current) {
             unreadCountsRef.current.set(thread.id, 0)
           } else {
-            const incoming = thread.messages.filter((message) => message.sender === 'peer').length
+            const incoming = thread.messages.filter(message => message.sender === 'peer').length
             unreadCountsRef.current.set(thread.id, incoming)
           }
           continue
@@ -160,7 +152,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         if (incomingCount > 0) {
           unreadCountsRef.current.set(
             thread.id,
-            (unreadCountsRef.current.get(thread.id) ?? 0) + incomingCount,
+            (unreadCountsRef.current.get(thread.id) ?? 0) + incomingCount
           )
           const preference = resolveThreadPreference(threadPreferencesRef.current, thread.id)
           if (hasLoadedRef.current && !preference.muted) {
@@ -178,7 +170,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
 
       hasLoadedRef.current = true
       const hydratedThreads = loaded
-        .map((thread) => ({
+        .map(thread => ({
           ...thread,
           unread: unreadCountsRef.current.get(thread.id) ?? 0,
         }))
@@ -222,14 +214,11 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         void refresh()
       }, delayMs)
     },
-    [refresh],
+    [refresh]
   )
 
   const markFailedMessagesIgnored = useCallback((messageIds: string[]) => {
-    const next = extendIgnoredFailedMessageIds(
-      ignoredFailedMessageIdsRef.current,
-      messageIds,
-    )
+    const next = extendIgnoredFailedMessageIds(ignoredFailedMessageIdsRef.current, messageIds)
     ignoredFailedMessageIdsRef.current = next
     persistIgnoredFailedMessageIds(next)
   }, [])
@@ -240,7 +229,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         return
       }
       queueInFlightRef.current.add(entry.id)
-      setOfflineQueue((previous) => markQueueEntrySending(previous, entry.id))
+      setOfflineQueue(previous => markQueueEntrySending(previous, entry.id))
       try {
         const outcome = await postChatMessage(entry.threadId, entry.draft)
         if (isFailedOutboundOutcome(outcome)) {
@@ -248,12 +237,12 @@ export function ChatsProvider({ children }: PropsWithChildren) {
           if (outcome.messageId) {
             markFailedMessagesIgnored([outcome.messageId])
           }
-          setOfflineQueue((previous) =>
-            markQueueEntryAttemptFailed(previous, entry.id, backendStatus),
+          setOfflineQueue(previous =>
+            markQueueEntryAttemptFailed(previous, entry.id, backendStatus)
           )
           return
         }
-        setOfflineQueue((previous) => markQueueEntryDelivered(previous, entry.id))
+        setOfflineQueue(previous => markQueueEntryDelivered(previous, entry.id))
         if (entry.sourceMessageId) {
           markFailedMessagesIgnored([entry.sourceMessageId])
         }
@@ -266,14 +255,12 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         await refresh()
       } catch (queueError) {
         const message = queueError instanceof Error ? queueError.message : String(queueError)
-        setOfflineQueue((previous) =>
-          markQueueEntryAttemptFailed(previous, entry.id, message),
-        )
+        setOfflineQueue(previous => markQueueEntryAttemptFailed(previous, entry.id, message))
       } finally {
         queueInFlightRef.current.delete(entry.id)
       }
     },
-    [markFailedMessagesIgnored, refresh, setOfflineQueue],
+    [markFailedMessagesIgnored, refresh, setOfflineQueue]
   )
 
   const retryQueueNow = useCallback(
@@ -282,47 +269,56 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       if (!id) {
         return
       }
-      setOfflineQueue((previous) => retryQueueEntryNow(previous, id))
-      const entry = offlineQueueRef.current.find((candidate) => candidate.id === id)
+      setOfflineQueue(previous => retryQueueEntryNow(previous, id))
+      const entry = offlineQueueRef.current.find(candidate => candidate.id === id)
       if (!entry) {
         return
       }
       await runQueueEntry(entry)
     },
-    [runQueueEntry, offlineQueueRef, setOfflineQueue],
+    [runQueueEntry, offlineQueueRef, setOfflineQueue]
   )
 
-  const pauseQueue = useCallback((queueId: string) => {
-    const id = queueId.trim()
-    if (!id) {
-      return
-    }
-    setOfflineQueue((previous) => pauseQueueEntry(previous, id))
-  }, [setOfflineQueue])
+  const pauseQueue = useCallback(
+    (queueId: string) => {
+      const id = queueId.trim()
+      if (!id) {
+        return
+      }
+      setOfflineQueue(previous => pauseQueueEntry(previous, id))
+    },
+    [setOfflineQueue]
+  )
 
-  const resumeQueue = useCallback((queueId: string) => {
-    const id = queueId.trim()
-    if (!id) {
-      return
-    }
-    setOfflineQueue((previous) => resumeQueueEntry(previous, id))
-  }, [setOfflineQueue])
+  const resumeQueue = useCallback(
+    (queueId: string) => {
+      const id = queueId.trim()
+      if (!id) {
+        return
+      }
+      setOfflineQueue(previous => resumeQueueEntry(previous, id))
+    },
+    [setOfflineQueue]
+  )
 
-  const removeQueue = useCallback((queueId: string) => {
-    const id = queueId.trim()
-    if (!id) {
-      return
-    }
-    const entry = offlineQueueRef.current.find((candidate) => candidate.id === id)
-    if (entry?.sourceMessageId) {
-      markFailedMessagesIgnored([entry.sourceMessageId])
-    }
-    setOfflineQueue((previous) => removeQueueEntry(previous, id))
-  }, [markFailedMessagesIgnored, offlineQueueRef, setOfflineQueue])
+  const removeQueue = useCallback(
+    (queueId: string) => {
+      const id = queueId.trim()
+      if (!id) {
+        return
+      }
+      const entry = offlineQueueRef.current.find(candidate => candidate.id === id)
+      if (entry?.sourceMessageId) {
+        markFailedMessagesIgnored([entry.sourceMessageId])
+      }
+      setOfflineQueue(previous => removeQueueEntry(previous, id))
+    },
+    [markFailedMessagesIgnored, offlineQueueRef, setOfflineQueue]
+  )
 
   const clearQueue = useCallback(() => {
     const ignoredIds = offlineQueueRef.current
-      .map((entry) => entry.sourceMessageId)
+      .map(entry => entry.sourceMessageId)
       .filter((entry): entry is string => Boolean(entry))
     if (ignoredIds.length > 0) {
       markFailedMessagesIgnored(ignoredIds)
@@ -348,7 +344,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       return
     }
     unreadCountsRef.current.set(id, 0)
-    setThreads((previous) => reduceMarkThreadRead(previous, id))
+    setThreads(previous => reduceMarkThreadRead(previous, id))
   }, [])
 
   const markAllRead = useCallback(() => {
@@ -362,7 +358,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     if (!hasUnread) {
       return
     }
-    setThreads((previous) => reduceMarkAllThreadsRead(previous))
+    setThreads(previous => reduceMarkAllThreadsRead(previous))
   }, [])
 
   const sendMessage = useCallback(
@@ -388,82 +384,80 @@ export function ChatsProvider({ children }: PropsWithChildren) {
           threadId,
         })
         const reasonCode = deriveReasonCode(message)
-        setOfflineQueue((previous) =>
+        setOfflineQueue(previous =>
           enqueueSendError(previous, {
             threadId,
             destination: threadId,
             draft,
             reason: message,
             reasonCode,
-          }),
+          })
         )
         return {}
       }
     },
-    [markFailedMessagesIgnored, refresh, setOfflineQueue],
+    [markFailedMessagesIgnored, refresh, setOfflineQueue]
   )
 
-  const createThread = useCallback((destination: string, name?: string): string | null => {
-    const threadId = destination.trim()
-    if (!threadId) {
-      setError('Destination is required')
-      return null
-    }
+  const createThread = useCallback(
+    (destination: string, name?: string): string | null => {
+      const threadId = destination.trim()
+      if (!threadId) {
+        setError('Destination is required')
+        return null
+      }
 
-    setError(null)
-    const existing = selectThreadById(threads, threadId)
-    if (existing) {
-      return existing.id
-    }
-    if (draftThreadsRef.current.has(threadId)) {
+      setError(null)
+      const existing = selectThreadById(threads, threadId)
+      if (existing) {
+        return existing.id
+      }
+      if (draftThreadsRef.current.has(threadId)) {
+        return threadId
+      }
+
+      const draft: ChatThread = {
+        id: threadId,
+        name: name?.trim() || shortHash(threadId),
+        destination: shortHash(threadId, 8),
+        preview: 'No messages yet',
+        unread: 0,
+        pinned: false,
+        muted: false,
+        lastActivity: 'new',
+        messages: [],
+      }
+      draftThreadsRef.current.set(threadId, draft)
+      knownMessageIdsRef.current.set(threadId, new Set())
+      unreadCountsRef.current.set(threadId, 0)
+      setThreads(previous => reduceCreateDraftThread(previous, applyThreadMetadata(draft)))
       return threadId
-    }
-
-    const draft: ChatThread = {
-      id: threadId,
-      name: name?.trim() || shortHash(threadId),
-      destination: shortHash(threadId, 8),
-      preview: 'No messages yet',
-      unread: 0,
-      pinned: false,
-      muted: false,
-      lastActivity: 'new',
-      messages: [],
-    }
-    draftThreadsRef.current.set(threadId, draft)
-    knownMessageIdsRef.current.set(threadId, new Set())
-    unreadCountsRef.current.set(threadId, 0)
-    setThreads((previous) =>
-      reduceCreateDraftThread(previous, applyThreadMetadata(draft)),
-    )
-    return threadId
-  }, [applyThreadMetadata, threads])
-
-  const setThreadPinned = useCallback(
-    (threadId: string, pinned?: boolean) => {
-      const id = threadId.trim()
-      if (!id) {
-        return
-      }
-      const current = resolveThreadPreference(threadPreferencesRef.current, id)
-      const nextPinned = typeof pinned === 'boolean' ? pinned : !current.pinned
-      if (nextPinned === current.pinned) {
-        return
-      }
-      const next = {
-        ...current,
-        pinned: nextPinned,
-      }
-      if (!next.pinned && !next.muted) {
-        threadPreferencesRef.current.delete(id)
-      } else {
-        threadPreferencesRef.current.set(id, next)
-      }
-      persistThreadPreferences(threadPreferencesRef.current)
-      setThreads((previous) => reduceSetThreadPinned(previous, id, nextPinned))
     },
-    [],
+    [applyThreadMetadata, threads]
   )
+
+  const setThreadPinned = useCallback((threadId: string, pinned?: boolean) => {
+    const id = threadId.trim()
+    if (!id) {
+      return
+    }
+    const current = resolveThreadPreference(threadPreferencesRef.current, id)
+    const nextPinned = typeof pinned === 'boolean' ? pinned : !current.pinned
+    if (nextPinned === current.pinned) {
+      return
+    }
+    const next = {
+      ...current,
+      pinned: nextPinned,
+    }
+    if (!next.pinned && !next.muted) {
+      threadPreferencesRef.current.delete(id)
+    } else {
+      threadPreferencesRef.current.set(id, next)
+    }
+    persistThreadPreferences(threadPreferencesRef.current)
+    setThreads(previous => reduceSetThreadPinned(previous, id, nextPinned))
+  }, [])
 
   const setThreadMuted = useCallback((threadId: string, muted?: boolean) => {
     const id = threadId.trim()
@@ -485,7 +479,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       threadPreferencesRef.current.set(id, next)
     }
     persistThreadPreferences(threadPreferencesRef.current)
-    setThreads((previous) => reduceSetThreadMuted(previous, id, nextMuted))
+    setThreads(previous => reduceSetThreadMuted(previous, id, nextMuted))
   }, [])
 
   const applyMessageEvent = useCallback(
@@ -515,7 +509,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
               status:
                 deriveReceiptStatus(
                   'out',
-                  statusHints.statusDetail ?? incomingMessage.statusDetail ?? null,
+                  statusHints.statusDetail ?? incomingMessage.statusDetail ?? null
                 ) ?? incomingMessage.status,
               statusReasonCode:
                 statusHints.reasonCode ??
@@ -523,7 +517,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
               deliveryTrace: appendDeliveryTraceEntry(
                 incomingMessage,
                 statusHints.statusDetail,
-                statusHints.reasonCode,
+                statusHints.reasonCode
               ),
             }
 
@@ -538,22 +532,19 @@ export function ChatsProvider({ children }: PropsWithChildren) {
 
       const isIncoming = mergedMessage.sender === 'peer' && isNewMessage
       if (isIncoming) {
-        unreadCountsRef.current.set(
-          threadId,
-          (unreadCountsRef.current.get(threadId) ?? 0) + 1,
-        )
+        unreadCountsRef.current.set(threadId, (unreadCountsRef.current.get(threadId) ?? 0) + 1)
       } else if (!unreadCountsRef.current.has(threadId)) {
         unreadCountsRef.current.set(threadId, 0)
       }
 
       const preference = resolveThreadPreference(threadPreferencesRef.current, threadId)
-      setThreads((previous) =>
+      setThreads(previous =>
         reduceRuntimeMessage(previous, {
           applyThreadMetadata,
           derivedThread,
           mergedMessage,
           unread: unreadCountsRef.current.get(threadId),
-        }),
+        })
       )
 
       if (isIncoming && hasLoadedRef.current && !preference.muted) {
@@ -573,7 +564,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         ])
       }
     },
-    [applyThreadMetadata, emitIncomingNotifications, scheduleRefresh],
+    [applyThreadMetadata, emitIncomingNotifications, scheduleRefresh]
   )
 
   const applyReceiptEvent = useCallback(
@@ -585,7 +576,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       }
 
       let found = false
-      setThreads((previous) => {
+      setThreads(previous => {
         const next = reduceReceiptUpdate(previous, receipt)
         found = next.found
         return next.threads
@@ -595,7 +586,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         scheduleRefresh()
       }
     },
-    [scheduleRefresh],
+    [scheduleRefresh]
   )
 
   useChatRuntimeEventPump({
@@ -657,7 +648,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       setThreadMuted,
       setThreadPinned,
       threads,
-    ],
+    ]
   )
 
   return <ChatsContext.Provider value={value}>{children}</ChatsContext.Provider>
@@ -726,7 +717,7 @@ function isFailedOutboundOutcome(outcome: OutboundSendOutcome): boolean {
 }
 
 function extractReceiptUpdate(
-  event: LxmfRpcEvent,
+  event: LxmfRpcEvent
 ): { messageId: string; status?: string; reasonCode?: string } | null {
   if (!event.payload || typeof event.payload !== 'object' || Array.isArray(event.payload)) {
     return null
@@ -751,9 +742,10 @@ function extractReceiptUpdate(
   }
 }
 
-function extractEventStatusHints(
-  event: LxmfRpcEvent,
-): { statusDetail?: string; reasonCode?: string } {
+function extractEventStatusHints(event: LxmfRpcEvent): {
+  statusDetail?: string
+  reasonCode?: string
+} {
   if (!event.payload || typeof event.payload !== 'object' || Array.isArray(event.payload)) {
     return {}
   }

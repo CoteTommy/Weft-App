@@ -9,21 +9,27 @@ import { ListSkeleton } from '@shared/ui/ListSkeleton'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
 import { VirtualizedList } from '@shared/ui/VirtualizedList'
-import {
-  buildNewChatHref,
-  parseLxmfContactReference,
-} from '@shared/utils/contactReference'
+import { buildNewChatHref, parseLxmfContactReference } from '@shared/utils/contactReference'
 import { shortHash } from '@shared/utils/identity'
 import { filterIndexedItems, indexSearchItems } from '@shared/utils/search'
-import { type LxmfSendMessageOptions,sendLxmfMessage } from '@lib/lxmf-api'
+import { type LxmfSendMessageOptions, sendLxmfMessage } from '@lib/lxmf-api'
 
 import { sendHubJoin } from '../services/announcesService'
 import { useAnnounces } from '../hooks/useAnnounces'
 
 export function AnnouncesPage() {
   const navigate = useNavigate()
-  const { announces, loading, loadingMore, hasMore, announcing, error, refresh, loadMore, announceNow } =
-    useAnnounces()
+  const {
+    announces,
+    loading,
+    loadingMore,
+    hasMore,
+    announcing,
+    error,
+    refresh,
+    loadMore,
+    announceNow,
+  } = useAnnounces()
   const [query, setQuery] = useState('')
   const [selectedAnnounce, setSelectedAnnounce] = useState<AnnounceItem | null>(null)
   const [replyText, setReplyText] = useState('')
@@ -36,7 +42,7 @@ export function AnnouncesPage() {
     () =>
       indexSearchItems(
         announces,
-        (announce) => [
+        announce => [
           announce.title,
           announce.body,
           announce.audience,
@@ -45,13 +51,13 @@ export function AnnouncesPage() {
           announce.priority,
           announce.postedAt,
         ],
-        { cacheKey: 'announces' },
+        { cacheKey: 'announces' }
       ),
-    [announces],
+    [announces]
   )
   const filteredAnnounces = useMemo(
     () => filterIndexedItems(indexedAnnounces, deferredQuery),
-    [deferredQuery, indexedAnnounces],
+    [deferredQuery, indexedAnnounces]
   )
   const canSendToSource = Boolean(selectedAnnounce?.source.trim())
 
@@ -172,11 +178,13 @@ export function AnnouncesPage() {
         <input
           ref={searchInputRef}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={event => setQuery(event.target.value)}
           className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
           placeholder="Search announces by title, source, audience, or body"
         />
-        {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
+        {error ? (
+          <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
+        ) : null}
         {!loading && announces.length === 0 ? (
           <p className="text-sm text-slate-500">No announce payloads have been seen yet.</p>
         ) : null}
@@ -195,8 +203,8 @@ export function AnnouncesPage() {
               estimateItemHeight={106}
               className="min-h-0 flex-1 overflow-y-auto pr-1"
               listClassName="pb-1"
-              getKey={(announce) => announce.id}
-              renderItem={(announce) => (
+              getKey={announce => announce.id}
+              renderItem={announce => (
                 <div className="py-1">
                   <button
                     type="button"
@@ -209,7 +217,9 @@ export function AnnouncesPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{announce.title}</p>
-                        <p className="mt-1 max-h-10 overflow-hidden text-sm text-slate-600">{announce.body}</p>
+                        <p className="mt-1 max-h-10 overflow-hidden text-sm text-slate-600">
+                          {announce.body}
+                        </p>
                         <p className="mt-1 text-xs text-slate-500">
                           Audience: {announce.audience} • Source: {shortHash(announce.source, 8)}
                         </p>
@@ -218,7 +228,7 @@ export function AnnouncesPage() {
                         <span
                           className={clsx(
                             'rounded-full px-2 py-1 text-xs font-semibold',
-                            priorityBadgeClass(announce.priority),
+                            priorityBadgeClass(announce.priority)
                           )}
                         >
                           {announce.priority}
@@ -255,12 +265,16 @@ export function AnnouncesPage() {
         >
           <div
             className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            onClick={event => event.stopPropagation()}
           >
             <div className="mb-3 flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Announcement</p>
-                <h3 className="mt-1 text-lg font-semibold text-slate-900">{selectedAnnounce.title}</h3>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Announcement
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-900">
+                  {selectedAnnounce.title}
+                </h3>
               </div>
               <button
                 type="button"
@@ -274,17 +288,22 @@ export function AnnouncesPage() {
             <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
               <p>{selectedAnnounce.body}</p>
               <p className="mt-2 text-xs text-slate-500">
-                Audience: {selectedAnnounce.audience} • Priority: {selectedAnnounce.priority} • Posted: {selectedAnnounce.postedAt}
+                Audience: {selectedAnnounce.audience} • Priority: {selectedAnnounce.priority} •
+                Posted: {selectedAnnounce.postedAt}
               </p>
-              <p className="mt-1 break-all text-xs text-slate-500">Source: {selectedAnnounce.source || 'Unknown'}</p>
-              <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Capabilities</p>
+              <p className="mt-1 break-all text-xs text-slate-500">
+                Source: {selectedAnnounce.source || 'Unknown'}
+              </p>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Capabilities
+              </p>
               <div className="mt-1 flex flex-wrap gap-1">
                 {selectedAnnounce.capabilities.length === 0 ? (
                   <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] text-slate-600">
                     none advertised
                   </span>
                 ) : (
-                  selectedAnnounce.capabilities.map((capability) => (
+                  selectedAnnounce.capabilities.map(capability => (
                     <span
                       key={capability}
                       className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700"
@@ -295,16 +314,22 @@ export function AnnouncesPage() {
                 )}
               </div>
               {hasHubJoinCapability(selectedAnnounce.capabilities) ? (
-                <p className="mt-2 text-xs text-emerald-700">This announce matches known RCH capabilities.</p>
+                <p className="mt-2 text-xs text-emerald-700">
+                  This announce matches known RCH capabilities.
+                </p>
               ) : (
-                <p className="mt-2 text-xs text-slate-500">Capabilities do not clearly identify RCH; join is still available manually.</p>
+                <p className="mt-2 text-xs text-slate-500">
+                  Capabilities do not clearly identify RCH; join is still available manually.
+                </p>
               )}
             </div>
 
-            <label className="mb-1 block text-xs font-semibold text-slate-600">Send message to source</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">
+              Send message to source
+            </label>
             <textarea
               value={replyText}
-              onChange={(event) => setReplyText(event.target.value)}
+              onChange={event => setReplyText(event.target.value)}
               rows={4}
               className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-300"
               placeholder="Write a message..."
@@ -341,7 +366,9 @@ export function AnnouncesPage() {
                     if (!parsed.ok) {
                       return
                     }
-                    void navigate(buildNewChatHref(parsed.value.destinationHash, selectedAnnounce.title))
+                    void navigate(
+                      buildNewChatHref(parsed.value.destinationHash, selectedAnnounce.title)
+                    )
                     closeModal()
                   }}
                   className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
@@ -378,7 +405,7 @@ function hasHubJoinCapability(capabilities: string[]): boolean {
   if (capabilities.length === 0) {
     return false
   }
-  const normalized = capabilities.map((entry) => entry.trim().toLowerCase())
+  const normalized = capabilities.map(entry => entry.trim().toLowerCase())
   const knownRchCaps = new Set([
     'topic_broker',
     'group_chat',
@@ -388,5 +415,5 @@ function hasHubJoinCapability(capabilities: string[]): boolean {
     'federation',
     'telemetry',
   ])
-  return normalized.some((entry) => knownRchCaps.has(entry))
+  return normalized.some(entry => knownRchCaps.has(entry))
 }

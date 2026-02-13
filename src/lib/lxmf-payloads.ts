@@ -238,9 +238,7 @@ export function parseLxmfInterfaceList(value: unknown): LxmfInterfaceListRespons
     throw new Error('interfaces must be an array')
   }
   return {
-    interfaces: rawList.map((entry, index) =>
-      parseInterfaceRecord(entry, `interfaces[${index}]`),
-    ),
+    interfaces: rawList.map((entry, index) => parseInterfaceRecord(entry, `interfaces[${index}]`)),
     meta: readMetaField(value, 'interfaces.meta'),
   }
 }
@@ -252,9 +250,7 @@ export function parseLxmfAnnounceList(value: unknown): LxmfAnnounceListResponse 
     throw new Error('announces must be an array')
   }
   return {
-    announces: rawList.map((entry, index) =>
-      parseAnnounceRecord(entry, `announces[${index}]`),
-    ),
+    announces: rawList.map((entry, index) => parseAnnounceRecord(entry, `announces[${index}]`)),
     next_cursor: asNullableString(root.next_cursor, 'announces.next_cursor'),
     meta: asNullableContractMeta(root.meta, 'announces.meta'),
   }
@@ -274,23 +270,19 @@ export function parseLxmfInterfaceMetrics(value: unknown): LxmfInterfaceMetricsR
   }
 }
 
-export function parseLxmfPropagationNodeList(
-  value: unknown,
-): LxmfPropagationNodeListResponse {
+export function parseLxmfPropagationNodeList(value: unknown): LxmfPropagationNodeListResponse {
   const rawList = readArrayField(value, 'nodes')
   if (!rawList) {
     throw new Error('nodes must be an array')
   }
   return {
-    nodes: rawList.map((entry, index) =>
-      parsePropagationNodeRecord(entry, `nodes[${index}]`),
-    ),
+    nodes: rawList.map((entry, index) => parsePropagationNodeRecord(entry, `nodes[${index}]`)),
     meta: readMetaField(value, 'nodes.meta'),
   }
 }
 
 export function parseLxmfOutboundPropagationNode(
-  value: unknown,
+  value: unknown
 ): LxmfOutboundPropagationNodeResponse {
   const root = asObject(value, 'outbound_propagation_node')
   return {
@@ -299,9 +291,7 @@ export function parseLxmfOutboundPropagationNode(
   }
 }
 
-export function parseLxmfMessageDeliveryTrace(
-  value: unknown,
-): LxmfMessageDeliveryTraceResponse {
+export function parseLxmfMessageDeliveryTrace(value: unknown): LxmfMessageDeliveryTraceResponse {
   const root = asObject(value, 'message_delivery_trace')
   const transitionsRaw = readArrayField(root, 'transitions') ?? []
   return {
@@ -312,11 +302,11 @@ export function parseLxmfMessageDeliveryTrace(
         status: asString(trace.status, `message_delivery_trace.transitions[${index}].status`),
         timestamp: asNumber(
           trace.timestamp,
-          `message_delivery_trace.transitions[${index}].timestamp`,
+          `message_delivery_trace.transitions[${index}].timestamp`
         ),
         reason_code: asOptionalString(
           trace.reason_code,
-          `message_delivery_trace.transitions[${index}].reason_code`,
+          `message_delivery_trace.transitions[${index}].reason_code`
         ),
       }
     }),
@@ -391,10 +381,7 @@ function parseAnnounceRecord(value: unknown, path: string): LxmfAnnounceRecord {
   }
 }
 
-function parsePropagationNodeRecord(
-  value: unknown,
-  path: string,
-): LxmfPropagationNodeRecord {
+function parsePropagationNodeRecord(value: unknown, path: string): LxmfPropagationNodeRecord {
   const record = asObject(value, path)
   return {
     peer: asString(record.peer, `${path}.peer`),
@@ -483,7 +470,7 @@ function asOptionalCapabilities(value: unknown): string[] | undefined {
     return undefined
   }
   const capabilities = value
-    .map((entry) => {
+    .map(entry => {
       if (typeof entry === 'string') {
         return entry.trim()
       }
@@ -492,7 +479,7 @@ function asOptionalCapabilities(value: unknown): string[] | undefined {
       }
       return ''
     })
-    .filter((entry) => entry.length > 0)
+    .filter(entry => entry.length > 0)
   return capabilities.length > 0 ? capabilities : undefined
 }
 

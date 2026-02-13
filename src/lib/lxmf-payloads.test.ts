@@ -14,13 +14,7 @@ import {
 } from './lxmf-payloads'
 
 function loadContractFixture(): Record<string, unknown> {
-  const fixturePath = join(
-    process.cwd(),
-    'docs',
-    'fixtures',
-    'contract-v2',
-    'payload-domains.json',
-  )
+  const fixturePath = join(process.cwd(), 'docs', 'fixtures', 'contract-v2', 'payload-domains.json')
   const raw = readFileSync(fixturePath, 'utf8')
   return JSON.parse(raw) as Record<string, unknown>
 }
@@ -32,10 +26,7 @@ describe('lxmf payload parsers', () => {
     const parsed = parseLxmfAnnounceList(fixture.announce_list)
 
     expect(parsed.announces).toHaveLength(1)
-    expect(parsed.announces[0].capabilities).toEqual([
-      'topic_broker',
-      'telemetry_relay',
-    ])
+    expect(parsed.announces[0].capabilities).toEqual(['topic_broker', 'telemetry_relay'])
     expect(parsed.announces[0].name).toBe('Hub Node')
     expect(parsed.announces[0].rssi).toBe(-72.5)
     expect(parsed.next_cursor).toBe('1770855200')
@@ -45,7 +36,7 @@ describe('lxmf payload parsers', () => {
   test('parses message delivery transitions', () => {
     const parsed = parseLxmfMessageDeliveryTrace(fixture.message_delivery_trace)
     expect(parsed.message_id).toBe('lxmf-interop-001')
-    expect(parsed.transitions.map((entry) => entry.status)).toEqual([
+    expect(parsed.transitions.map(entry => entry.status)).toEqual([
       'queued',
       'retrying: propagated relay',
       'delivered',

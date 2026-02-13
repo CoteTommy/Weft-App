@@ -79,7 +79,7 @@ export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageC
   return (
     <form
       className="rounded-2xl border border-slate-200 bg-white p-2"
-      onSubmit={(event) => {
+      onSubmit={event => {
         event.preventDefault()
         void (async () => {
           const trimmed = text.trim()
@@ -139,7 +139,7 @@ export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageC
         type="file"
         multiple
         className="hidden"
-        onChange={(event) => {
+        onChange={event => {
           const files = event.target.files
           if (!files || files.length === 0) {
             return
@@ -158,7 +158,7 @@ export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageC
                   dataBase64: await fileToBase64(file),
                 })
               }
-              setAttachments((previous) => [...previous, ...incoming])
+              setAttachments(previous => [...previous, ...incoming])
               setError(null)
               setSendFeedback(null)
             } catch (loadError) {
@@ -180,8 +180,8 @@ export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageC
               <button
                 type="button"
                 onClick={() =>
-                  setAttachments((previous) =>
-                    previous.filter((_, attachmentIndex) => attachmentIndex !== index),
+                  setAttachments(previous =>
+                    previous.filter((_, attachmentIndex) => attachmentIndex !== index)
                   )
                 }
                 className="rounded-full p-0.5 text-slate-500 transition hover:bg-slate-200"
@@ -197,13 +197,13 @@ export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageC
         <div className="mb-2 grid gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2">
           <input
             value={paperTitle}
-            onChange={(event) => setPaperTitle(event.target.value)}
+            onChange={event => setPaperTitle(event.target.value)}
             className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs text-slate-700 outline-none transition focus:border-amber-300"
             placeholder="Paper title (optional)"
           />
           <input
             value={paperCategory}
-            onChange={(event) => setPaperCategory(event.target.value)}
+            onChange={event => setPaperCategory(event.target.value)}
             className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs text-slate-700 outline-none transition focus:border-amber-300"
             placeholder="Paper category (optional)"
           />
@@ -215,7 +215,7 @@ export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageC
           className="h-11 flex-1 rounded-xl border border-transparent px-3 text-sm text-slate-800 outline-none transition focus:border-blue-200 focus:bg-blue-50/50"
           placeholder="Type a message..."
           value={text}
-          onChange={(event) => {
+          onChange={event => {
             setText(event.target.value)
             setSendFeedback(null)
           }}
@@ -231,7 +231,7 @@ export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageC
         </button>
         <button
           type="button"
-          onClick={() => setPaperEnabled((value) => !value)}
+          onClick={() => setPaperEnabled(value => !value)}
           className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100"
           aria-label="Toggle paper metadata"
           disabled={sending}

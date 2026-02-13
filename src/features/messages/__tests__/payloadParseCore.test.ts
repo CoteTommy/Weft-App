@@ -48,10 +48,7 @@ describe('payload parse core', () => {
       message({
         id: 'file1',
         fields: {
-          '5': [[
-            'note.txt',
-            bytes,
-          ]],
+          '5': [['note.txt', bytes]],
         },
       }),
     ])

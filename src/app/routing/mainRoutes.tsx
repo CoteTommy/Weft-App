@@ -11,42 +11,44 @@ export type MainRouteEntry = {
 }
 
 const ChatsPage = lazy(() =>
-  import('@features/chats/pages/ChatsPage').then((module) => ({ default: module.ChatsPage })),
+  import('@features/chats/pages/ChatsPage').then(module => ({ default: module.ChatsPage }))
 )
 const ChatThreadPage = lazy(() =>
-  import('@features/chats/pages/ChatThreadPage').then((module) => ({ default: module.ChatThreadPage })),
+  import('@features/chats/pages/ChatThreadPage').then(module => ({
+    default: module.ChatThreadPage,
+  }))
 )
 const PeoplePage = lazy(() =>
-  import('@features/people/pages/PeoplePage').then((module) => ({ default: module.PeoplePage })),
+  import('@features/people/pages/PeoplePage').then(module => ({ default: module.PeoplePage }))
 )
 const MapPage = lazy(() =>
-  import('@features/map/pages/MapPage').then((module) => ({ default: module.MapPage })),
+  import('@features/map/pages/MapPage').then(module => ({ default: module.MapPage }))
 )
 const NetworkPage = lazy(() =>
-  import('@features/network/pages/NetworkPage').then((module) => ({ default: module.NetworkPage })),
+  import('@features/network/pages/NetworkPage').then(module => ({ default: module.NetworkPage }))
 )
 const CommandCenterPage = lazy(() =>
-  import('@features/command-center/pages/CommandCenterPage').then((module) => ({
+  import('@features/command-center/pages/CommandCenterPage').then(module => ({
     default: module.CommandCenterPage,
-  })),
+  }))
 )
 const InterfacesPage = lazy(() =>
-  import('@features/interfaces/pages/InterfacesPage').then((module) => ({
+  import('@features/interfaces/pages/InterfacesPage').then(module => ({
     default: module.InterfacesPage,
-  })),
+  }))
 )
 const AnnouncesPage = lazy(() =>
-  import('@features/announces/pages/AnnouncesPage').then((module) => ({
+  import('@features/announces/pages/AnnouncesPage').then(module => ({
     default: module.AnnouncesPage,
-  })),
+  }))
 )
 const FilesPage = lazy(() =>
-  import('@features/files/pages/FilesPage').then((module) => ({ default: module.FilesPage })),
+  import('@features/files/pages/FilesPage').then(module => ({ default: module.FilesPage }))
 )
 const SettingsPage = lazy(() =>
-  import('@features/settings/pages/SettingsPage').then((module) => ({
+  import('@features/settings/pages/SettingsPage').then(module => ({
     default: module.SettingsPage,
-  })),
+  }))
 )
 
 export const KNOWN_MAIN_ROUTES = [

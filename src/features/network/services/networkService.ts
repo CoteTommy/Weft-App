@@ -1,8 +1,4 @@
-import type {
-  NetworkPeerItem,
-  NetworkPeerStatus,
-  NetworkPeerTrust,
-} from '@shared/types/network'
+import type { NetworkPeerItem, NetworkPeerStatus, NetworkPeerTrust } from '@shared/types/network'
 import { shortHash } from '@shared/utils/identity'
 import { formatRelativeFromNow } from '@shared/utils/time'
 import { listLxmfPeers } from '@lib/lxmf-api'

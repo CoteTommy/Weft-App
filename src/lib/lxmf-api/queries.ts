@@ -19,7 +19,9 @@ import {
 import { invokeWithProbe } from './common'
 import type { ProbeOptions } from './types'
 
-export async function listLxmfMessages(options: ProbeOptions = {}): Promise<LxmfMessageListResponse> {
+export async function listLxmfMessages(
+  options: ProbeOptions = {}
+): Promise<LxmfMessageListResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_list_messages', options)
   return parseLxmfMessageList(payload)
 }
@@ -29,7 +31,9 @@ export async function listLxmfPeers(options: ProbeOptions = {}): Promise<LxmfPee
   return parseLxmfPeerList(payload)
 }
 
-export async function listLxmfInterfaces(options: ProbeOptions = {}): Promise<LxmfInterfaceListResponse> {
+export async function listLxmfInterfaces(
+  options: ProbeOptions = {}
+): Promise<LxmfInterfaceListResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_list_interfaces', options)
   return parseLxmfInterfaceList(payload)
 }
@@ -42,7 +46,7 @@ export type ListLxmfAnnouncesParams = {
 
 export async function listLxmfAnnounces(
   options: ProbeOptions = {},
-  params: ListLxmfAnnouncesParams = {},
+  params: ListLxmfAnnouncesParams = {}
 ): Promise<LxmfAnnounceListResponse> {
   const fields: Record<string, unknown> = {}
   if (typeof params.limit === 'number' && Number.isFinite(params.limit)) {
@@ -59,21 +63,21 @@ export async function listLxmfAnnounces(
 }
 
 export async function lxmfInterfaceMetrics(
-  options: ProbeOptions = {},
+  options: ProbeOptions = {}
 ): Promise<LxmfInterfaceMetricsResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_interface_metrics', options)
   return parseLxmfInterfaceMetrics(payload)
 }
 
 export async function listLxmfPropagationNodes(
-  options: ProbeOptions = {},
+  options: ProbeOptions = {}
 ): Promise<LxmfPropagationNodeListResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_list_propagation_nodes', options)
   return parseLxmfPropagationNodeList(payload)
 }
 
 export async function getLxmfOutboundPropagationNode(
-  options: ProbeOptions = {},
+  options: ProbeOptions = {}
 ): Promise<LxmfOutboundPropagationNodeResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_get_outbound_propagation_node', options)
   return parseLxmfOutboundPropagationNode(payload)
@@ -81,7 +85,7 @@ export async function getLxmfOutboundPropagationNode(
 
 export async function setLxmfOutboundPropagationNode(
   peer: string | null,
-  options: ProbeOptions = {},
+  options: ProbeOptions = {}
 ): Promise<LxmfOutboundPropagationNodeResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_set_outbound_propagation_node', options, {
     peer,
@@ -91,7 +95,7 @@ export async function setLxmfOutboundPropagationNode(
 
 export async function getLxmfMessageDeliveryTrace(
   messageId: string,
-  options: ProbeOptions = {},
+  options: ProbeOptions = {}
 ): Promise<LxmfMessageDeliveryTraceResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_message_delivery_trace', options, {
     message_id: messageId,

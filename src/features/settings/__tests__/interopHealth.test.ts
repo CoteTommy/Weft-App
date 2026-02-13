@@ -108,7 +108,7 @@ describe('buildInteropSnapshot', () => {
     expect(result.receivePath).toBe('blocked')
     expect(result.profileMatch).toBe(false)
     expect(result.rpcMatch).toBe(false)
-    expect(result.findings.some((item) => item.includes('Runtime is offline'))).toBe(true)
+    expect(result.findings.some(item => item.includes('Runtime is offline'))).toBe(true)
   })
 
   test('detects relay-unset failures and pending outbound queue', () => {
@@ -141,6 +141,6 @@ describe('buildInteropSnapshot', () => {
     expect(result.sendPath).toBe('blocked')
     expect(result.outboundPending).toBe(1)
     expect(result.outboundFailed).toBe(1)
-    expect(result.findings.some((item) => item.includes('no propagation relay'))).toBe(true)
+    expect(result.findings.some(item => item.includes('no propagation relay'))).toBe(true)
   })
 })

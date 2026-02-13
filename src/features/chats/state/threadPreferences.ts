@@ -56,7 +56,7 @@ export function persistThreadPreferences(preferences: Map<string, ThreadPreferen
 
 export function resolveThreadPreference(
   preferences: Map<string, ThreadPreference>,
-  threadId: string,
+  threadId: string
 ): ThreadPreference {
   return preferences.get(threadId) ?? { pinned: false, muted: false }
 }

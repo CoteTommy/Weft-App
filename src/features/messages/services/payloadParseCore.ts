@@ -18,10 +18,7 @@ export interface ParsedMapPoint {
 
 export function extractMapPointsFromMessages(records: LxmfMessageRecord[]): ParsedMapPoint[] {
   const points = records.flatMap(extractPointsFromMessage)
-  points.sort(
-    (left, right) =>
-      timestampFromPointId(right.id) - timestampFromPointId(left.id),
-  )
+  points.sort((left, right) => timestampFromPointId(right.id) - timestampFromPointId(left.id))
   return points
 }
 
@@ -51,7 +48,7 @@ function extractFieldLocationPoints(record: LxmfMessageRecord): ParsedMapPoint[]
       record,
       location.lat,
       location.lon,
-      record.title.trim() || firstLine(record.content) || 'Location point',
+      record.title.trim() || firstLine(record.content) || 'Location point'
     ),
   ]
 }
@@ -85,8 +82,8 @@ function extractWithPattern(record: LxmfMessageRecord, pattern: RegExp): ParsedM
         record,
         lat,
         lon,
-        record.title.trim() || firstLine(record.content) || 'Location point',
-      ),
+        record.title.trim() || firstLine(record.content) || 'Location point'
+      )
     )
   }
   return points
@@ -96,7 +93,7 @@ function buildMapPoint(
   record: LxmfMessageRecord,
   lat: number,
   lon: number,
-  label: string,
+  label: string
 ): ParsedMapPoint {
   const timestampMs = normalizeTimestampMs(record.timestamp)
   return {
@@ -106,12 +103,7 @@ function buildMapPoint(
     lon,
     source: shortHash(record.direction === 'out' ? record.destination : record.source, 8),
     when: new Date(timestampMs).toLocaleString(),
-    direction:
-      record.direction === 'out'
-        ? 'out'
-        : record.direction === 'in'
-          ? 'in'
-          : 'unknown',
+    direction: record.direction === 'out' ? 'out' : record.direction === 'in' ? 'in' : 'unknown',
   }
 }
 
@@ -185,7 +177,7 @@ function extractFilesFromMessage(record: LxmfMessageRecord): FileItem[] {
 }
 
 function parseLocationMeta(
-  fields: LxmfMessageRecord['fields'],
+  fields: LxmfMessageRecord['fields']
 ): { lat: number; lon: number } | undefined {
   const root = asObject(fields)
   if (!root) {
@@ -194,10 +186,7 @@ function parseLocationMeta(
 
   const location = asObject(root.location)
   const lat = asNumber(location?.lat) ?? asNumber(location?.latitude)
-  const lon =
-    asNumber(location?.lon) ??
-    asNumber(location?.lng) ??
-    asNumber(location?.longitude)
+  const lon = asNumber(location?.lon) ?? asNumber(location?.lng) ?? asNumber(location?.longitude)
   if (lat !== undefined && lon !== undefined) {
     return { lat, lon }
   }
@@ -233,7 +222,7 @@ function parseLocationMeta(
 }
 
 function parseCanonicalAttachments(
-  value: unknown,
+  value: unknown
 ): Array<{ name: string; sizeBytes: number; dataBase64: string; mime?: string }> {
   if (!Array.isArray(value)) {
     return []

@@ -1,6 +1,6 @@
 import type { InterfaceItem, InterfaceMetrics } from '@shared/types/interfaces'
 import { listLxmfInterfaces, lxmfInterfaceMetrics } from '@lib/lxmf-api'
-import type { LxmfInterfaceMetricsResponse,LxmfInterfaceRecord } from '@lib/lxmf-payloads'
+import type { LxmfInterfaceMetricsResponse, LxmfInterfaceRecord } from '@lib/lxmf-payloads'
 
 export interface InterfaceSnapshot {
   interfaces: InterfaceItem[]
@@ -13,13 +13,15 @@ export async function fetchInterfaceSnapshot(): Promise<InterfaceSnapshot> {
     return fromMetricsResponse(response)
   } catch {
     const fallback = await listLxmfInterfaces()
-    const interfaces = sortInterfaces(fallback.interfaces.map((record, index) => mapDaemonInterface(record, index)))
+    const interfaces = sortInterfaces(
+      fallback.interfaces.map((record, index) => mapDaemonInterface(record, index))
+    )
     return {
       interfaces,
       metrics: {
         total: interfaces.length,
-        enabled: interfaces.filter((item) => item.status === 'Enabled').length,
-        disabled: interfaces.filter((item) => item.status === 'Disabled').length,
+        enabled: interfaces.filter(item => item.status === 'Enabled').length,
+        disabled: interfaces.filter(item => item.status === 'Disabled').length,
         byType: countByType(interfaces),
       },
     }
@@ -27,7 +29,9 @@ export async function fetchInterfaceSnapshot(): Promise<InterfaceSnapshot> {
 }
 
 function fromMetricsResponse(response: LxmfInterfaceMetricsResponse): InterfaceSnapshot {
-  const interfaces = sortInterfaces(response.interfaces.map((record, index) => mapDaemonInterface(record, index)))
+  const interfaces = sortInterfaces(
+    response.interfaces.map((record, index) => mapDaemonInterface(record, index))
+  )
   return {
     interfaces,
     metrics: {

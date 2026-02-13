@@ -1,4 +1,4 @@
-import { type MutableRefObject,useEffect } from 'react'
+import { type MutableRefObject, useEffect } from 'react'
 
 import { nextDueQueueEntry, type OfflineQueueEntry } from '../state/offlineQueue'
 import { CHAT_QUEUE_RETRY_INTERVAL_MS } from '../types'

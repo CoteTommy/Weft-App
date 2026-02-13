@@ -43,7 +43,7 @@ const pending = new Map<
 >()
 
 export async function parseMapPointsOffThread(
-  messages: LxmfMessageRecord[],
+  messages: LxmfMessageRecord[]
 ): Promise<ParsedMapPoint[]> {
   try {
     const parsed = await runParseJob('map_points', messages)
@@ -53,9 +53,7 @@ export async function parseMapPointsOffThread(
   }
 }
 
-export async function parseFileItemsOffThread(
-  messages: LxmfMessageRecord[],
-): Promise<FileItem[]> {
+export async function parseFileItemsOffThread(messages: LxmfMessageRecord[]): Promise<FileItem[]> {
   try {
     const parsed = await runParseJob('file_items', messages)
     return parsed as FileItem[]

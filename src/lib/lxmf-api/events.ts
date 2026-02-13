@@ -1,6 +1,6 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
-import { type LxmfRpcEvent,parseLxmfRpcEventOrNull } from '../lxmf-payloads'
+import { type LxmfRpcEvent, parseLxmfRpcEventOrNull } from '../lxmf-payloads'
 import { invokeWithProbe, parseEventPumpStatus } from './common'
 import type { LxmfEventPumpStatus, ProbeOptions } from './types'
 
@@ -10,7 +10,7 @@ export async function pollLxmfEvent(options: ProbeOptions = {}): Promise<LxmfRpc
 }
 
 export async function startLxmfEventPump(
-  options: ProbeOptions & { intervalMs?: number } = {},
+  options: ProbeOptions & { intervalMs?: number } = {}
 ): Promise<LxmfEventPumpStatus> {
   const payload = await invokeWithProbe<unknown>('lxmf_start_event_pump', options, {
     interval_ms: options.intervalMs ?? null,
@@ -23,12 +23,13 @@ export async function stopLxmfEventPump(): Promise<LxmfEventPumpStatus> {
   return parseEventPumpStatus(payload)
 }
 
-export async function subscribeLxmfEvents(onEvent: (event: LxmfRpcEvent) => void): Promise<UnlistenFn> {
-  return await listen<unknown>('weft://lxmf-event', (event) => {
+export async function subscribeLxmfEvents(
+  onEvent: (event: LxmfRpcEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<unknown>('weft://lxmf-event', event => {
     const parsed = parseLxmfRpcEventOrNull(event.payload)
     if (parsed) {
       onEvent(parsed)
     }
   })
 }
-

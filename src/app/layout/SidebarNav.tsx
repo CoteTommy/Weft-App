@@ -15,10 +15,7 @@ import {
 } from 'lucide-react'
 
 import { useChatsState } from '@features/chats/state/ChatsProvider'
-import {
-  getWeftPreferences,
-  PREFERENCES_UPDATED_EVENT,
-} from '@shared/runtime/preferences'
+import { getWeftPreferences, PREFERENCES_UPDATED_EVENT } from '@shared/runtime/preferences'
 import {
   DISPLAY_NAME_UPDATED_EVENT,
   getStoredDisplayName,
@@ -84,29 +81,27 @@ export function SidebarNav() {
   const [displayName, setDisplayName] = useState(() => getStoredDisplayName() ?? 'Loading...')
   const [identityHint, setIdentityHint] = useState<string | null>(null)
   const [commandCenterEnabled, setCommandCenterEnabled] = useState(
-    () => getWeftPreferences().commandCenterEnabled,
+    () => getWeftPreferences().commandCenterEnabled
   )
-  const totalUnread = threads.reduce(
-    (sum, thread) => sum + (thread.muted ? 0 : thread.unread),
-    0,
-  )
+  const totalUnread = threads.reduce((sum, thread) => sum + (thread.muted ? 0 : thread.unread), 0)
   const renderedNavItems = commandCenterEnabled
-    ? [...navItems.slice(0, 4), { to: '/command-center', label: 'Command Center', icon: Command }, ...navItems.slice(4)]
+    ? [
+        ...navItems.slice(0, 4),
+        { to: '/command-center', label: 'Command Center', icon: Command },
+        ...navItems.slice(4),
+      ]
     : navItems
 
   const refreshIdentity = useCallback(async () => {
     try {
-      const [probe, profile] = await Promise.all([
-        probeLxmf(),
-        getLxmfProfile().catch(() => null),
-      ])
+      const [probe, profile] = await Promise.all([probeLxmf(), getLxmfProfile().catch(() => null)])
       setDisplayName(
-        resolveDisplayName(probe.profile, probe.rpc.identity_hash, profile?.displayName ?? null),
+        resolveDisplayName(probe.profile, probe.rpc.identity_hash, profile?.displayName ?? null)
       )
       const identityHash = probe.rpc.identity_hash?.trim()
       setIdentityHint(identityHash ? shortHash(identityHash, 8) : probe.profile)
     } catch {
-      setDisplayName((current) => (current === 'Loading...' ? 'Unknown' : current))
+      setDisplayName(current => (current === 'Loading...' ? 'Unknown' : current))
       setIdentityHint(null)
     }
   }, [])
@@ -148,7 +143,7 @@ export function SidebarNav() {
       </div>
 
       <nav className="space-y-1.5">
-        {renderedNavItems.map((item) => (
+        {renderedNavItems.map(item => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -163,7 +158,7 @@ export function SidebarNav() {
                 'ui-transition flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium',
                 isActive
                   ? 'bg-blue-600 text-white shadow-[0_12px_20px_-16px_rgba(37,99,235,0.9)]'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               )
             }
           >
@@ -181,7 +176,9 @@ export function SidebarNav() {
       <div className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 p-3">
         <p className="text-xs font-semibold text-slate-600">Connected as</p>
         <p className="mt-1 truncate text-sm font-semibold text-slate-900">{displayName}</p>
-        {identityHint ? <p className="mt-0.5 truncate text-[11px] text-slate-500">{identityHint}</p> : null}
+        {identityHint ? (
+          <p className="mt-0.5 truncate text-[11px] text-slate-500">{identityHint}</p>
+        ) : null}
       </div>
     </aside>
   )

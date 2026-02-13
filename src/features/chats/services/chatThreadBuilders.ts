@@ -8,7 +8,7 @@ import { parseMessageAssets } from './chatMessageAssets'
 export function buildThreads(
   records: LxmfMessageRecord[],
   peerNames: Map<string, string> = new Map(),
-  selfAuthor = 'You',
+  selfAuthor = 'You'
 ): ChatThread[] {
   const byCounterparty = new Map<string, LxmfMessageRecord[]>()
 
@@ -30,9 +30,9 @@ export function buildThreads(
 
   const threadsWithTime = [...byCounterparty.entries()].map(([counterparty, threadRecords]) => {
     const sorted = [...threadRecords].sort(
-      (a, b) => normalizeTimestampMs(a.timestamp) - normalizeTimestampMs(b.timestamp),
+      (a, b) => normalizeTimestampMs(a.timestamp) - normalizeTimestampMs(b.timestamp)
     )
-    const messages = sorted.map((record) => toChatMessage(record, counterparty, selfAuthor))
+    const messages = sorted.map(record => toChatMessage(record, counterparty, selfAuthor))
     const last = sorted[sorted.length - 1]
     const lastTimestampMs = normalizeTimestampMs(last?.timestamp ?? Date.now())
 
@@ -53,7 +53,7 @@ export function buildThreads(
   })
 
   threadsWithTime.sort((a, b) => b.lastTimestampMs - a.lastTimestampMs)
-  return threadsWithTime.map((entry) => entry.thread)
+  return threadsWithTime.map(entry => entry.thread)
 }
 
 function latestPreview(record: LxmfMessageRecord | undefined): string {
@@ -79,7 +79,11 @@ function latestPreview(record: LxmfMessageRecord | undefined): string {
   return 'No messages yet'
 }
 
-function toChatMessage(record: LxmfMessageRecord, counterparty: string, selfAuthor: string): ChatMessage {
+function toChatMessage(
+  record: LxmfMessageRecord,
+  counterparty: string,
+  selfAuthor: string
+): ChatMessage {
   const timestampMs = normalizeTimestampMs(record.timestamp)
   const statusDetail = normalizeStatusDetail(record.receipt_status)
   const assets = parseMessageAssets(record.fields)
@@ -113,7 +117,7 @@ function normalizeTimestampMs(value: number): number {
 
 export function deriveReceiptStatus(
   direction: string,
-  receiptStatus: string | null,
+  receiptStatus: string | null
 ): ChatMessage['status'] | undefined {
   if (direction !== 'out') {
     return undefined

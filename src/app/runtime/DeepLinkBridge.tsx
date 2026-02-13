@@ -45,18 +45,15 @@ export function DeepLinkBridge({ onboardingCompleted }: DeepLinkBridgeProps) {
         if (!disposed && current) {
           routeFromUrls(current)
         }
-        unlisten = await deepLink.onOpenUrl((urls) => {
+        unlisten = await deepLink.onOpenUrl(urls => {
           routeFromUrls(urls)
         })
-        unlistenSingleInstance = await listen<unknown>(
-          'weft://single-instance',
-          (event) => {
-            const urls = extractUrlsFromSingleInstancePayload(event.payload)
-            if (urls.length > 0) {
-              routeFromUrls(urls)
-            }
-          },
-        )
+        unlistenSingleInstance = await listen<unknown>('weft://single-instance', event => {
+          const urls = extractUrlsFromSingleInstancePayload(event.payload)
+          if (urls.length > 0) {
+            routeFromUrls(urls)
+          }
+        })
       } catch {
         // Deep-link support is optional in non-Tauri contexts.
       }

@@ -5,10 +5,7 @@ import clsx from 'clsx'
 
 import { useChatsState } from '@features/chats/state/ChatsProvider'
 import { publishAppNotification } from '@shared/runtime/notifications'
-import {
-  getWeftPreferences,
-  PREFERENCES_UPDATED_EVENT,
-} from '@shared/runtime/preferences'
+import { getWeftPreferences, PREFERENCES_UPDATED_EVENT } from '@shared/runtime/preferences'
 import {
   FOCUS_NEW_CHAT_EVENT,
   FOCUS_QUICK_REPLY_EVENT,
@@ -35,7 +32,7 @@ export function CommandPalette() {
   const [runningActionId, setRunningActionId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [commandCenterEnabled, setCommandCenterEnabled] = useState(
-    () => getWeftPreferences().commandCenterEnabled,
+    () => getWeftPreferences().commandCenterEnabled
   )
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -72,7 +69,7 @@ export function CommandPalette() {
         void navigate('/chats')
       },
     }),
-    [location.pathname, navigate, threads],
+    [location.pathname, navigate, threads]
   )
 
   const actions = useMemo<PaletteAction[]>(() => {
@@ -170,7 +167,7 @@ export function CommandPalette() {
         },
       })
     }
-    const threadActions = threads.slice(0, 40).map<PaletteAction>((thread) => ({
+    const threadActions = threads.slice(0, 40).map<PaletteAction>(thread => ({
       id: `thread:${thread.id}`,
       title: `Jump to ${thread.name}`,
       subtitle: thread.preview || thread.destination,
@@ -188,7 +185,7 @@ export function CommandPalette() {
       return actions
     }
     const tokens = normalized.split(/\s+/).filter(Boolean)
-    return actions.filter((action) => {
+    return actions.filter(action => {
       const haystack = [
         action.title,
         action.subtitle ?? '',
@@ -197,7 +194,7 @@ export function CommandPalette() {
       ]
         .join(' ')
         .toLowerCase()
-      return tokens.every((token) => haystack.includes(token))
+      return tokens.every(token => haystack.includes(token))
     })
   }, [actions, query])
 
@@ -237,14 +234,12 @@ export function CommandPalette() {
         }
         if (event.key === 'ArrowDown') {
           event.preventDefault()
-          setSelectedIndex((value) =>
-            Math.min(value + 1, Math.max(filteredActions.length - 1, 0)),
-          )
+          setSelectedIndex(value => Math.min(value + 1, Math.max(filteredActions.length - 1, 0)))
           return
         }
         if (event.key === 'ArrowUp') {
           event.preventDefault()
-          setSelectedIndex((value) => Math.max(0, value - 1))
+          setSelectedIndex(value => Math.max(0, value - 1))
           return
         }
         if (event.key === 'Enter') {
@@ -262,17 +257,17 @@ export function CommandPalette() {
       if (key === 'k') {
         event.preventDefault()
         setFeedback(null)
-        setOpen((value) => !value)
+        setOpen(value => !value)
         return
       }
       if (key === 'n') {
         event.preventDefault()
-        void runAction(actions.find((action) => action.id === 'new-chat'))
+        void runAction(actions.find(action => action.id === 'new-chat'))
         return
       }
       if (key === 'f') {
         event.preventDefault()
-        void runAction(actions.find((action) => action.id === 'search-current'))
+        void runAction(actions.find(action => action.id === 'search-current'))
         return
       }
       if (key === 'j') {
@@ -317,18 +312,19 @@ export function CommandPalette() {
     <div className="fixed inset-0 z-50 bg-slate-900/30 p-4" onClick={() => setOpen(false)}>
       <div
         className="mx-auto mt-[10vh] w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_-35px_rgba(15,23,42,0.6)]"
-        onClick={(event) => event.stopPropagation()}
+        onClick={event => event.stopPropagation()}
       >
         <div className="border-b border-slate-100 p-3">
           <input
             ref={inputRef}
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={event => setQuery(event.target.value)}
             className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
             placeholder="Type a command or jump to a thread..."
           />
           <p className="mt-2 text-[11px] text-slate-500">
-            Shortcuts: ⌘/Ctrl+K command palette, ⌘/Ctrl+N new chat, ⌘/Ctrl+F search, ⌘/Ctrl+J jump threads, ⌘/Ctrl+R quick reply
+            Shortcuts: ⌘/Ctrl+K command palette, ⌘/Ctrl+N new chat, ⌘/Ctrl+F search, ⌘/Ctrl+J jump
+            threads, ⌘/Ctrl+R quick reply
           </p>
           {feedback ? <p className="mt-2 text-xs text-rose-700">{feedback}</p> : null}
         </div>
@@ -346,9 +342,7 @@ export function CommandPalette() {
                     }}
                     className={clsx(
                       'flex w-full items-start justify-between rounded-xl px-3 py-2 text-left transition',
-                      selectedIndex === index
-                        ? 'bg-blue-50 text-blue-900'
-                        : 'hover:bg-slate-50',
+                      selectedIndex === index ? 'bg-blue-50 text-blue-900' : 'hover:bg-slate-50'
                     )}
                   >
                     <div className="min-w-0">

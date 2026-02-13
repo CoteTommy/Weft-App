@@ -83,8 +83,8 @@ export function DeliveryDiagnosticsDrawer({
 }: DeliveryDiagnosticsDrawerProps) {
   const reduceMotion = useReducedMotion()
   const queuePending = useMemo(
-    () => queueEntries.filter((entry) => entry.status === 'queued').length,
-    [queueEntries],
+    () => queueEntries.filter(entry => entry.status === 'queued').length,
+    [queueEntries]
   )
 
   useEffect(() => {
@@ -118,7 +118,7 @@ export function DeliveryDiagnosticsDrawer({
             animate={reduceMotion ? undefined : { x: 0, opacity: 1 }}
             exit={reduceMotion ? undefined : { x: 32, opacity: 0.96 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            onClick={(event) => event.stopPropagation()}
+            onClick={event => event.stopPropagation()}
           >
             <div className="flex h-full min-h-0 flex-col">
               <header className="border-b border-slate-200 px-4 py-3">
@@ -179,7 +179,10 @@ export function DeliveryDiagnosticsDrawer({
                     Runtime
                   </p>
                   <div className="mt-2 space-y-1.5 text-xs text-slate-700">
-                    <DetailRow label="Expected profile" value={runtimeTarget.profile ?? 'default'} />
+                    <DetailRow
+                      label="Expected profile"
+                      value={runtimeTarget.profile ?? 'default'}
+                    />
                     <DetailRow label="Expected RPC" value={runtimeTarget.rpc ?? 'auto'} mono />
                     <DetailRow label="Queue pending" value={String(queuePending)} />
                     <DetailRow
@@ -190,8 +193,15 @@ export function DeliveryDiagnosticsDrawer({
                       <>
                         <DetailRow label="Runtime profile" value={snapshot.status.profile} />
                         <DetailRow label="Runtime RPC" value={snapshot.status.rpc} mono />
-                        <DetailRow label="Display name" value={snapshot.profile?.displayName ?? '—'} />
-                        <DetailRow label="Relay selected" value={snapshot.outboundNode.peer ?? 'none'} mono />
+                        <DetailRow
+                          label="Display name"
+                          value={snapshot.profile?.displayName ?? '—'}
+                        />
+                        <DetailRow
+                          label="Relay selected"
+                          value={snapshot.outboundNode.peer ?? 'none'}
+                          mono
+                        />
                       </>
                     ) : null}
                   </div>
@@ -210,19 +220,25 @@ export function DeliveryDiagnosticsDrawer({
                     <ShieldCheck className="h-4 w-4 text-slate-400" />
                   </div>
                   {recoveryEvents.length === 0 ? (
-                    <p className="mt-2 text-xs text-slate-500">No automatic recovery actions yet.</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      No automatic recovery actions yet.
+                    </p>
                   ) : (
                     <ul className="mt-2 space-y-1.5">
-                      {recoveryEvents.slice(0, 8).map((entry) => (
+                      {recoveryEvents.slice(0, 8).map(entry => (
                         <li
                           key={entry.id}
                           className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px]"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className={clsx('font-semibold', recoveryToneClass(entry.status))}>
+                            <span
+                              className={clsx('font-semibold', recoveryToneClass(entry.status))}
+                            >
                               {entry.category} • {entry.status}
                             </span>
-                            <span className="text-slate-400">{formatRelativeFromNow(entry.atMs)}</span>
+                            <span className="text-slate-400">
+                              {formatRelativeFromNow(entry.atMs)}
+                            </span>
                           </div>
                           <p className="mt-1 text-slate-600">{entry.detail}</p>
                         </li>
@@ -239,13 +255,18 @@ export function DeliveryDiagnosticsDrawer({
                     <p className="mt-2 text-xs text-slate-500">No outbound traces loaded.</p>
                   ) : (
                     <div className="mt-2 space-y-2">
-                      {snapshot.outboundMessages.map((message) => {
+                      {snapshot.outboundMessages.map(message => {
                         const diagnostics = summarizeTrace(message)
                         return (
-                          <article key={message.id} className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                          <article
+                            key={message.id}
+                            className="rounded-xl border border-slate-200 bg-slate-50 p-2.5"
+                          >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="truncate font-mono text-[11px] text-slate-700">{message.id}</p>
+                                <p className="truncate font-mono text-[11px] text-slate-700">
+                                  {message.id}
+                                </p>
                                 <p className="truncate text-[11px] text-slate-500">
                                   to {shortHash(message.destination)}
                                 </p>
@@ -253,7 +274,7 @@ export function DeliveryDiagnosticsDrawer({
                               <span
                                 className={clsx(
                                   'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                                  statusToneClass(diagnostics.latestStatus),
+                                  statusToneClass(diagnostics.latestStatus)
                                 )}
                               >
                                 {diagnostics.latestStatus}
@@ -262,7 +283,10 @@ export function DeliveryDiagnosticsDrawer({
                             <div className="mt-2 space-y-1 text-[11px] text-slate-600">
                               <DetailRow label="Path used" value={diagnostics.pathUsed} />
                               <DetailRow label="Fallback step" value={diagnostics.fallbackStep} />
-                              <DetailRow label="Latest failure reason" value={diagnostics.latestFailureReason} />
+                              <DetailRow
+                                label="Latest failure reason"
+                                value={diagnostics.latestFailureReason}
+                              />
                             </div>
                           </article>
                         )
@@ -290,17 +314,24 @@ export function DeliveryDiagnosticsDrawer({
                     <p className="mt-2 text-xs text-slate-500">Offline queue is empty.</p>
                   ) : (
                     <ul className="mt-2 space-y-2">
-                      {queueEntries.map((entry) => (
-                        <li key={entry.id} className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2">
+                      {queueEntries.map(entry => (
+                        <li
+                          key={entry.id}
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2"
+                        >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="truncate font-mono text-[11px] text-slate-700">{entry.id}</p>
-                              <p className="truncate text-[11px] text-slate-500">{shortHash(entry.destination)}</p>
+                              <p className="truncate font-mono text-[11px] text-slate-700">
+                                {entry.id}
+                              </p>
+                              <p className="truncate text-[11px] text-slate-500">
+                                {shortHash(entry.destination)}
+                              </p>
                             </div>
                             <span
                               className={clsx(
                                 'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                                queueStatusToneClass(entry.status),
+                                queueStatusToneClass(entry.status)
                               )}
                             >
                               {entry.status}
@@ -308,8 +339,14 @@ export function DeliveryDiagnosticsDrawer({
                           </div>
                           <div className="mt-2 space-y-1 text-[11px] text-slate-600">
                             <DetailRow label="Attempts" value={String(entry.attempts)} />
-                            <DetailRow label="Next retry" value={formatRelativeFromNow(entry.nextRetryAtMs)} />
-                            <DetailRow label="Reason" value={entry.reason ?? entry.lastError ?? '—'} />
+                            <DetailRow
+                              label="Next retry"
+                              value={formatRelativeFromNow(entry.nextRetryAtMs)}
+                            />
+                            <DetailRow
+                              label="Reason"
+                              value={entry.reason ?? entry.lastError ?? '—'}
+                            />
                           </div>
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             <button
@@ -388,8 +425,11 @@ function summarizeTrace(message: DeliveryDiagnosticsMessageSnapshot): {
   }
 }
 
-function uniqueMethods(transitions: LxmfDeliveryTraceEntry[], receiptStatus: string | null): string[] {
-  const statuses = transitions.map((entry) => entry.status)
+function uniqueMethods(
+  transitions: LxmfDeliveryTraceEntry[],
+  receiptStatus: string | null
+): string[] {
+  const statuses = transitions.map(entry => entry.status)
   if (receiptStatus) {
     statuses.push(receiptStatus)
   }
@@ -450,7 +490,11 @@ function statusToneClass(status: string): string {
   if (normalized.startsWith('delivered') || normalized.startsWith('sent')) {
     return 'bg-emerald-100 text-emerald-700'
   }
-  if (normalized.startsWith('sending') || normalized.startsWith('queued') || normalized.startsWith('outbound')) {
+  if (
+    normalized.startsWith('sending') ||
+    normalized.startsWith('queued') ||
+    normalized.startsWith('outbound')
+  ) {
     return 'bg-blue-100 text-blue-700'
   }
   return 'bg-slate-200 text-slate-700'
@@ -479,11 +523,21 @@ function queueStatusToneClass(status: OfflineQueueEntry['status']): string {
   return 'bg-amber-100 text-amber-700'
 }
 
-function DetailRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+function DetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+}) {
   return (
     <p className="flex items-start justify-between gap-2">
       <span className="text-slate-500">{label}</span>
-      <span className={clsx('text-right text-slate-700', mono && 'font-mono text-[11px]')}>{value}</span>
+      <span className={clsx('text-right text-slate-700', mono && 'font-mono text-[11px]')}>
+        {value}
+      </span>
     </p>
   )
 }

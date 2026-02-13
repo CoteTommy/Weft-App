@@ -32,7 +32,9 @@ export function publishAppNotification(input: AppNotificationInput): void {
   if (!shouldPublishNotification(input.kind ?? 'system')) {
     return
   }
-  window.dispatchEvent(new CustomEvent<AppNotificationInput>(APP_NOTIFICATION_EVENT, { detail: input }))
+  window.dispatchEvent(
+    new CustomEvent<AppNotificationInput>(APP_NOTIFICATION_EVENT, { detail: input })
+  )
   if (shouldPlayNotificationSound()) {
     playNotificationSound()
   }
@@ -52,7 +54,7 @@ export function getStoredAppNotifications(): AppNotification[] {
       return []
     }
     return parsed
-      .map((item) => parseStoredNotification(item))
+      .map(item => parseStoredNotification(item))
       .filter((item): item is AppNotification => item !== null)
       .slice(0, MAX_NOTIFICATIONS)
   } catch {
@@ -64,7 +66,10 @@ export function persistAppNotifications(items: AppNotification[]): void {
   if (typeof window === 'undefined') {
     return
   }
-  window.localStorage.setItem(APP_NOTIFICATIONS_KEY, JSON.stringify(items.slice(0, MAX_NOTIFICATIONS)))
+  window.localStorage.setItem(
+    APP_NOTIFICATIONS_KEY,
+    JSON.stringify(items.slice(0, MAX_NOTIFICATIONS))
+  )
 }
 
 export function createAppNotification(input: AppNotificationInput): AppNotification | null {

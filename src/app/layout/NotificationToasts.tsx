@@ -48,17 +48,17 @@ export function NotificationToasts() {
       return
     }
     queueMicrotask(() => {
-      setToasts((previous) => [...additions, ...previous].slice(0, MAX_TOASTS))
+      setToasts(previous => [...additions, ...previous].slice(0, MAX_TOASTS))
     })
   }, [notifications])
 
   const sortedToasts = useMemo(
     () => [...toasts].sort((left, right) => right.openedAtMs - left.openedAtMs),
-    [toasts],
+    [toasts]
   )
 
   const dismiss = (id: string) => {
-    setToasts((previous) => previous.filter((toast) => toast.id !== id))
+    setToasts(previous => previous.filter(toast => toast.id !== id))
   }
 
   if (sortedToasts.length === 0) {
@@ -73,14 +73,14 @@ export function NotificationToasts() {
     window.dispatchEvent(
       new CustomEvent('weft:open-thread', {
         detail: { threadId: id },
-      }),
+      })
     )
   }
 
   return (
     <div className="pointer-events-none absolute bottom-4 right-4 z-40 w-[min(340px,calc(100vw-2rem))] space-y-2">
       <AnimatePresence initial={false}>
-        {sortedToasts.map((toast) => (
+        {sortedToasts.map(toast => (
           <ToastCard
             key={toast.id}
             toast={toast}
@@ -151,7 +151,7 @@ function ToastCard({ toast, onClose, onOpen, onReply, onMuteThread }: ToastCardP
               ? 'bg-blue-100 text-blue-700'
               : toast.kind === 'connection'
                 ? 'bg-amber-100 text-amber-700'
-                : 'bg-slate-100 text-slate-700',
+                : 'bg-slate-100 text-slate-700'
           )}
         >
           {toast.kind === 'message' ? (
@@ -165,7 +165,9 @@ function ToastCard({ toast, onClose, onOpen, onReply, onMuteThread }: ToastCardP
         <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpen}>
           <p className="truncate text-xs font-semibold text-slate-900">{toast.title}</p>
           <p className="mt-0.5 line-clamp-2 text-xs text-slate-600">{toast.body}</p>
-          <p className="mt-1 text-[11px] text-slate-400">{formatRelativeFromNow(toast.createdAtMs)}</p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            {formatRelativeFromNow(toast.createdAtMs)}
+          </p>
         </button>
         <button
           type="button"

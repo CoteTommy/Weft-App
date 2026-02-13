@@ -1,4 +1,4 @@
-import { type ReactNode,useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface VirtualizedListProps<T> {
   items: T[]
@@ -49,23 +49,20 @@ export function VirtualizedList<T>({
 
   const visibleCount = Math.max(1, Math.ceil(viewportHeight / safeEstimate))
   const startIndex = Math.max(0, Math.floor(scrollTop / safeEstimate) - safeOverscan)
-  const endIndex = Math.min(
-    items.length,
-    startIndex + visibleCount + safeOverscan * 2,
-  )
+  const endIndex = Math.min(items.length, startIndex + visibleCount + safeOverscan * 2)
   const topPadding = startIndex * safeEstimate
   const bottomPadding = Math.max(0, (items.length - endIndex) * safeEstimate)
 
   const visibleItems = useMemo(
     () => items.slice(startIndex, endIndex),
-    [endIndex, items, startIndex],
+    [endIndex, items, startIndex]
   )
 
   return (
     <div
       ref={setContainerRef}
       className={className}
-      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      onScroll={event => setScrollTop(event.currentTarget.scrollTop)}
     >
       <div
         className={listClassName}

@@ -49,9 +49,7 @@ export function WelcomePage() {
   const navigate = useNavigate()
   const [step, setStep] = useState<OnboardingStep>(0)
   const [displayName, setDisplayName] = useState(() => getStoredDisplayName() ?? '')
-  const [connectivityMode, setConnectivityMode] = useState<ConnectivityMode>(
-    saved.connectivityMode,
-  )
+  const [connectivityMode, setConnectivityMode] = useState<ConnectivityMode>(saved.connectivityMode)
   const [profileDraft, setProfileDraft] = useState(saved.profile ?? '')
   const [rpcDraft, setRpcDraft] = useState(saved.rpc ?? '')
   const [transportDraft, setTransportDraft] = useState(saved.transport ?? '')
@@ -60,7 +58,7 @@ export function WelcomePage() {
   const [error, setError] = useState<string | null>(null)
 
   const effectiveTransport = useMemo(() => {
-    const preset = CONNECTIVITY_PRESETS.find((entry) => entry.mode === connectivityMode)
+    const preset = CONNECTIVITY_PRESETS.find(entry => entry.mode === connectivityMode)
     if (connectivityMode === 'custom') {
       return transportDraft.trim() || undefined
     }
@@ -73,7 +71,9 @@ export function WelcomePage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-8">
       <section className="w-full rounded-3xl border border-white/60 bg-white/85 p-8 shadow-[0_30px_90px_-50px_rgba(22,45,83,0.4)] backdrop-blur">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Weft Desktop</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
+          Weft Desktop
+        </p>
         <h1 className="mt-3 font-heading text-4xl text-slate-900">Welcome to Weft</h1>
         <p className="mt-3 max-w-xl text-sm text-slate-600">
           Private chat over resilient mesh networking. This quick setup gets your identity and
@@ -81,12 +81,12 @@ export function WelcomePage() {
         </p>
 
         <div className="mt-6 flex gap-2 text-xs">
-          {[0, 1, 2].map((value) => (
+          {[0, 1, 2].map(value => (
             <span
               key={value}
               className={clsx(
                 'rounded-full px-3 py-1 font-semibold',
-                step >= value ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500',
+                step >= value ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
               )}
             >
               {value === 0 ? 'Identity' : value === 1 ? 'Connectivity' : 'Review'}
@@ -102,7 +102,7 @@ export function WelcomePage() {
             <input
               id="displayName"
               value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
+              onChange={event => setDisplayName(event.target.value)}
               className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-blue-300"
               placeholder="e.g. Alex"
             />
@@ -114,7 +114,7 @@ export function WelcomePage() {
 
         {step === 1 ? (
           <div className="mt-6 space-y-3">
-            {CONNECTIVITY_PRESETS.map((preset) => (
+            {CONNECTIVITY_PRESETS.map(preset => (
               <button
                 key={preset.mode}
                 type="button"
@@ -128,7 +128,7 @@ export function WelcomePage() {
                   'w-full rounded-2xl border px-4 py-3 text-left transition',
                   connectivityMode === preset.mode
                     ? 'border-blue-300 bg-blue-50'
-                    : 'border-slate-200 bg-white hover:bg-slate-50',
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
                 )}
               >
                 <p className="text-sm font-semibold text-slate-900">{preset.label}</p>
@@ -137,13 +137,15 @@ export function WelcomePage() {
             ))}
 
             <div className="rounded-2xl border border-slate-200 bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Advanced</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Advanced
+              </p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <label className="text-xs text-slate-600">
                   Profile
                   <input
                     value={profileDraft}
-                    onChange={(event) => setProfileDraft(event.target.value)}
+                    onChange={event => setProfileDraft(event.target.value)}
                     className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
                     placeholder="leave blank for active profile"
                   />
@@ -152,7 +154,7 @@ export function WelcomePage() {
                   RPC endpoint (optional)
                   <input
                     value={rpcDraft}
-                    onChange={(event) => setRpcDraft(event.target.value)}
+                    onChange={event => setRpcDraft(event.target.value)}
                     className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
                     placeholder="127.0.0.1:4242"
                   />
@@ -163,7 +165,7 @@ export function WelcomePage() {
                   Transport bind (required for custom)
                   <input
                     value={transportDraft}
-                    onChange={(event) => setTransportDraft(event.target.value)}
+                    onChange={event => setTransportDraft(event.target.value)}
                     className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
                     placeholder="127.0.0.1:0"
                   />
@@ -177,7 +179,7 @@ export function WelcomePage() {
                 <input
                   type="checkbox"
                   checked={autoStart}
-                  onChange={(event) => setAutoStart(event.target.checked)}
+                  onChange={event => setAutoStart(event.target.checked)}
                   className="h-4 w-4 rounded border-slate-300"
                 />
                 Auto-start daemon after setup
@@ -193,10 +195,11 @@ export function WelcomePage() {
             </p>
             <p className="mt-1">
               <span className="font-semibold">Mode:</span>{' '}
-              {CONNECTIVITY_PRESETS.find((entry) => entry.mode === connectivityMode)?.label}
+              {CONNECTIVITY_PRESETS.find(entry => entry.mode === connectivityMode)?.label}
             </p>
             <p className="mt-1">
-              <span className="font-semibold">Profile:</span> {profileDraft.trim() || 'active profile'}
+              <span className="font-semibold">Profile:</span>{' '}
+              {profileDraft.trim() || 'active profile'}
             </p>
             <p className="mt-1">
               <span className="font-semibold">RPC:</span> {rpcDraft.trim() || 'profile default'}
@@ -206,7 +209,8 @@ export function WelcomePage() {
               {effectiveTransport ?? 'runtime default'}
             </p>
             <p className="mt-1">
-              <span className="font-semibold">Auto-start:</span> {autoStart ? 'Enabled' : 'Disabled'}
+              <span className="font-semibold">Auto-start:</span>{' '}
+              {autoStart ? 'Enabled' : 'Disabled'}
             </p>
           </div>
         ) : null}
@@ -215,7 +219,7 @@ export function WelcomePage() {
           {step > 0 ? (
             <button
               type="button"
-              onClick={() => setStep((value) => (value - 1) as OnboardingStep)}
+              onClick={() => setStep(value => (value - 1) as OnboardingStep)}
               className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               Back
@@ -226,7 +230,7 @@ export function WelcomePage() {
               type="button"
               onClick={() => {
                 setError(null)
-                setStep((value) => (value + 1) as OnboardingStep)
+                setStep(value => (value + 1) as OnboardingStep)
               }}
               disabled={step === 0 ? !canContinueFromIdentity : false}
               className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"

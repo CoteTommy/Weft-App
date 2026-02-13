@@ -11,13 +11,15 @@ export interface FetchAnnouncesPageResult {
   nextCursor: string | null
 }
 
-export async function fetchAnnouncesPage(cursor?: string | null): Promise<FetchAnnouncesPageResult> {
+export async function fetchAnnouncesPage(
+  cursor?: string | null
+): Promise<FetchAnnouncesPageResult> {
   const response = await listLxmfAnnounces(
     {},
     {
       limit: 200,
       cursor: cursor ?? undefined,
-    },
+    }
   )
   const announces = response.announces.map(mapRecordToAnnounce)
   announces.sort((a, b) => b.postedAtMs - a.postedAtMs)
@@ -97,15 +99,19 @@ export function mapAnnounceEventPayload(payload: unknown): AnnounceItem | null {
   if (!peer) {
     return null
   }
-  const timestamp = typeof record.timestamp === 'number' && Number.isFinite(record.timestamp)
-    ? record.timestamp
-    : Date.now() / 1000
-  const seenCount = typeof record.seen_count === 'number' && Number.isFinite(record.seen_count)
-    ? Math.max(0, Math.trunc(record.seen_count))
-    : 1
-  const capabilities = normalizeCapabilities(Array.isArray(record.capabilities)
-    ? record.capabilities.filter((entry): entry is string => typeof entry === 'string')
-    : [])
+  const timestamp =
+    typeof record.timestamp === 'number' && Number.isFinite(record.timestamp)
+      ? record.timestamp
+      : Date.now() / 1000
+  const seenCount =
+    typeof record.seen_count === 'number' && Number.isFinite(record.seen_count)
+      ? Math.max(0, Math.trunc(record.seen_count))
+      : 1
+  const capabilities = normalizeCapabilities(
+    Array.isArray(record.capabilities)
+      ? record.capabilities.filter((entry): entry is string => typeof entry === 'string')
+      : []
+  )
   const name = typeof record.name === 'string' ? record.name.trim() : ''
   const postedAtMs = normalizeTimestampMs(timestamp)
   return {

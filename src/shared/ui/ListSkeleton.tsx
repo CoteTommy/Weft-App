@@ -15,7 +15,7 @@ export function ListSkeleton({ rows = 6, className, rowClassName }: ListSkeleton
           key={index}
           className={clsx(
             'h-16 animate-pulse rounded-2xl border border-slate-200 bg-slate-100/80',
-            rowClassName,
+            rowClassName
           )}
         />
       ))}

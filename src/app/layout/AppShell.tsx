@@ -32,7 +32,7 @@ export function AppShell() {
   const lastPersistedRouteRef = useRef<string>(getWeftPreferences().lastMainRoute ?? '/chats')
   const desktopMuteSyncRef = useRef<boolean | null>(null)
   const [motionPreference, setMotionPreference] = useState<MotionPreference>(
-    () => getWeftPreferences().motionPreference,
+    () => getWeftPreferences().motionPreference
   )
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export function AppShell() {
     }
     let unlisten: (() => void) | null = null
     let disposed = false
-    void subscribeTrayActions((event) => {
+    void subscribeTrayActions(event => {
       if (event.action === 'new_message') {
         void navigate('/chats')
         window.setTimeout(() => {
@@ -130,7 +130,7 @@ export function AppShell() {
         }
       }
     })
-      .then((stop) => {
+      .then(stop => {
         if (disposed) {
           stop()
           return
@@ -165,7 +165,7 @@ export function AppShell() {
     const fallbackAppearance = media.matches ? 'dark' : 'light'
     applyPlatformAndAppearance('unknown', fallbackAppearance)
     void getDesktopShellPreferences()
-      .then((prefs) => {
+      .then(prefs => {
         applyPlatformAndAppearance(prefs.platform, prefs.appearance)
       })
       .catch(() => {

@@ -4,11 +4,7 @@ import { unstable_batchedUpdates } from 'react-dom'
 import { startLxmfEventPump, subscribeLxmfEvents } from '@lib/lxmf-api'
 import type { LxmfRpcEvent } from '@lib/lxmf-payloads'
 
-import {
-  CHAT_EVENT_BATCH_MS,
-  CHAT_WATCHDOG_INTERVAL_MS,
-  CHAT_WATCHDOG_STALE_MS,
-} from '../types'
+import { CHAT_EVENT_BATCH_MS, CHAT_WATCHDOG_INTERVAL_MS, CHAT_WATCHDOG_STALE_MS } from '../types'
 
 export type UseChatRuntimeEventPumpParams = {
   applyMessageEvent: (event: LxmfRpcEvent) => void
@@ -51,16 +47,19 @@ export function useChatRuntimeEventPump({
     })
   }, [applyMessageEvent, applyReceiptEvent, scheduleRefresh])
 
-  const enqueueRuntimeEvent = useCallback((event: LxmfRpcEvent) => {
-    lastEventAtRef.current = Date.now()
-    pendingEventsRef.current.push(event)
-    if (eventBatchTimerRef.current !== null) {
-      return
-    }
-    eventBatchTimerRef.current = window.setTimeout(() => {
-      flushEventBatch()
-    }, CHAT_EVENT_BATCH_MS)
-  }, [flushEventBatch])
+  const enqueueRuntimeEvent = useCallback(
+    (event: LxmfRpcEvent) => {
+      lastEventAtRef.current = Date.now()
+      pendingEventsRef.current.push(event)
+      if (eventBatchTimerRef.current !== null) {
+        return
+      }
+      eventBatchTimerRef.current = window.setTimeout(() => {
+        flushEventBatch()
+      }, CHAT_EVENT_BATCH_MS)
+    },
+    [flushEventBatch]
+  )
 
   useEffect(() => {
     let unlisten: (() => void) | null = null
@@ -68,10 +67,10 @@ export function useChatRuntimeEventPump({
     void startLxmfEventPump().catch(() => {
       // The provider keeps functioning without streaming event updates.
     })
-    void subscribeLxmfEvents((event) => {
+    void subscribeLxmfEvents(event => {
       enqueueRuntimeEvent(event)
     })
-      .then((stop) => {
+      .then(stop => {
         if (disposed) {
           stop()
           return

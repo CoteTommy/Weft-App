@@ -23,13 +23,11 @@ describe('search utils', () => {
       { id: 'a', name: 'Alice', status: 'online' },
       { id: 'b', name: 'Bob', status: 'offline' },
     ]
-    const indexed = indexSearchItems(
-      items,
-      (item) => [item.name, item.status],
-      { cacheKey: 'people' },
-    )
-    expect(filterIndexedItems(indexed, 'alice online').map((item) => item.id)).toEqual(['a'])
-    expect(filterIndexedItems(indexed, 'offline').map((item) => item.id)).toEqual(['b'])
+    const indexed = indexSearchItems(items, item => [item.name, item.status], {
+      cacheKey: 'people',
+    })
+    expect(filterIndexedItems(indexed, 'alice online').map(item => item.id)).toEqual(['a'])
+    expect(filterIndexedItems(indexed, 'offline').map(item => item.id)).toEqual(['b'])
   })
 
   test('buildSearchText flattens nullable values safely', () => {

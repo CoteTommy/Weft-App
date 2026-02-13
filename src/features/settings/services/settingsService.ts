@@ -6,10 +6,7 @@ import {
 } from '@shared/runtime/preferences'
 import type { SettingsSnapshot } from '@shared/types/settings'
 import { resolveDisplayName, setStoredDisplayName } from '@shared/utils/identity'
-import {
-  getDesktopShellPreferences,
-  setDesktopShellPreferences,
-} from '@lib/desktop-shell-api'
+import { getDesktopShellPreferences, setDesktopShellPreferences } from '@lib/desktop-shell-api'
 import {
   daemonRestart,
   daemonStatus,
@@ -46,7 +43,7 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
   const displayName = resolveDisplayName(
     status.profile,
     probe.rpc.identity_hash,
-    profile?.displayName ?? null,
+    profile?.displayName ?? null
   )
   const interop = buildInteropSnapshot({
     expectedProfile: preferences.profile,
@@ -187,9 +184,7 @@ export function savePerformanceSettings(input: {
   })
 }
 
-export function saveFeatureSettings(input: {
-  commandCenterEnabled?: boolean
-}): void {
+export function saveFeatureSettings(input: { commandCenterEnabled?: boolean }): void {
   updateWeftPreferences({
     commandCenterEnabled: input.commandCenterEnabled,
   })

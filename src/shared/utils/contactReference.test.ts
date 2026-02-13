@@ -15,7 +15,7 @@ describe('parseLxmfContactReference', () => {
 
   test('parses lxma:// with destination and public key', () => {
     const parsed = parseLxmfContactReference(
-      'lxma://00112233445566778899aabbccddeeff:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      'lxma://00112233445566778899aabbccddeeff:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
     )
     expect(parsed.ok).toBe(true)
     if (parsed.ok) {
@@ -26,9 +26,7 @@ describe('parseLxmfContactReference', () => {
   })
 
   test('accepts lxma:// with destination only', () => {
-    const parsed = parseLxmfContactReference(
-      'lxma://00112233445566778899aabbccddeeff?name=Example',
-    )
+    const parsed = parseLxmfContactReference('lxma://00112233445566778899aabbccddeeff?name=Example')
     expect(parsed.ok).toBe(true)
     if (parsed.ok) {
       expect(parsed.value.destinationHash).toBe('00112233445566778899aabbccddeeff')
@@ -45,10 +43,10 @@ describe('parseLxmfContactReference', () => {
 describe('buildNewChatHref', () => {
   test('builds a chat link with destination and optional name', () => {
     expect(buildNewChatHref('00112233445566778899aabbccddeeff')).toBe(
-      '/chats?new_dest=00112233445566778899aabbccddeeff',
+      '/chats?new_dest=00112233445566778899aabbccddeeff'
     )
     expect(buildNewChatHref('00112233445566778899aabbccddeeff', 'Alice')).toBe(
-      '/chats?new_dest=00112233445566778899aabbccddeeff&new_name=Alice',
+      '/chats?new_dest=00112233445566778899aabbccddeeff&new_name=Alice'
     )
   })
 })

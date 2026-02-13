@@ -8,11 +8,10 @@ export async function getLxmfProfile(options: ProbeOptions = {}): Promise<LxmfPr
 
 export async function setLxmfDisplayName(
   displayName: string | null,
-  options: ProbeOptions = {},
+  options: ProbeOptions = {}
 ): Promise<LxmfProfileInfo> {
   const payload = await invokeWithProbe<unknown>('lxmf_set_display_name', options, {
     display_name: displayName,
   })
   return parseLxmfProfileInfo(payload)
 }
-

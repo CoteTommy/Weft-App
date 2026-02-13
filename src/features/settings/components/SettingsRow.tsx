@@ -11,4 +11,3 @@ export function SettingsRow({ label, value }: SettingsRowProps) {
     </div>
   )
 }
-

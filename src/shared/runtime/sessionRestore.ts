@@ -17,7 +17,12 @@ export function isRestorableMainRoute(route: string): boolean {
   if (!normalized.startsWith('/')) {
     return false
   }
-  return RESTORABLE_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`) || normalized.startsWith(`${prefix}?`))
+  return RESTORABLE_PREFIXES.some(
+    prefix =>
+      normalized === prefix ||
+      normalized.startsWith(`${prefix}/`) ||
+      normalized.startsWith(`${prefix}?`)
+  )
 }
 
 export function normalizeMainRoute(route: string | undefined | null): string {

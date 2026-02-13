@@ -13,7 +13,11 @@ import { InteropHealthCard } from '../components/InteropHealthCard'
 import { NotificationToggle } from '../components/NotificationToggle'
 import { OutboundPropagationRelayCard } from '../components/OutboundPropagationRelayCard'
 import { SettingsRow } from '../components/SettingsRow'
-import { CONNECTIVITY_OPTIONS, DEFAULT_NOTIFICATION_SETTINGS, SETTINGS_SECTIONS } from '../constants'
+import {
+  CONNECTIVITY_OPTIONS,
+  DEFAULT_NOTIFICATION_SETTINGS,
+  SETTINGS_SECTIONS,
+} from '../constants'
 import {
   saveConnectivitySettings,
   saveDesktopShellSettings,
@@ -42,9 +46,9 @@ export function SettingsPage() {
   const [restartAfterSave, setRestartAfterSave] = useState(false)
   const [propagationPeerDraft, setPropagationPeerDraft] = useState('')
   const [savingPropagationPeer, setSavingPropagationPeer] = useState(false)
-  const [notificationSettings, setNotificationSettings] = useState<SettingsSnapshot['notifications']>(
-    DEFAULT_NOTIFICATION_SETTINGS,
-  )
+  const [notificationSettings, setNotificationSettings] = useState<
+    SettingsSnapshot['notifications']
+  >(DEFAULT_NOTIFICATION_SETTINGS)
   const [motionPreference, setMotionPreference] = useState<MotionPreference>('snappy')
   const [performanceHudEnabled, setPerformanceHudEnabled] = useState(false)
   const [minimizeToTrayOnClose, setMinimizeToTrayOnClose] = useState(true)
@@ -89,14 +93,14 @@ export function SettingsPage() {
           features: settings.features,
         }),
         null,
-        2,
-      ),
+        2
+      )
     )
   }, [settings])
 
   const updateNotifications = (
     patch: Partial<SettingsSnapshot['notifications']>,
-    feedback = 'Notification settings updated.',
+    feedback = 'Notification settings updated.'
   ) => {
     const next = { ...notificationSettings, ...patch }
     setNotificationSettings(next)
@@ -126,10 +130,7 @@ export function SettingsPage() {
     setSaveFeedback(feedback)
   }
 
-  const updateDesktop = (
-    patch: Partial<SettingsSnapshot['desktop']>,
-    feedback: string,
-  ) => {
+  const updateDesktop = (patch: Partial<SettingsSnapshot['desktop']>, feedback: string) => {
     const localNext = {
       minimizeToTrayOnClose,
       startInTray,
@@ -143,16 +144,14 @@ export function SettingsPage() {
     setNotificationsMuted(localNext.notificationsMuted)
     setSaveFeedback(feedback)
     void saveDesktopShellSettings(localNext)
-      .then((saved) => {
+      .then(saved => {
         setMinimizeToTrayOnClose(saved.minimizeToTrayOnClose)
         setStartInTray(saved.startInTray)
         setSingleInstanceFocus(saved.singleInstanceFocus)
         setNotificationsMuted(saved.notificationsMuted)
       })
-      .catch((desktopError) => {
-        setSaveFeedback(
-          desktopError instanceof Error ? desktopError.message : String(desktopError),
-        )
+      .catch(desktopError => {
+        setSaveFeedback(desktopError instanceof Error ? desktopError.message : String(desktopError))
       })
   }
 
@@ -176,13 +175,15 @@ export function SettingsPage() {
       />
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {loading ? <p className="text-sm text-slate-500">Loading settings...</p> : null}
-        {error ? <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
+        {error ? (
+          <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
+        ) : null}
 
         {settings ? (
           <>
             <div className="sticky top-0 z-20 mb-3 rounded-xl border border-slate-200 bg-white/95 p-2 backdrop-blur">
               <div className="flex flex-wrap gap-2">
-                {SETTINGS_SECTIONS.map((section) => (
+                {SETTINGS_SECTIONS.map(section => (
                   <button
                     key={section.id}
                     type="button"
@@ -195,7 +196,7 @@ export function SettingsPage() {
                       'rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
                       activeSection === section.id
                         ? 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100',
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                     )}
                   >
                     {section.label}
@@ -215,7 +216,7 @@ export function SettingsPage() {
                 <>
                   <form
                     className="rounded-xl border border-slate-200 bg-white px-4 py-3"
-                    onSubmit={(event) => {
+                    onSubmit={event => {
                       event.preventDefault()
                       void (async () => {
                         setSavingName(true)
@@ -225,7 +226,9 @@ export function SettingsPage() {
                           await refresh()
                           setSaveFeedback('Display name updated.')
                         } catch (saveError) {
-                          setSaveFeedback(saveError instanceof Error ? saveError.message : String(saveError))
+                          setSaveFeedback(
+                            saveError instanceof Error ? saveError.message : String(saveError)
+                          )
                         } finally {
                           setSavingName(false)
                         }
@@ -236,7 +239,7 @@ export function SettingsPage() {
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <input
                         value={displayNameDraft}
-                        onChange={(event) => setDisplayNameDraft(event.target.value)}
+                        onChange={event => setDisplayNameDraft(event.target.value)}
                         className="h-10 min-w-[220px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
                         placeholder="Set your LXMF display name"
                       />
@@ -252,7 +255,9 @@ export function SettingsPage() {
 
                   <SettingsRow
                     label="Identity"
-                    value={settings.identityHash ? shortHash(settings.identityHash, 8) : 'Unavailable'}
+                    value={
+                      settings.identityHash ? shortHash(settings.identityHash, 8) : 'Unavailable'
+                    }
                   />
 
                   {settings.identityHash ? (
@@ -275,7 +280,7 @@ export function SettingsPage() {
                   <SettingsRow label="Connection" value={settings.connection} />
                   <form
                     className="rounded-xl border border-slate-200 bg-white px-4 py-3"
-                    onSubmit={(event) => {
+                    onSubmit={event => {
                       event.preventDefault()
                       void (async () => {
                         setSavingConnectivity(true)
@@ -293,10 +298,12 @@ export function SettingsPage() {
                           setSaveFeedback(
                             restartAfterSave
                               ? 'Connectivity settings saved and daemon restarted.'
-                              : 'Connectivity settings saved.',
+                              : 'Connectivity settings saved.'
                           )
                         } catch (saveError) {
-                          setSaveFeedback(saveError instanceof Error ? saveError.message : String(saveError))
+                          setSaveFeedback(
+                            saveError instanceof Error ? saveError.message : String(saveError)
+                          )
                         } finally {
                           setSavingConnectivity(false)
                         }
@@ -309,10 +316,12 @@ export function SettingsPage() {
                         Mode
                         <select
                           value={connectivityMode}
-                          onChange={(event) => setConnectivityMode(event.target.value as ConnectivityMode)}
+                          onChange={event =>
+                            setConnectivityMode(event.target.value as ConnectivityMode)
+                          }
                           className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
                         >
-                          {CONNECTIVITY_OPTIONS.map((option) => (
+                          {CONNECTIVITY_OPTIONS.map(option => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
@@ -323,7 +332,7 @@ export function SettingsPage() {
                         Profile
                         <input
                           value={profileDraft}
-                          onChange={(event) => setProfileDraft(event.target.value)}
+                          onChange={event => setProfileDraft(event.target.value)}
                           className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
                         />
                       </label>
@@ -333,7 +342,7 @@ export function SettingsPage() {
                         RPC endpoint
                         <input
                           value={rpcDraft}
-                          onChange={(event) => setRpcDraft(event.target.value)}
+                          onChange={event => setRpcDraft(event.target.value)}
                           className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
                           placeholder="127.0.0.1:4242"
                         />
@@ -342,7 +351,7 @@ export function SettingsPage() {
                         Transport bind
                         <input
                           value={transportDraft}
-                          onChange={(event) => setTransportDraft(event.target.value)}
+                          onChange={event => setTransportDraft(event.target.value)}
                           className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
                           placeholder="127.0.0.1:0"
                         />
@@ -353,7 +362,7 @@ export function SettingsPage() {
                         <input
                           type="checkbox"
                           checked={autoStartDaemon}
-                          onChange={(event) => setAutoStartDaemon(event.target.checked)}
+                          onChange={event => setAutoStartDaemon(event.target.checked)}
                         />
                         Auto-start daemon
                       </label>
@@ -361,7 +370,7 @@ export function SettingsPage() {
                         <input
                           type="checkbox"
                           checked={restartAfterSave}
-                          onChange={(event) => setRestartAfterSave(event.target.checked)}
+                          onChange={event => setRestartAfterSave(event.target.checked)}
                         />
                         Restart daemon after save
                       </label>
@@ -394,10 +403,12 @@ export function SettingsPage() {
                           setSaveFeedback(
                             peer
                               ? `Propagation relay set to ${shortHash(peer, 8)}.`
-                              : 'Propagation relay cleared.',
+                              : 'Propagation relay cleared.'
                           )
                         } catch (saveError) {
-                          setSaveFeedback(saveError instanceof Error ? saveError.message : String(saveError))
+                          setSaveFeedback(
+                            saveError instanceof Error ? saveError.message : String(saveError)
+                          )
                         } finally {
                           setSavingPropagationPeer(false)
                         }
@@ -417,7 +428,9 @@ export function SettingsPage() {
                           await refresh()
                           setSaveFeedback('Propagation relay cleared.')
                         } catch (saveError) {
-                          setSaveFeedback(saveError instanceof Error ? saveError.message : String(saveError))
+                          setSaveFeedback(
+                            saveError instanceof Error ? saveError.message : String(saveError)
+                          )
                         } finally {
                           setSavingPropagationPeer(false)
                         }
@@ -438,10 +451,10 @@ export function SettingsPage() {
                       label="Desktop alerts"
                       description="Show native desktop alerts for incoming messages."
                       checked={notificationSettings.desktopEnabled}
-                      onChange={(next) => {
+                      onChange={next => {
                         updateNotifications(
                           { desktopEnabled: next },
-                          next ? 'Desktop alerts enabled.' : 'Desktop alerts disabled.',
+                          next ? 'Desktop alerts enabled.' : 'Desktop alerts disabled.'
                         )
                       }}
                     />
@@ -449,10 +462,10 @@ export function SettingsPage() {
                       label="In-app inbox"
                       description="Store notifications in the top-right notification center."
                       checked={notificationSettings.inAppEnabled}
-                      onChange={(next) => {
+                      onChange={next => {
                         updateNotifications(
                           { inAppEnabled: next },
-                          next ? 'In-app notifications enabled.' : 'In-app notifications disabled.',
+                          next ? 'In-app notifications enabled.' : 'In-app notifications disabled.'
                         )
                       }}
                     />
@@ -460,10 +473,12 @@ export function SettingsPage() {
                       label="Message notifications"
                       description="Notify on new incoming messages."
                       checked={notificationSettings.messageEnabled}
-                      onChange={(next) => {
+                      onChange={next => {
                         updateNotifications(
                           { messageEnabled: next },
-                          next ? 'Message notifications enabled.' : 'Message notifications disabled.',
+                          next
+                            ? 'Message notifications enabled.'
+                            : 'Message notifications disabled.'
                         )
                       }}
                     />
@@ -471,10 +486,10 @@ export function SettingsPage() {
                       label="System notifications"
                       description="Notify on internal errors and send failures."
                       checked={notificationSettings.systemEnabled}
-                      onChange={(next) => {
+                      onChange={next => {
                         updateNotifications(
                           { systemEnabled: next },
-                          next ? 'System notifications enabled.' : 'System notifications disabled.',
+                          next ? 'System notifications enabled.' : 'System notifications disabled.'
                         )
                       }}
                     />
@@ -482,10 +497,12 @@ export function SettingsPage() {
                       label="Connection notifications"
                       description="Notify when daemon/RPC connection changes."
                       checked={notificationSettings.connectionEnabled}
-                      onChange={(next) => {
+                      onChange={next => {
                         updateNotifications(
                           { connectionEnabled: next },
-                          next ? 'Connection notifications enabled.' : 'Connection notifications disabled.',
+                          next
+                            ? 'Connection notifications enabled.'
+                            : 'Connection notifications disabled.'
                         )
                       }}
                     />
@@ -493,10 +510,10 @@ export function SettingsPage() {
                       label="Sound cues"
                       description="Play a subtle sound for each new in-app notification."
                       checked={notificationSettings.soundEnabled}
-                      onChange={(next) => {
+                      onChange={next => {
                         updateNotifications(
                           { soundEnabled: next },
-                          next ? 'Notification sound enabled.' : 'Notification sound disabled.',
+                          next ? 'Notification sound enabled.' : 'Notification sound disabled.'
                         )
                       }}
                     />
@@ -511,7 +528,7 @@ export function SettingsPage() {
                     <p className="text-sm font-medium text-slate-700">Config import/export</p>
                     <textarea
                       value={configPayload}
-                      onChange={(event) => setConfigPayload(event.target.value)}
+                      onChange={event => setConfigPayload(event.target.value)}
                       rows={8}
                       className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 outline-none transition focus:border-blue-300"
                     />
@@ -546,7 +563,7 @@ export function SettingsPage() {
                               const mergedNotifications = mergeNotificationSettings(
                                 notificationSettings,
                                 parsed.notifications,
-                                parsed.notificationsEnabled,
+                                parsed.notificationsEnabled
                               )
                               saveNotificationSettings(mergedNotifications)
                               setNotificationSettings(mergedNotifications)
@@ -576,7 +593,9 @@ export function SettingsPage() {
                               setSaveFeedback('Configuration imported.')
                             } catch (importError) {
                               setSaveFeedback(
-                                importError instanceof Error ? importError.message : String(importError),
+                                importError instanceof Error
+                                  ? importError.message
+                                  : String(importError)
                               )
                             }
                           })()
@@ -591,8 +610,8 @@ export function SettingsPage() {
                   <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                     <p className="text-sm font-medium text-slate-700">Backup and Restore</p>
                     <p className="mt-1 text-xs text-slate-600">
-                      Export your Weft app identity settings and connectivity profile, then restore on
-                      another machine.
+                      Export your Weft app identity settings and connectivity profile, then restore
+                      on another machine.
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <button
@@ -645,7 +664,7 @@ export function SettingsPage() {
                           type="file"
                           accept="application/json,.json"
                           className="hidden"
-                          onChange={(event) => {
+                          onChange={event => {
                             const file = event.target.files?.[0]
                             if (!file) {
                               return
@@ -676,7 +695,7 @@ export function SettingsPage() {
                                 const mergedNotifications = mergeNotificationSettings(
                                   notificationSettings,
                                   parsed.notifications,
-                                  parsed.connectivity?.notificationsEnabled,
+                                  parsed.connectivity?.notificationsEnabled
                                 )
                                 saveNotificationSettings(mergedNotifications)
                                 setNotificationSettings(mergedNotifications)
@@ -690,7 +709,9 @@ export function SettingsPage() {
                                   }
                                 }
                                 if (parsed.desktop) {
-                                  const savedDesktop = await saveDesktopShellSettings(parsed.desktop)
+                                  const savedDesktop = await saveDesktopShellSettings(
+                                    parsed.desktop
+                                  )
                                   setMinimizeToTrayOnClose(savedDesktop.minimizeToTrayOnClose)
                                   setStartInTray(savedDesktop.startInTray)
                                   setSingleInstanceFocus(savedDesktop.singleInstanceFocus)
@@ -706,7 +727,9 @@ export function SettingsPage() {
                                 setSaveFeedback('Backup imported.')
                               } catch (importError) {
                                 setSaveFeedback(
-                                  importError instanceof Error ? importError.message : String(importError),
+                                  importError instanceof Error
+                                    ? importError.message
+                                    : String(importError)
                                 )
                               } finally {
                                 setBackupWorking(false)
@@ -755,13 +778,13 @@ export function SettingsPage() {
                         <input
                           type="checkbox"
                           checked={minimizeToTrayOnClose}
-                          onChange={(event) => {
+                          onChange={event => {
                             const next = event.target.checked
                             updateDesktop(
                               { minimizeToTrayOnClose: next },
                               next
                                 ? 'Closing window now minimizes to tray.'
-                                : 'Closing window now exits the app.',
+                                : 'Closing window now exits the app.'
                             )
                           }}
                         />
@@ -771,13 +794,13 @@ export function SettingsPage() {
                         <input
                           type="checkbox"
                           checked={startInTray}
-                          onChange={(event) => {
+                          onChange={event => {
                             const next = event.target.checked
                             updateDesktop(
                               { startInTray: next },
                               next
                                 ? 'App will start hidden in tray.'
-                                : 'App will open window on startup.',
+                                : 'App will open window on startup.'
                             )
                           }}
                         />
@@ -787,13 +810,13 @@ export function SettingsPage() {
                         <input
                           type="checkbox"
                           checked={singleInstanceFocus}
-                          onChange={(event) => {
+                          onChange={event => {
                             const next = event.target.checked
                             updateDesktop(
                               { singleInstanceFocus: next },
                               next
                                 ? 'Secondary launches will focus the existing window.'
-                                : 'Secondary launches will forward payloads without forcing focus.',
+                                : 'Secondary launches will forward payloads without forcing focus.'
                             )
                           }}
                         />
@@ -803,13 +826,13 @@ export function SettingsPage() {
                         <input
                           type="checkbox"
                           checked={notificationsMuted}
-                          onChange={(event) => {
+                          onChange={event => {
                             const next = event.target.checked
                             updateDesktop(
                               { notificationsMuted: next },
                               next
                                 ? 'Notifications muted at desktop shell level.'
-                                : 'Notifications unmuted.',
+                                : 'Notifications unmuted.'
                             )
                           }}
                         />
@@ -828,11 +851,11 @@ export function SettingsPage() {
                         Motion quality
                         <select
                           value={motionPreference}
-                          onChange={(event) => {
+                          onChange={event => {
                             const next = event.target.value as MotionPreference
                             updatePerformance(
                               { motionPreference: next },
-                              `Motion quality set to ${next}.`,
+                              `Motion quality set to ${next}.`
                             )
                           }}
                           className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
@@ -846,12 +869,12 @@ export function SettingsPage() {
                         <input
                           type="checkbox"
                           checked={performanceHudEnabled}
-                          onChange={(event) => {
+                          onChange={event => {
                             updatePerformance(
                               { hudEnabled: event.target.checked },
                               event.target.checked
                                 ? 'Performance HUD enabled.'
-                                : 'Performance HUD disabled.',
+                                : 'Performance HUD disabled.'
                             )
                           }}
                         />
@@ -865,12 +888,12 @@ export function SettingsPage() {
                       <input
                         type="checkbox"
                         checked={commandCenterEnabled}
-                        onChange={(event) => {
+                        onChange={event => {
                           updateFeatures(
                             { commandCenterEnabled: event.target.checked },
                             event.target.checked
                               ? 'Command Center enabled.'
-                              : 'Command Center hidden.',
+                              : 'Command Center hidden.'
                           )
                         }}
                       />

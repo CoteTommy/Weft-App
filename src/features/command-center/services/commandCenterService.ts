@@ -11,7 +11,11 @@ import {
   sendLxmfCommand,
 } from '@lib/lxmf-api'
 import type { LxmfDaemonLocalStatus, LxmfProbeReport } from '@lib/lxmf-contract'
-import type { LxmfAnnounceRecord, LxmfPeerRecord, LxmfPropagationNodeRecord } from '@lib/lxmf-payloads'
+import type {
+  LxmfAnnounceRecord,
+  LxmfPeerRecord,
+  LxmfPropagationNodeRecord,
+} from '@lib/lxmf-payloads'
 
 export interface CommandCenterSnapshot {
   status: LxmfDaemonLocalStatus
@@ -26,7 +30,11 @@ export async function fetchCommandCenterSnapshot(): Promise<CommandCenterSnapsho
     daemonStatus(),
     probeLxmf(),
     listLxmfPeers().catch(() => ({ peers: [], meta: null })),
-    listLxmfAnnounces({}, { limit: 60 }).catch(() => ({ announces: [], next_cursor: null, meta: null })),
+    listLxmfAnnounces({}, { limit: 60 }).catch(() => ({
+      announces: [],
+      next_cursor: null,
+      meta: null,
+    })),
     listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
   ])
   return {
@@ -39,7 +47,7 @@ export async function fetchCommandCenterSnapshot(): Promise<CommandCenterSnapsho
 }
 
 export async function runCommandCenterAction(
-  action: 'announce_now' | 'daemon_start' | 'daemon_stop' | 'daemon_restart',
+  action: 'announce_now' | 'daemon_start' | 'daemon_stop' | 'daemon_restart'
 ): Promise<void> {
   if (action === 'announce_now') {
     await announceLxmfNow()
@@ -88,6 +96,6 @@ function parseCsv(value: string | undefined): string[] {
   }
   return value
     .split(',')
-    .map((entry) => entry.trim())
+    .map(entry => entry.trim())
     .filter(Boolean)
 }

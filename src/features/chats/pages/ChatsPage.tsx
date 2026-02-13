@@ -24,7 +24,7 @@ export function ChatsPage() {
   const indexedThreads = useMemo(() => indexThreads(threads), [threads])
   const filteredThreads = useMemo(
     () => filterThreadIndex(indexedThreads, deferredQuery),
-    [deferredQuery, indexedThreads],
+    [deferredQuery, indexedThreads]
   )
   const primaryThread = filteredThreads[0] ?? threads[0]
   const searchInputRef = useRef<HTMLInputElement | null>(null)
@@ -98,7 +98,7 @@ export function ChatsPage() {
         />
         <form
           className="mb-3 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2.5"
-          onSubmit={(event) => {
+          onSubmit={event => {
             event.preventDefault()
             const parsed = parseLxmfContactReference(destinationInput)
             if (!parsed.ok) {
@@ -117,7 +117,7 @@ export function ChatsPage() {
           <input
             ref={destinationInputRef}
             value={destinationInput}
-            onChange={(event) => {
+            onChange={event => {
               setDestinationInput(event.target.value)
               setComposeError(null)
             }}
@@ -127,7 +127,7 @@ export function ChatsPage() {
           <div className="flex items-center gap-2">
             <input
               value={nameInput}
-              onChange={(event) => {
+              onChange={event => {
                 setNameInput(event.target.value)
                 setComposeError(null)
               }}
@@ -146,13 +146,17 @@ export function ChatsPage() {
         <input
           ref={searchInputRef}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={event => setQuery(event.target.value)}
           className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
           placeholder="Search chats by name, destination, or latest message"
         />
-        {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
+        {error ? (
+          <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
+        ) : null}
         {!loading && threads.length === 0 ? (
-          <p className="text-sm text-slate-500">No chats yet. Send your first message from People.</p>
+          <p className="text-sm text-slate-500">
+            No chats yet. Send your first message from People.
+          </p>
         ) : null}
         {loading ? (
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
@@ -168,8 +172,8 @@ export function ChatsPage() {
               estimateItemHeight={98}
               className="min-h-0 flex-1 overflow-y-auto pr-1"
               listClassName="pb-1"
-              getKey={(thread) => thread.id}
-              renderItem={(thread) => (
+              getKey={thread => thread.id}
+              renderItem={thread => (
                 <div className="py-1">
                   <ThreadListRow thread={thread} />
                 </div>
@@ -180,7 +184,10 @@ export function ChatsPage() {
       </Panel>
 
       <Panel className="min-h-0 overflow-y-auto">
-        <PageHeading title="Select a conversation" subtitle="Choose a chat from the list to open the thread." />
+        <PageHeading
+          title="Select a conversation"
+          subtitle="Choose a chat from the list to open the thread."
+        />
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
           <p>This screen is focused on clarity for non-technical users.</p>
           <p className="mt-2">You can start by opening your most recent thread.</p>

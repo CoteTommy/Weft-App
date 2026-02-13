@@ -29,20 +29,23 @@ export function ChatThreadPage() {
   const indexedThreads = useMemo(() => indexThreads(threads), [threads])
   const filteredThreads = useMemo(
     () => filterThreadIndex(indexedThreads, deferredThreadQuery),
-    [deferredThreadQuery, indexedThreads],
+    [deferredThreadQuery, indexedThreads]
   )
-  const thread = useMemo(() => threads.find((candidate) => candidate.id === chatId), [chatId, threads])
+  const thread = useMemo(
+    () => threads.find(candidate => candidate.id === chatId),
+    [chatId, threads]
+  )
   const filteredMessages = useMemo(() => {
     if (!thread) {
       return []
     }
-    return thread.messages.filter((message) =>
+    return thread.messages.filter(message =>
       matchesQuery(deferredMessageQuery, [
         message.author,
         message.body,
         message.sentAt,
         message.status,
-      ]),
+      ])
     )
   }, [deferredMessageQuery, thread])
 
@@ -58,7 +61,7 @@ export function ChatThreadPage() {
       messageSearchInputRef.current?.select()
     }
     const onFocusQuickReply = () => {
-      setComposerFocusToken((value) => value + 1)
+      setComposerFocusToken(value => value + 1)
     }
     window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
     window.addEventListener(FOCUS_QUICK_REPLY_EVENT, onFocusQuickReply)
@@ -78,7 +81,7 @@ export function ChatThreadPage() {
         <PageHeading title="Chats" subtitle="Recent conversations" />
         <input
           value={threadQuery}
-          onChange={(event) => setThreadQuery(event.target.value)}
+          onChange={event => setThreadQuery(event.target.value)}
           className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
           placeholder="Filter threads"
         />
@@ -96,8 +99,8 @@ export function ChatThreadPage() {
             estimateItemHeight={92}
             className="min-h-0 flex-1 overflow-y-auto pr-1"
             listClassName="pb-1"
-            getKey={(threadItem) => threadItem.id}
-            renderItem={(threadItem) => (
+            getKey={threadItem => threadItem.id}
+            renderItem={threadItem => (
               <div className="py-1">
                 <ThreadListRow thread={threadItem} compact />
               </div>
@@ -123,14 +126,22 @@ export function ChatThreadPage() {
                     onClick={() => setThreadPinned(thread.id)}
                     className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                   >
-                    {thread.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                    {thread.pinned ? (
+                      <PinOff className="h-3.5 w-3.5" />
+                    ) : (
+                      <Pin className="h-3.5 w-3.5" />
+                    )}
                     {thread.pinned ? 'Unpin' : 'Pin'}
                   </button>
                   <button
                     onClick={() => setThreadMuted(thread.id)}
                     className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                   >
-                    {thread.muted ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
+                    {thread.muted ? (
+                      <Bell className="h-3.5 w-3.5" />
+                    ) : (
+                      <BellOff className="h-3.5 w-3.5" />
+                    )}
                     {thread.muted ? 'Unmute' : 'Mute'}
                   </button>
                 </div>
@@ -139,11 +150,13 @@ export function ChatThreadPage() {
             <input
               ref={messageSearchInputRef}
               value={messageQuery}
-              onChange={(event) => setMessageQuery(event.target.value)}
+              onChange={event => setMessageQuery(event.target.value)}
               className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
               placeholder="Search messages in this thread"
             />
-            {error ? <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
+            {error ? (
+              <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
+            ) : null}
             <div className="mb-4 min-h-0 flex-1 pr-1">
               {thread.messages.length > 0 && filteredMessages.length === 0 ? (
                 <p className="text-sm text-slate-500">No messages match your search.</p>
@@ -151,10 +164,10 @@ export function ChatThreadPage() {
                 <MessageTimeline
                   className="h-full"
                   messages={filteredMessages}
-                  onRetry={(message) => {
+                  onRetry={message => {
                     const attachments = message.attachments
-                      .filter((attachment) => Boolean(attachment.dataBase64))
-                      .map((attachment) => ({
+                      .filter(attachment => Boolean(attachment.dataBase64))
+                      .map(attachment => ({
                         name: attachment.name,
                         mime: attachment.mime,
                         sizeBytes: attachment.sizeBytes,
@@ -177,7 +190,7 @@ export function ChatThreadPage() {
             <MessageComposer
               focusToken={composerFocusToken}
               sessionKey={thread.id}
-              onSend={(draft) => {
+              onSend={draft => {
                 return sendMessage(thread.id, draft)
               }}
             />

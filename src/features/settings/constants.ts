@@ -26,4 +26,3 @@ export const SETTINGS_SECTIONS: Array<{ id: SettingsSection; label: string }> = 
   { id: 'data', label: 'Data' },
   { id: 'advanced', label: 'Advanced' },
 ]
-

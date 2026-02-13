@@ -1,4 +1,9 @@
-import { type LxmfDaemonLocalStatus, type LxmfProbeReport,parseLxmfDaemonLocalStatus, parseLxmfProbeReport } from '../lxmf-contract'
+import {
+  type LxmfDaemonLocalStatus,
+  type LxmfProbeReport,
+  parseLxmfDaemonLocalStatus,
+  parseLxmfProbeReport,
+} from '../lxmf-contract'
 import { daemonControlAction, invokeWithProbe } from './common'
 import type { DaemonControlOptions, ProbeOptions } from './types'
 
@@ -12,7 +17,9 @@ export async function daemonStatus(options: ProbeOptions = {}): Promise<LxmfDaem
   return parseLxmfDaemonLocalStatus(payload)
 }
 
-export async function daemonStart(options: DaemonControlOptions = {}): Promise<LxmfDaemonLocalStatus> {
+export async function daemonStart(
+  options: DaemonControlOptions = {}
+): Promise<LxmfDaemonLocalStatus> {
   return daemonControlAction('daemon_start', options)
 }
 
@@ -21,8 +28,7 @@ export async function daemonStop(options: ProbeOptions = {}): Promise<LxmfDaemon
 }
 
 export async function daemonRestart(
-  options: DaemonControlOptions = {},
+  options: DaemonControlOptions = {}
 ): Promise<LxmfDaemonLocalStatus> {
   return daemonControlAction('daemon_restart', options)
 }
-

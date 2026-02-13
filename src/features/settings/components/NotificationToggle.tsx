@@ -16,7 +16,7 @@ export function NotificationToggle({
       <input
         type="checkbox"
         checked={checked}
-        onChange={(event) => {
+        onChange={event => {
           onChange(event.target.checked)
         }}
         className="mt-0.5"
@@ -28,4 +28,3 @@ export function NotificationToggle({
     </label>
   )
 }
-

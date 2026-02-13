@@ -30,7 +30,7 @@ export function buildConfigPayload(input: {
 export function mergeNotificationSettings(
   current: SettingsSnapshot['notifications'],
   patch?: Partial<SettingsSnapshot['notifications']>,
-  legacyDesktopEnabled?: boolean,
+  legacyDesktopEnabled?: boolean
 ): SettingsSnapshot['notifications'] {
   return {
     ...current,

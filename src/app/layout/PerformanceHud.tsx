@@ -16,7 +16,7 @@ interface HudSnapshot {
 export function PerformanceHud() {
   const [hudEnabled, setHudEnabled] = useState(() => getWeftPreferences().performanceHudEnabled)
   const [motionPreference, setMotionPreference] = useState<MotionPreference>(
-    () => getWeftPreferences().motionPreference,
+    () => getWeftPreferences().motionPreference
   )
   const [snapshot, setSnapshot] = useState<HudSnapshot>({
     fps: 0,
@@ -91,7 +91,7 @@ export function PerformanceHud() {
       <div
         className={clsx(
           'rounded-xl border px-3 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur',
-          toneClass,
+          toneClass
         )}
       >
         <span>{snapshot.fps} FPS</span>

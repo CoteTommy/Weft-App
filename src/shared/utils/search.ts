@@ -25,7 +25,7 @@ export function tokenizeQuery(query: string): string[] {
 
 export function buildSearchText(values: SearchValue[]): string {
   return values
-    .map((value) => normalizeSearchText(String(value ?? '')))
+    .map(value => normalizeSearchText(String(value ?? '')))
     .filter(Boolean)
     .join(' ')
 }
@@ -38,7 +38,7 @@ export function matchesSearchTokens(tokens: string[], searchText: string): boole
   if (!normalizedText) {
     return false
   }
-  return tokens.every((token) => normalizedText.includes(token))
+  return tokens.every(token => normalizedText.includes(token))
 }
 
 export function matchesQuery(query: string, values: SearchValue[]): boolean {
@@ -48,32 +48,29 @@ export function matchesQuery(query: string, values: SearchValue[]): boolean {
 export function indexSearchItems<T extends object>(
   items: T[],
   toSearchValues: (item: T) => SearchValue[],
-  options?: SearchIndexOptions,
+  options?: SearchIndexOptions
 ): IndexedSearchItem<T>[] {
   const cacheKey = options?.cacheKey ?? 'default'
-  return items.map((item) => ({
+  return items.map(item => ({
     item,
     searchText: getCachedSearchText(item, cacheKey, toSearchValues),
   }))
 }
 
-export function filterIndexedItems<T>(
-  items: IndexedSearchItem<T>[],
-  query: string,
-): T[] {
+export function filterIndexedItems<T>(items: IndexedSearchItem<T>[], query: string): T[] {
   const tokens = tokenizeQuery(query)
   if (tokens.length === 0) {
-    return items.map((entry) => entry.item)
+    return items.map(entry => entry.item)
   }
   return items
-    .filter((entry) => matchesSearchTokens(tokens, entry.searchText))
-    .map((entry) => entry.item)
+    .filter(entry => matchesSearchTokens(tokens, entry.searchText))
+    .map(entry => entry.item)
 }
 
 function getCachedSearchText<T extends object>(
   item: T,
   cacheKey: string,
-  toSearchValues: (item: T) => SearchValue[],
+  toSearchValues: (item: T) => SearchValue[]
 ): string {
   const existingCache = searchTextCache.get(item)
   if (existingCache?.has(cacheKey)) {

@@ -23,7 +23,12 @@ export async function getDesktopShellPreferences(): Promise<DesktopShellPreferen
 }
 
 export async function setDesktopShellPreferences(
-  patch: Partial<Pick<DesktopShellPreferences, 'minimizeToTrayOnClose' | 'startInTray' | 'singleInstanceFocus' | 'notificationsMuted'>>,
+  patch: Partial<
+    Pick<
+      DesktopShellPreferences,
+      'minimizeToTrayOnClose' | 'startInTray' | 'singleInstanceFocus' | 'notificationsMuted'
+    >
+  >
 ): Promise<DesktopShellPreferences> {
   const payload = await invoke<unknown>('desktop_set_shell_preferences', {
     minimize_to_tray_on_close: patch.minimizeToTrayOnClose ?? null,
@@ -35,9 +40,9 @@ export async function setDesktopShellPreferences(
 }
 
 export async function subscribeTrayActions(
-  onAction: (action: DesktopTrayAction) => void,
+  onAction: (action: DesktopTrayAction) => void
 ): Promise<UnlistenFn> {
-  return await listen<unknown>('weft://tray-action', (event) => {
+  return await listen<unknown>('weft://tray-action', event => {
     const parsed = parseTrayAction(event.payload)
     if (parsed) {
       onAction(parsed)
@@ -53,13 +58,10 @@ function parseDesktopShellPreferences(value: unknown): DesktopShellPreferences {
   return {
     minimizeToTrayOnClose: asBoolean(
       record.minimize_to_tray_on_close,
-      'desktop.minimize_to_tray_on_close',
+      'desktop.minimize_to_tray_on_close'
     ),
     startInTray: asBoolean(record.start_in_tray, 'desktop.start_in_tray'),
-    singleInstanceFocus: asBoolean(
-      record.single_instance_focus,
-      'desktop.single_instance_focus',
-    ),
+    singleInstanceFocus: asBoolean(record.single_instance_focus, 'desktop.single_instance_focus'),
     notificationsMuted: asBoolean(record.notifications_muted, 'desktop.notifications_muted'),
     platform: asString(record.platform, 'desktop.platform'),
     appearance: asAppearance(record.appearance),

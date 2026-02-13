@@ -38,7 +38,7 @@ export function setStoredDisplayName(value: string): void {
 export function resolveDisplayName(
   profile: string,
   identityHash?: string | null,
-  lxmfDisplayName?: string | null,
+  lxmfDisplayName?: string | null
 ): string {
   const normalizedLxmfDisplayName = lxmfDisplayName?.trim()
   if (normalizedLxmfDisplayName) {

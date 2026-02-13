@@ -20,14 +20,14 @@ export function MapPage() {
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const filteredPoints = useMemo(
     () =>
-      points.filter((point) =>
-        matchesQuery(query, [point.label, point.source, point.when, point.lat, point.lon]),
+      points.filter(point =>
+        matchesQuery(query, [point.label, point.source, point.when, point.lat, point.lon])
       ),
-    [points, query],
+    [points, query]
   )
   const selectedPoint = useMemo(
-    () => filteredPoints.find((point) => point.id === selectedId) ?? filteredPoints[0] ?? null,
-    [filteredPoints, selectedId],
+    () => filteredPoints.find(point => point.id === selectedId) ?? filteredPoints[0] ?? null,
+    [filteredPoints, selectedId]
   )
 
   useEffect(() => {
@@ -61,12 +61,14 @@ export function MapPage() {
         <input
           ref={searchInputRef}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={event => setQuery(event.target.value)}
           className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
           placeholder="Search points by label, source, or coordinates"
         />
         {loading ? <p className="text-sm text-slate-500">Loading map points...</p> : null}
-        {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
+        {error ? (
+          <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
+        ) : null}
         {!loading && points.length === 0 ? (
           <p className="text-sm text-slate-500">
             No location points found yet. Share messages with `geo:lat,lon` to populate this map.
@@ -75,7 +77,7 @@ export function MapPage() {
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           <ul className="space-y-2">
-            {filteredPoints.map((point) => (
+            {filteredPoints.map(point => (
               <li key={point.id}>
                 <button
                   type="button"
@@ -146,7 +148,7 @@ export function MapPage() {
 
         <form
           className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
-          onSubmit={(event) => {
+          onSubmit={event => {
             event.preventDefault()
             void (async () => {
               const parsedDestination = parseLxmfContactReference(destinationInput)
@@ -182,7 +184,7 @@ export function MapPage() {
           </p>
           <input
             value={destinationInput}
-            onChange={(event) => {
+            onChange={event => {
               setDestinationInput(event.target.value)
               setShareFeedback(null)
             }}
@@ -191,7 +193,7 @@ export function MapPage() {
           />
           <input
             value={locationLabel}
-            onChange={(event) => setLocationLabel(event.target.value)}
+            onChange={event => setLocationLabel(event.target.value)}
             className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
             placeholder="Location label"
           />

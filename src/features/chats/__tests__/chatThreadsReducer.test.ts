@@ -2,10 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { ChatMessage, ChatThread } from '@shared/types/chat'
 
-import {
-  reduceReceiptUpdate,
-  reduceRuntimeMessage,
-} from '../state/chatThreadsReducer'
+import { reduceReceiptUpdate, reduceRuntimeMessage } from '../state/chatThreadsReducer'
 
 function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -39,7 +36,7 @@ describe('chat threads domain reducer', () => {
     const base = [makeThread()]
     const incoming = makeMessage({ id: 'm-2', body: 'updated' })
     const next = reduceRuntimeMessage(base, {
-      applyThreadMetadata: (thread) => thread,
+      applyThreadMetadata: thread => thread,
       derivedThread: makeThread({
         id: 'dst-1',
         name: 'Peer',

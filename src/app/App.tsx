@@ -19,16 +19,20 @@ import {
 import { normalizeMainRoute } from '@shared/runtime/sessionRestore'
 
 const WelcomePage = lazy(() =>
-  import('@features/welcome/pages/WelcomePage').then((module) => ({ default: module.WelcomePage })),
+  import('@features/welcome/pages/WelcomePage').then(module => ({ default: module.WelcomePage }))
 )
 
 export default function App() {
   const initialPreferences = getWeftPreferences()
   const [onboardingCompleted, setOnboardingCompleted] = useState(() => hasCompletedOnboarding())
-  const [motionPreference, setMotionPreference] = useState<MotionPreference>(initialPreferences.motionPreference)
-  const [commandCenterEnabled, setCommandCenterEnabled] = useState(initialPreferences.commandCenterEnabled)
+  const [motionPreference, setMotionPreference] = useState<MotionPreference>(
+    initialPreferences.motionPreference
+  )
+  const [commandCenterEnabled, setCommandCenterEnabled] = useState(
+    initialPreferences.commandCenterEnabled
+  )
   const [lastMainRoute, setLastMainRoute] = useState(
-    sanitizeMainRoute(normalizeMainRoute(initialPreferences.lastMainRoute)),
+    sanitizeMainRoute(normalizeMainRoute(initialPreferences.lastMainRoute))
   )
 
   useEffect(() => {
@@ -60,14 +64,18 @@ export default function App() {
           <Routes>
             <Route
               path="/welcome"
-              element={onboardingCompleted ? <Navigate to={lastMainRoute} replace /> : <WelcomePage />}
+              element={
+                onboardingCompleted ? <Navigate to={lastMainRoute} replace /> : <WelcomePage />
+              }
             />
             <Route
-              element={onboardingCompleted ? <ChatsStateLayout /> : <Navigate to="/welcome" replace />}
+              element={
+                onboardingCompleted ? <ChatsStateLayout /> : <Navigate to="/welcome" replace />
+              }
             >
               <Route element={<AppShell />}>
                 <Route index element={<Navigate to={lastMainRoute} replace />} />
-                {MAIN_ROUTES.map((route) => (
+                {MAIN_ROUTES.map(route => (
                   <Route
                     key={route.path}
                     path={route.path}
