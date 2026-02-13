@@ -9,12 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { unstable_batchedUpdates } from 'react-dom'
 import { Outlet } from 'react-router-dom'
-import {
-  startLxmfEventPump,
-  subscribeLxmfEvents,
-} from '../../../lib/lxmf-api'
 import type { LxmfMessageRecord, LxmfRpcEvent } from '../../../lib/lxmf-payloads'
 import type {
   ChatThread,
@@ -27,10 +22,6 @@ import {
   getStoredDisplayName,
   shortHash,
 } from '../../../shared/utils/identity'
-import {
-  getWeftPreferences,
-  PREFERENCES_UPDATED_EVENT,
-} from '../../../shared/runtime/preferences'
 import { publishAppNotification } from '../../../shared/runtime/notifications'
 import { fetchChatThreads, postChatMessage, buildThreads } from '../services/chatService'
 import { deriveReasonCode, deriveReceiptStatus } from '../services/chatThreadBuilders'
@@ -39,18 +30,14 @@ import {
   enqueueSendError,
   extendIgnoredFailedMessageIds,
   getIgnoredFailedMessageIds,
-  getStoredOfflineQueue,
   markQueueEntryAttemptFailed,
   markQueueEntryDelivered,
   markQueueEntrySending,
-  nextDueQueueEntry,
   pauseQueueEntry,
-  persistOfflineQueue,
   persistIgnoredFailedMessageIds,
   removeQueueEntry,
   resumeQueueEntry,
   retryQueueEntryNow,
-  syncQueueFromThreads,
   type OfflineQueueEntry,
 } from './offlineQueue'
 import { selectThreadById } from './chatSelectors'
@@ -71,56 +58,37 @@ import {
   persistThreadPreferences,
   resolveThreadPreference,
 } from './threadPreferences'
-
-interface ChatsState {
-  threads: ChatThread[]
-  loading: boolean
-  error: string | null
-  refresh: () => Promise<void>
-  sendMessage: (threadId: string, draft: OutboundMessageDraft) => Promise<OutboundSendOutcome>
-  offlineQueue: OfflineQueueEntry[]
-  retryQueueNow: (queueId: string) => Promise<void>
-  pauseQueue: (queueId: string) => void
-  resumeQueue: (queueId: string) => void
-  removeQueue: (queueId: string) => void
-  clearQueue: () => void
-  markThreadRead: (threadId: string) => void
-  markAllRead: () => void
-  createThread: (destination: string, name?: string) => string | null
-  setThreadPinned: (threadId: string, pinned?: boolean) => void
-  setThreadMuted: (threadId: string, muted?: boolean) => void
-}
+import {
+  CHAT_REFRESH_DEBOUNCE_MS,
+  type ChatsState,
+  type IncomingNotificationItem,
+} from './types'
+import { useChatOfflineQueue } from './useChatOfflineQueue'
+import { useChatIncomingNotifications } from './useChatIncomingNotifications'
+import { useChatRuntimeEventPump } from './useChatRuntimeEventPump'
+import { useChatQueueRetryScheduler } from './useChatQueueRetryScheduler'
 
 const ChatsContext = createContext<ChatsState | undefined>(undefined)
-const CHAT_EVENT_BATCH_MS = 80
-const CHAT_REFRESH_DEBOUNCE_MS = 120
-const CHAT_WATCHDOG_INTERVAL_MS = 10_000
-const CHAT_WATCHDOG_STALE_MS = 45_000
 
 export function ChatsProvider({ children }: PropsWithChildren) {
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [offlineQueue, setOfflineQueue] = useState<OfflineQueueEntry[]>(() =>
-    getStoredOfflineQueue(),
-  )
   const knownMessageIdsRef = useRef<Map<string, Set<string>>>(new Map())
   const unreadCountsRef = useRef<Map<string, number>>(new Map())
   const draftThreadsRef = useRef<Map<string, ChatThread>>(new Map())
-  const offlineQueueRef = useRef<OfflineQueueEntry[]>(offlineQueue)
   const ignoredFailedMessageIdsRef = useRef<Set<string>>(getIgnoredFailedMessageIds())
   const queueInFlightRef = useRef<Set<string>>(new Set())
   const hasLoadedRef = useRef(false)
   const refreshingRef = useRef(false)
-  const lastEventAtRef = useRef(0)
   const lastRefreshAtRef = useRef(0)
-  const listenerHealthyRef = useRef(false)
   const refreshTimerRef = useRef<number | null>(null)
-  const eventBatchTimerRef = useRef<number | null>(null)
-  const pendingEventsRef = useRef<LxmfRpcEvent[]>([])
-  const notificationsEnabledRef = useRef(getWeftPreferences().notificationsEnabled)
-  const messageNotificationsEnabledRef = useRef(getWeftPreferences().messageNotificationsEnabled)
   const threadPreferencesRef = useRef(getStoredThreadPreferences())
+  const { offlineQueue, offlineQueueRef, setOfflineQueue } = useChatOfflineQueue({
+    threads,
+    ignoredFailedMessageIdsRef,
+  })
+  const { emitIncomingNotifications } = useChatIncomingNotifications()
 
   const applyThreadMetadata = useCallback((thread: ChatThread): ChatThread => {
     const preference = resolveThreadPreference(threadPreferencesRef.current, thread.id)
@@ -133,52 +101,6 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       muted: preference.muted,
     }
   }, [])
-
-  const emitIncomingNotifications = useCallback(
-    async (items: Array<{ threadId: string; threadName: string; latestBody: string; count: number }>) => {
-      if (typeof window === 'undefined' || !('Notification' in window) || items.length === 0) {
-        return
-      }
-      if (!notificationsEnabledRef.current) {
-        return
-      }
-      if (!messageNotificationsEnabledRef.current) {
-        return
-      }
-      if (document.visibilityState === 'visible' && document.hasFocus()) {
-        return
-      }
-
-      let permission = Notification.permission
-      if (permission === 'default') {
-        permission = await Notification.requestPermission()
-      }
-      if (permission !== 'granted') {
-        return
-      }
-
-      for (const item of items) {
-        const body =
-          item.count > 1
-            ? `${item.count} new messages in ${item.threadName}`
-            : item.latestBody || `New message in ${item.threadName}`
-        const notification = new Notification(item.threadName, {
-          body,
-          tag: `thread:${item.threadId}`,
-        })
-        notification.onclick = () => {
-          window.focus()
-          window.dispatchEvent(
-            new CustomEvent('weft:open-thread', {
-              detail: { threadId: item.threadId },
-            }),
-          )
-          notification.close()
-        }
-      }
-    },
-    [],
-  )
 
   const rewriteSelfAuthors = useCallback((nextAuthor: string) => {
     const normalizedAuthor = nextAuthor.trim() || 'You'
@@ -194,12 +116,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     try {
       setError(null)
       const loaded = await fetchChatThreads()
-      const pendingNotifications: Array<{
-        threadId: string
-        threadName: string
-        latestBody: string
-        count: number
-      }> = []
+      const pendingNotifications: IncomingNotificationItem[] = []
       const activeIds = new Set([
         ...loaded.map((thread) => thread.id),
         ...draftThreadsRef.current.keys(),
@@ -354,7 +271,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         queueInFlightRef.current.delete(entry.id)
       }
     },
-    [markFailedMessagesIgnored, refresh],
+    [markFailedMessagesIgnored, refresh, setOfflineQueue],
   )
 
   const retryQueueNow = useCallback(
@@ -370,7 +287,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       }
       await runQueueEntry(entry)
     },
-    [runQueueEntry],
+    [runQueueEntry, offlineQueueRef, setOfflineQueue],
   )
 
   const pauseQueue = useCallback((queueId: string) => {
@@ -379,7 +296,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       return
     }
     setOfflineQueue((previous) => pauseQueueEntry(previous, id))
-  }, [])
+  }, [setOfflineQueue])
 
   const resumeQueue = useCallback((queueId: string) => {
     const id = queueId.trim()
@@ -387,7 +304,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       return
     }
     setOfflineQueue((previous) => resumeQueueEntry(previous, id))
-  }, [])
+  }, [setOfflineQueue])
 
   const removeQueue = useCallback((queueId: string) => {
     const id = queueId.trim()
@@ -399,7 +316,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       markFailedMessagesIgnored([entry.sourceMessageId])
     }
     setOfflineQueue((previous) => removeQueueEntry(previous, id))
-  }, [markFailedMessagesIgnored])
+  }, [markFailedMessagesIgnored, offlineQueueRef, setOfflineQueue])
 
   const clearQueue = useCallback(() => {
     const ignoredIds = offlineQueueRef.current
@@ -409,7 +326,16 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       markFailedMessagesIgnored(ignoredIds)
     }
     setOfflineQueue(clearOfflineQueue())
-  }, [markFailedMessagesIgnored])
+  }, [markFailedMessagesIgnored, offlineQueueRef, setOfflineQueue])
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
+    }
+  }, [])
 
   const markThreadRead = useCallback((threadId: string) => {
     const id = threadId.trim()
@@ -472,7 +398,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         return {}
       }
     },
-    [markFailedMessagesIgnored, refresh],
+    [markFailedMessagesIgnored, refresh, setOfflineQueue],
   )
 
   const createThread = useCallback((destination: string, name?: string): string | null => {
@@ -670,103 +596,16 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     [scheduleRefresh],
   )
 
-  const flushEventBatch = useCallback(() => {
-    eventBatchTimerRef.current = null
-    const pending = pendingEventsRef.current
-    pendingEventsRef.current = []
-    if (pending.length === 0) {
-      return
-    }
-    unstable_batchedUpdates(() => {
-      for (const event of pending) {
-        if (event.event_type === 'inbound' || event.event_type === 'outbound') {
-          applyMessageEvent(event)
-          continue
-        }
-        if (event.event_type === 'receipt') {
-          applyReceiptEvent(event)
-          continue
-        }
-        if (event.event_type === 'runtime_started' || event.event_type === 'runtime_stopped') {
-          scheduleRefresh()
-        }
-      }
-    })
-  }, [applyMessageEvent, applyReceiptEvent, scheduleRefresh])
-
-  const enqueueRuntimeEvent = useCallback(
-    (event: LxmfRpcEvent) => {
-      lastEventAtRef.current = Date.now()
-      pendingEventsRef.current.push(event)
-      if (eventBatchTimerRef.current !== null) {
-        return
-      }
-      eventBatchTimerRef.current = window.setTimeout(() => {
-        flushEventBatch()
-      }, CHAT_EVENT_BATCH_MS)
-    },
-    [flushEventBatch],
-  )
+  useChatRuntimeEventPump({
+    applyMessageEvent,
+    applyReceiptEvent,
+    scheduleRefresh,
+    getLastRefreshAt: () => lastRefreshAtRef.current,
+  })
 
   useEffect(() => {
     void refresh()
   }, [refresh])
-
-  useEffect(() => {
-    let unlisten: (() => void) | null = null
-    let disposed = false
-    void startLxmfEventPump().catch(() => {
-      listenerHealthyRef.current = false
-    })
-    void subscribeLxmfEvents((event) => {
-      enqueueRuntimeEvent(event)
-    })
-      .then((stop) => {
-        if (disposed) {
-          stop()
-          return
-        }
-        listenerHealthyRef.current = true
-        unlisten = stop
-      })
-      .catch(() => {
-        listenerHealthyRef.current = false
-      })
-
-    return () => {
-      disposed = true
-      listenerHealthyRef.current = false
-      unlisten?.()
-    }
-  }, [enqueueRuntimeEvent])
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      const now = Date.now()
-      const freshestAt = Math.max(lastEventAtRef.current, lastRefreshAtRef.current)
-      const staleMs = freshestAt === 0 ? Number.POSITIVE_INFINITY : now - freshestAt
-      if (!listenerHealthyRef.current || staleMs >= CHAT_WATCHDOG_STALE_MS) {
-        scheduleRefresh()
-      }
-    }, CHAT_WATCHDOG_INTERVAL_MS)
-    return () => {
-      window.clearInterval(intervalId)
-    }
-  }, [scheduleRefresh])
-
-  useEffect(() => {
-    return () => {
-      if (refreshTimerRef.current !== null) {
-        window.clearTimeout(refreshTimerRef.current)
-        refreshTimerRef.current = null
-      }
-      if (eventBatchTimerRef.current !== null) {
-        window.clearTimeout(eventBatchTimerRef.current)
-        eventBatchTimerRef.current = null
-      }
-      pendingEventsRef.current = []
-    }
-  }, [])
 
   useEffect(() => {
     const handleDisplayNameUpdate = () => {
@@ -778,41 +617,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
     }
   }, [rewriteSelfAuthors])
 
-  useEffect(() => {
-    const handlePreferencesUpdate = () => {
-      const preferences = getWeftPreferences()
-      notificationsEnabledRef.current = preferences.notificationsEnabled
-      messageNotificationsEnabledRef.current = preferences.messageNotificationsEnabled
-    }
-    window.addEventListener(PREFERENCES_UPDATED_EVENT, handlePreferencesUpdate)
-    return () => {
-      window.removeEventListener(PREFERENCES_UPDATED_EVENT, handlePreferencesUpdate)
-    }
-  }, [])
-
-  useEffect(() => {
-    offlineQueueRef.current = offlineQueue
-    persistOfflineQueue(offlineQueue)
-  }, [offlineQueue])
-
-  useEffect(() => {
-    setOfflineQueue((previous) =>
-      syncQueueFromThreads(previous, threads, ignoredFailedMessageIdsRef.current),
-    )
-  }, [threads])
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      const due = nextDueQueueEntry(offlineQueueRef.current)
-      if (!due) {
-        return
-      }
-      void runQueueEntry(due)
-    }, 2_000)
-    return () => {
-      window.clearInterval(intervalId)
-    }
-  }, [runQueueEntry])
+  useChatQueueRetryScheduler({ offlineQueueRef, runQueueEntry })
 
   const value = useMemo(
     () => ({

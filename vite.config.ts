@@ -1,14 +1,26 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const devPort = 5173
 const tauriDevHost = process.env.TAURI_DEV_HOST
+const currentDir = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   clearScreen: false,
   envPrefix: ['VITE_', 'TAURI_'],
+  resolve: {
+    alias: {
+      '@app': resolve(currentDir, 'src/app'),
+      '@features': resolve(currentDir, 'src/features'),
+      '@shared': resolve(currentDir, 'src/shared'),
+      '@lib': resolve(currentDir, 'src/lib'),
+      '@runtime': resolve(currentDir, 'src/shared/runtime'),
+    },
+  },
   server: {
     port: devPort,
     strictPort: true,
