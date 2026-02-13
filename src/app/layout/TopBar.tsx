@@ -16,16 +16,20 @@ import { useNavigate } from 'react-router-dom'
 import {
   daemonStart,
   daemonStatus,
+  getLxmfMessageDeliveryTrace,
   getLxmfOutboundPropagationNode,
   getLxmfProfile,
   listLxmfInterfaces,
+  listLxmfMessages,
   listLxmfPropagationNodes,
   probeLxmf,
   type LxmfProfileInfo,
 } from '../../lib/lxmf-api'
 import type { LxmfDaemonLocalStatus, LxmfProbeReport } from '../../lib/lxmf-contract'
 import type {
+  LxmfDeliveryTraceEntry,
   LxmfInterfaceListResponse,
+  LxmfMessageRecord,
   LxmfOutboundPropagationNodeResponse,
   LxmfPropagationNodeListResponse,
 } from '../../lib/lxmf-payloads'
@@ -46,6 +50,15 @@ interface DiagnosticsSnapshot {
   outboundNode: LxmfOutboundPropagationNodeResponse
   propagationNodes: LxmfPropagationNodeListResponse
   interfaces: LxmfInterfaceListResponse
+  outboundMessages: DiagnosticsMessageSnapshot[]
+}
+
+interface DiagnosticsMessageSnapshot {
+  id: string
+  destination: string
+  timestamp: number
+  receiptStatus: string | null
+  transitions: LxmfDeliveryTraceEntry[]
 }
 
 export function TopBar() {
@@ -145,14 +158,28 @@ export function TopBar() {
     try {
       setDiagnosticsLoading(true)
       setDiagnosticsError(null)
-      const [status, probe, profile, outboundNode, propagationNodes, interfaces] = await Promise.all([
+      const [status, probe, profile, outboundNode, propagationNodes, interfaces, messages] = await Promise.all([
         daemonStatus(),
         probeLxmf(),
         getLxmfProfile().catch(() => null),
         getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
         listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
         listLxmfInterfaces().catch(() => ({ interfaces: [], meta: null })),
+        listLxmfMessages().catch(() => ({ messages: [], meta: null })),
       ])
+      const messageCandidates = selectDiagnosticsMessages(messages.messages)
+      const traceResults = await Promise.all(
+        messageCandidates.map(async (message) => {
+          const trace = await getLxmfMessageDeliveryTrace(message.id).catch(() => null)
+          return {
+            id: message.id,
+            destination: message.destination,
+            timestamp: message.timestamp,
+            receiptStatus: message.receipt_status,
+            transitions: trace?.transitions ?? [],
+          } satisfies DiagnosticsMessageSnapshot
+        }),
+      )
       setDiagnosticsSnapshot({
         capturedAtMs: Date.now(),
         status,
@@ -161,6 +188,7 @@ export function TopBar() {
         outboundNode,
         propagationNodes,
         interfaces,
+        outboundMessages: traceResults,
       })
     } catch (loadError) {
       setDiagnosticsError(loadError instanceof Error ? loadError.message : String(loadError))
@@ -449,6 +477,56 @@ export function TopBar() {
                       <p className="mt-0.5">{runtimeMismatch}</p>
                     </div>
                   ) : null}
+                  {diagnosticsSnapshot.outboundMessages.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-slate-700">Recent outbound traces</p>
+                      {diagnosticsSnapshot.outboundMessages.map((message) => {
+                        const latest = message.transitions.at(-1)
+                        const latestStatus = latest?.status ?? message.receiptStatus ?? 'unknown'
+                        return (
+                          <div key={message.id} className="rounded-xl border border-slate-200 bg-slate-50/80 p-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate font-mono text-[11px] text-slate-700">
+                                  {shortenValue(message.id)}
+                                </p>
+                                <p className="truncate text-[11px] text-slate-500">
+                                  to {shortenValue(message.destination)}
+                                </p>
+                              </div>
+                              <span
+                                className={clsx(
+                                  'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                                  statusToneClass(latestStatus),
+                                )}
+                              >
+                                {latestStatus}
+                              </span>
+                            </div>
+                            {message.transitions.length > 0 ? (
+                              <div className="mt-2 space-y-1">
+                                {message.transitions.slice(-3).map((entry, index) => (
+                                  <div key={`${message.id}:${entry.timestamp}:${index}`} className="flex gap-2 text-[10px]">
+                                    <span className="w-16 shrink-0 text-slate-400">
+                                      {formatRelativeFromNow(entry.timestamp * 1000)}
+                                    </span>
+                                    <span className="min-w-0 truncate text-slate-600">
+                                      {entry.status}
+                                      {entry.reason_code ? ` (${entry.reason_code})` : ''}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-2 text-[10px] text-slate-400">
+                                No trace transitions recorded yet.
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="px-3 py-4 text-xs text-slate-500">
@@ -528,6 +606,56 @@ function shortenValue(value: string | null): string {
     return value
   }
   return `${value.slice(0, 10)}...${value.slice(-8)}`
+}
+
+function statusToneClass(status: string): string {
+  const normalized = status.trim().toLowerCase()
+  if (normalized.startsWith('failed')) {
+    return 'bg-rose-100 text-rose-700'
+  }
+  if (normalized.startsWith('retrying')) {
+    return 'bg-amber-100 text-amber-700'
+  }
+  if (normalized.startsWith('delivered') || normalized.startsWith('sent')) {
+    return 'bg-emerald-100 text-emerald-700'
+  }
+  if (normalized.startsWith('sending') || normalized.startsWith('queued') || normalized.startsWith('outbound')) {
+    return 'bg-blue-100 text-blue-700'
+  }
+  return 'bg-slate-200 text-slate-700'
+}
+
+function selectDiagnosticsMessages(messages: LxmfMessageRecord[]): LxmfMessageRecord[] {
+  const outbound = messages
+    .filter((message) => message.direction === 'out')
+    .sort((left, right) => right.timestamp - left.timestamp)
+  const priority = outbound.filter((message) => isActionableStatus(message.receipt_status))
+  const selected: LxmfMessageRecord[] = []
+  const seen = new Set<string>()
+  for (const message of [...priority, ...outbound]) {
+    if (seen.has(message.id)) {
+      continue
+    }
+    seen.add(message.id)
+    selected.push(message)
+    if (selected.length >= 4) {
+      break
+    }
+  }
+  return selected
+}
+
+function isActionableStatus(status: string | null): boolean {
+  if (!status) {
+    return true
+  }
+  const normalized = status.trim().toLowerCase()
+  return (
+    normalized.startsWith('failed') ||
+    normalized.startsWith('retrying') ||
+    normalized.startsWith('sending') ||
+    normalized.startsWith('queued')
+  )
 }
 
 type RuntimeConnectionTarget = ReturnType<typeof getRuntimeConnectionOptions>
