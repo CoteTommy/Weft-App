@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Outlet } from 'react-router-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
@@ -11,6 +11,7 @@ export function AppShell() {
   const location = useLocation()
   const reduceMotion = useReducedMotion()
   const pageMotion = useAnimationControls()
+  const routeAnimationFrameRef = useRef<number | null>(null)
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -31,14 +32,33 @@ export function AppShell() {
     if (reduceMotion) {
       return
     }
-    void pageMotion.start({
-      opacity: [0.985, 1],
-      y: [5, 0],
-      transition: {
-        duration: 0.16,
-        ease: [0.22, 1, 0.36, 1],
-      },
+    if (routeAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(routeAnimationFrameRef.current)
+    }
+    pageMotion.set({
+      opacity: 0.985,
+      y: 4,
+      scale: 0.998,
     })
+    routeAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      void pageMotion.start({
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        transition: {
+          type: 'spring',
+          stiffness: 290,
+          damping: 30,
+          mass: 0.72,
+        },
+      })
+    })
+    return () => {
+      if (routeAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(routeAnimationFrameRef.current)
+        routeAnimationFrameRef.current = null
+      }
+    }
   }, [location.pathname, pageMotion, reduceMotion])
 
   return (
