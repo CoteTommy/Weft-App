@@ -1,4 +1,5 @@
 export type ConnectivityMode = 'automatic' | 'local_only' | 'lan_shared' | 'custom'
+export type MotionPreference = 'smooth' | 'snappy' | 'off'
 
 export interface WeftPreferences {
   onboardingCompleted: boolean
@@ -13,6 +14,8 @@ export interface WeftPreferences {
   systemNotificationsEnabled: boolean
   connectionNotificationsEnabled: boolean
   notificationSoundEnabled: boolean
+  motionPreference: MotionPreference
+  performanceHudEnabled: boolean
   pendingRoute?: string
 }
 
@@ -29,6 +32,8 @@ const DEFAULT_PREFERENCES: WeftPreferences = {
   systemNotificationsEnabled: true,
   connectionNotificationsEnabled: true,
   notificationSoundEnabled: false,
+  motionPreference: 'snappy',
+  performanceHudEnabled: false,
 }
 
 export function getWeftPreferences(): WeftPreferences {
@@ -141,6 +146,12 @@ function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPrefe
   if ('notificationSoundEnabled' in value) {
     out.notificationSoundEnabled = parseBoolean(value.notificationSoundEnabled, false)
   }
+  if ('motionPreference' in value) {
+    out.motionPreference = parseMotionPreference(value.motionPreference)
+  }
+  if ('performanceHudEnabled' in value) {
+    out.performanceHudEnabled = parseBoolean(value.performanceHudEnabled, false)
+  }
   if ('pendingRoute' in value) {
     out.pendingRoute = normalizeOptional(value.pendingRoute)
   }
@@ -157,6 +168,13 @@ function parseConnectivityMode(value: unknown): ConnectivityMode {
     return value
   }
   return 'automatic'
+}
+
+function parseMotionPreference(value: unknown): MotionPreference {
+  if (value === 'smooth' || value === 'snappy' || value === 'off') {
+    return value
+  }
+  return 'snappy'
 }
 
 function normalizeOptional(value: unknown): string | undefined {

@@ -9,6 +9,7 @@ export function buildConfigPayload(input: {
   transport: string
   autoStartDaemon: boolean
   notifications: SettingsSnapshot['notifications']
+  performance: SettingsSnapshot['performance']
 }): SettingsConfigPayload {
   return {
     mode: input.mode,
@@ -17,6 +18,7 @@ export function buildConfigPayload(input: {
     transport: input.transport,
     autoStartDaemon: input.autoStartDaemon,
     notifications: input.notifications,
+    performance: input.performance,
   }
 }
 
@@ -44,4 +46,3 @@ export function parseSettingsSection(value: string | null): SettingsSection {
   }
   return 'profile'
 }
-

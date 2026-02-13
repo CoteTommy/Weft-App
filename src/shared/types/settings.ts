@@ -1,4 +1,4 @@
-import type { ConnectivityMode } from '../runtime/preferences'
+import type { ConnectivityMode, MotionPreference } from '../runtime/preferences'
 
 export interface SettingsSnapshot {
   displayName: string
@@ -29,6 +29,10 @@ export interface SettingsSnapshot {
     systemEnabled: boolean
     connectionEnabled: boolean
     soundEnabled: boolean
+  }
+  performance: {
+    motionPreference: MotionPreference
+    hudEnabled: boolean
   }
   interop: {
     status: 'healthy' | 'warning' | 'critical'

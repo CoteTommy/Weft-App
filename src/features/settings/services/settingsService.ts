@@ -11,6 +11,7 @@ import {
 } from '../../../lib/lxmf-api'
 import type { SettingsSnapshot } from '../../../shared/types/settings'
 import {
+  type MotionPreference,
   type ConnectivityMode,
   getWeftPreferences,
   updateWeftPreferences,
@@ -67,6 +68,10 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       systemEnabled: preferences.systemNotificationsEnabled,
       connectionEnabled: preferences.connectionNotificationsEnabled,
       soundEnabled: preferences.notificationSoundEnabled,
+    },
+    performance: {
+      motionPreference: preferences.motionPreference,
+      hudEnabled: preferences.performanceHudEnabled,
     },
     interop,
   }
@@ -151,5 +156,15 @@ export function saveNotificationSettings(input: {
     systemNotificationsEnabled: input.systemEnabled,
     connectionNotificationsEnabled: input.connectionEnabled,
     notificationSoundEnabled: input.soundEnabled,
+  })
+}
+
+export function savePerformanceSettings(input: {
+  motionPreference?: MotionPreference
+  hudEnabled?: boolean
+}): void {
+  updateWeftPreferences({
+    motionPreference: input.motionPreference,
+    performanceHudEnabled: input.hudEnabled,
   })
 }

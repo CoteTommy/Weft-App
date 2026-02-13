@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import type { ConnectivityMode } from '../../../shared/runtime/preferences'
+import type { ConnectivityMode, MotionPreference } from '../../../shared/runtime/preferences'
 import type { SettingsSnapshot } from '../../../shared/types/settings'
 import { Panel } from '../../../shared/ui/Panel'
 import { PageHeading } from '../../../shared/ui/PageHeading'
@@ -11,6 +11,7 @@ import {
   saveDisplayName,
   saveNotificationSettings,
   saveOutboundPropagationNode,
+  savePerformanceSettings,
 } from '../services/settingsService'
 import { useSettings } from '../state/useSettings'
 import { DEFAULT_NOTIFICATION_SETTINGS, CONNECTIVITY_OPTIONS, SETTINGS_SECTIONS } from '../constants'
@@ -39,6 +40,8 @@ export function SettingsPage() {
   const [notificationSettings, setNotificationSettings] = useState<SettingsSnapshot['notifications']>(
     DEFAULT_NOTIFICATION_SETTINGS,
   )
+  const [motionPreference, setMotionPreference] = useState<MotionPreference>('snappy')
+  const [performanceHudEnabled, setPerformanceHudEnabled] = useState(false)
   const [configPayload, setConfigPayload] = useState('')
   const [backupWorking, setBackupWorking] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
@@ -55,6 +58,8 @@ export function SettingsPage() {
     setAutoStartDaemon(settings.connectivity.autoStartDaemon)
     setPropagationPeerDraft(settings.connectivity.outboundPropagationPeer ?? '')
     setNotificationSettings(settings.notifications)
+    setMotionPreference(settings.performance.motionPreference)
+    setPerformanceHudEnabled(settings.performance.hudEnabled)
     setConfigPayload(
       JSON.stringify(
         buildConfigPayload({
@@ -64,6 +69,7 @@ export function SettingsPage() {
           transport: settings.connectivity.transport ?? '',
           autoStartDaemon: settings.connectivity.autoStartDaemon,
           notifications: settings.notifications,
+          performance: settings.performance,
         }),
         null,
         2,
@@ -78,6 +84,18 @@ export function SettingsPage() {
     const next = { ...notificationSettings, ...patch }
     setNotificationSettings(next)
     saveNotificationSettings(next)
+    setSaveFeedback(feedback)
+  }
+
+  const updatePerformance = (patch: Partial<SettingsSnapshot['performance']>, feedback: string) => {
+    const next = {
+      motionPreference,
+      hudEnabled: performanceHudEnabled,
+      ...patch,
+    }
+    setMotionPreference(next.motionPreference)
+    setPerformanceHudEnabled(next.hudEnabled)
+    savePerformanceSettings(next)
     setSaveFeedback(feedback)
   }
 
@@ -475,6 +493,15 @@ export function SettingsPage() {
                               )
                               saveNotificationSettings(mergedNotifications)
                               setNotificationSettings(mergedNotifications)
+                              if (parsed.performance) {
+                                savePerformanceSettings(parsed.performance)
+                                if (parsed.performance.motionPreference) {
+                                  setMotionPreference(parsed.performance.motionPreference)
+                                }
+                                if (typeof parsed.performance.hudEnabled === 'boolean') {
+                                  setPerformanceHudEnabled(parsed.performance.hudEnabled)
+                                }
+                              }
                               await refresh()
                               setSaveFeedback('Configuration imported.')
                             } catch (importError) {
@@ -513,6 +540,10 @@ export function SettingsPage() {
                               autoStartDaemon,
                             },
                             notifications: notificationSettings,
+                            performance: {
+                              motionPreference,
+                              hudEnabled: performanceHudEnabled,
+                            },
                           }
                           const blob = new Blob([JSON.stringify(payload, null, 2)], {
                             type: 'application/json',
@@ -570,6 +601,15 @@ export function SettingsPage() {
                                 )
                                 saveNotificationSettings(mergedNotifications)
                                 setNotificationSettings(mergedNotifications)
+                                if (parsed.performance) {
+                                  savePerformanceSettings(parsed.performance)
+                                  if (parsed.performance.motionPreference) {
+                                    setMotionPreference(parsed.performance.motionPreference)
+                                  }
+                                  if (typeof parsed.performance.hudEnabled === 'boolean') {
+                                    setPerformanceHudEnabled(parsed.performance.hudEnabled)
+                                  }
+                                }
                                 await refresh()
                                 setSaveFeedback('Backup imported.')
                               } catch (importError) {
@@ -611,6 +651,44 @@ export function SettingsPage() {
                       <p>RPC Endpoint: {settings.rpcEndpoint}</p>
                       <p>Profile Path: {settings.profile}</p>
                       <p>Identity Hash: {settings.identityHash ?? 'n/a'}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                    <p className="text-sm font-semibold text-slate-800">Performance</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <label className="text-xs text-slate-600">
+                        Motion quality
+                        <select
+                          value={motionPreference}
+                          onChange={(event) => {
+                            const next = event.target.value as MotionPreference
+                            updatePerformance(
+                              { motionPreference: next },
+                              `Motion quality set to ${next}.`,
+                            )
+                          }}
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+                        >
+                          <option value="smooth">Smooth</option>
+                          <option value="snappy">Snappy</option>
+                          <option value="off">Off</option>
+                        </select>
+                      </label>
+                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={performanceHudEnabled}
+                          onChange={(event) => {
+                            updatePerformance(
+                              { hudEnabled: event.target.checked },
+                              event.target.checked
+                                ? 'Performance HUD enabled.'
+                                : 'Performance HUD disabled.',
+                            )
+                          }}
+                        />
+                        Show FPS HUD
+                      </label>
                     </div>
                   </div>
                 </div>

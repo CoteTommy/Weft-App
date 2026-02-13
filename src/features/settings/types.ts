@@ -1,4 +1,4 @@
-import type { ConnectivityMode } from '../../shared/runtime/preferences'
+import type { ConnectivityMode, MotionPreference } from '../../shared/runtime/preferences'
 import type { SettingsSnapshot } from '../../shared/types/settings'
 
 export type SettingsSection = 'profile' | 'connectivity' | 'notifications' | 'data' | 'advanced'
@@ -11,6 +11,7 @@ export interface SettingsConfigPayload {
   autoStartDaemon?: boolean
   notificationsEnabled?: boolean
   notifications?: Partial<SettingsSnapshot['notifications']>
+  performance?: Partial<SettingsSnapshot['performance']>
 }
 
 export interface BackupPayload {
@@ -25,5 +26,8 @@ export interface BackupPayload {
     notificationsEnabled?: boolean
   }
   notifications?: Partial<SettingsSnapshot['notifications']>
+  performance?: {
+    motionPreference?: MotionPreference
+    hudEnabled?: boolean
+  }
 }
-

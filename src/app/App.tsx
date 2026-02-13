@@ -16,16 +16,22 @@ import { MapPage } from '../features/map/pages/MapPage'
 import { DeepLinkBridge } from './runtime/DeepLinkBridge'
 import { NotificationCenterProvider } from './state/NotificationCenterProvider'
 import {
+  getWeftPreferences,
   hasCompletedOnboarding,
   PREFERENCES_UPDATED_EVENT,
+  type MotionPreference,
 } from '../shared/runtime/preferences'
 
 export default function App() {
   const [onboardingCompleted, setOnboardingCompleted] = useState(() => hasCompletedOnboarding())
+  const [motionPreference, setMotionPreference] = useState<MotionPreference>(
+    () => getWeftPreferences().motionPreference,
+  )
 
   useEffect(() => {
     const handleUpdate = () => {
       setOnboardingCompleted(hasCompletedOnboarding())
+      setMotionPreference(getWeftPreferences().motionPreference)
     }
     window.addEventListener(PREFERENCES_UPDATED_EVENT, handleUpdate)
     return () => {
@@ -34,7 +40,10 @@ export default function App() {
   }, [])
 
   return (
-    <MotionConfig transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}>
+    <MotionConfig
+      reducedMotion={motionPreference === 'off' ? 'always' : 'user'}
+      transition={transitionForMotionPreference(motionPreference)}
+    >
       <NotificationCenterProvider>
         <DeepLinkBridge onboardingCompleted={onboardingCompleted} />
         <Routes>
@@ -66,4 +75,17 @@ export default function App() {
       </NotificationCenterProvider>
     </MotionConfig>
   )
+}
+
+function transitionForMotionPreference(motionPreference: MotionPreference): {
+  duration: number
+  ease: [number, number, number, number]
+} {
+  if (motionPreference === 'smooth') {
+    return { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+  }
+  if (motionPreference === 'off') {
+    return { duration: 0, ease: [0.22, 1, 0.36, 1] }
+  }
+  return { duration: 0.14, ease: [0.22, 1, 0.36, 1] }
 }
