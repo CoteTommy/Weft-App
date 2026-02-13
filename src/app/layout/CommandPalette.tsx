@@ -78,7 +78,6 @@ export function CommandPalette() {
       {
         id: 'goto-chats',
         title: 'Open chats',
-        shortcut: 'G C',
         keywords: ['messages', 'threads'],
         run: () => {
           void navigate('/chats')
@@ -87,7 +86,6 @@ export function CommandPalette() {
       {
         id: 'goto-people',
         title: 'Open people',
-        shortcut: 'G P',
         keywords: ['contacts', 'peers'],
         run: () => {
           void navigate('/people')
@@ -96,7 +94,6 @@ export function CommandPalette() {
       {
         id: 'goto-announces',
         title: 'Open announces',
-        shortcut: 'G A',
         keywords: ['network', 'broadcast'],
         run: () => {
           void navigate('/announces')
@@ -105,7 +102,6 @@ export function CommandPalette() {
       {
         id: 'goto-settings',
         title: 'Open settings',
-        shortcut: 'G S',
         keywords: ['preferences', 'config'],
         run: () => {
           void navigate('/settings')
