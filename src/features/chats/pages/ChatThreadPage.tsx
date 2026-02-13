@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, BellOff, Pin, PinOff } from 'lucide-react'
 import { Navigate, useParams } from 'react-router-dom'
 import { MessageComposer } from '../components/MessageComposer'
@@ -11,6 +11,7 @@ import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 import { matchesQuery } from '../../../shared/utils/search'
 import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
+import { FOCUS_QUICK_REPLY_EVENT, FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
 
 export function ChatThreadPage() {
   const { chatId } = useParams()
@@ -18,6 +19,8 @@ export function ChatThreadPage() {
     useChatsState()
   const [threadQuery, setThreadQuery] = useState('')
   const [messageQuery, setMessageQuery] = useState('')
+  const [composerFocusToken, setComposerFocusToken] = useState(0)
+  const messageSearchInputRef = useRef<HTMLInputElement | null>(null)
   const deferredThreadQuery = useDeferredValue(threadQuery)
   const deferredMessageQuery = useDeferredValue(messageQuery)
   const indexedThreads = useMemo(() => indexThreads(threads), [threads])
@@ -45,6 +48,22 @@ export function ChatThreadPage() {
       markThreadRead(thread.id)
     }
   }, [markThreadRead, thread])
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      messageSearchInputRef.current?.focus()
+      messageSearchInputRef.current?.select()
+    }
+    const onFocusQuickReply = () => {
+      setComposerFocusToken((value) => value + 1)
+    }
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    window.addEventListener(FOCUS_QUICK_REPLY_EVENT, onFocusQuickReply)
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+      window.removeEventListener(FOCUS_QUICK_REPLY_EVENT, onFocusQuickReply)
+    }
+  }, [])
 
   if (!loading && !thread) {
     return <Navigate to="/chats" replace />
@@ -115,6 +134,7 @@ export function ChatThreadPage() {
               }
             />
             <input
+              ref={messageSearchInputRef}
               value={messageQuery}
               onChange={(event) => setMessageQuery(event.target.value)}
               className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
@@ -152,6 +172,7 @@ export function ChatThreadPage() {
               )}
             </div>
             <MessageComposer
+              focusToken={composerFocusToken}
               onSend={(draft) => {
                 return sendMessage(thread.id, draft)
               }}

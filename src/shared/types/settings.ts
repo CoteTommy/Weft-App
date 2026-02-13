@@ -34,6 +34,9 @@ export interface SettingsSnapshot {
     motionPreference: MotionPreference
     hudEnabled: boolean
   }
+  features: {
+    commandCenterEnabled: boolean
+  }
   interop: {
     status: 'healthy' | 'warning' | 'critical'
     expectedProfile: string

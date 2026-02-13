@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Paperclip, StickyNote, X } from 'lucide-react'
 import type {
   OutboundAttachmentDraft,
@@ -8,9 +8,10 @@ import type {
 
 interface MessageComposerProps {
   onSend?: (draft: OutboundMessageDraft) => Promise<OutboundSendOutcome> | void
+  focusToken?: number
 }
 
-export function MessageComposer({ onSend }: MessageComposerProps) {
+export function MessageComposer({ onSend, focusToken = 0 }: MessageComposerProps) {
   const [text, setText] = useState('')
   const [attachments, setAttachments] = useState<OutboundAttachmentDraft[]>([])
   const [paperEnabled, setPaperEnabled] = useState(false)
@@ -23,6 +24,12 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const textInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    textInputRef.current?.focus()
+    textInputRef.current?.select()
+  }, [focusToken])
 
   return (
     <form
@@ -156,6 +163,7 @@ export function MessageComposer({ onSend }: MessageComposerProps) {
       ) : null}
       <div className="flex items-center gap-2">
         <input
+          ref={textInputRef}
           className="h-11 flex-1 rounded-xl border border-transparent px-3 text-sm text-slate-800 outline-none transition focus:border-blue-200 focus:bg-blue-50/50"
           placeholder="Type a message..."
           value={text}

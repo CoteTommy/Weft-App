@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { Link, useNavigate } from 'react-router-dom'
 import { ListSkeleton } from '../../../shared/ui/ListSkeleton'
@@ -11,6 +11,7 @@ import {
   parseLxmfContactReference,
 } from '../../../shared/utils/contactReference'
 import { filterIndexedItems, indexSearchItems } from '../../../shared/utils/search'
+import { FOCUS_NEW_CHAT_EVENT, FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
 import { usePeople } from '../state/usePeople'
 
 export function PeoplePage() {
@@ -20,6 +21,8 @@ export function PeoplePage() {
   const [destinationInput, setDestinationInput] = useState('')
   const [nameInput, setNameInput] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const destinationInputRef = useRef<HTMLInputElement | null>(null)
   const deferredQuery = useDeferredValue(query)
   const indexedPeople = useMemo(
     () =>
@@ -34,6 +37,23 @@ export function PeoplePage() {
     () => filterIndexedItems(indexedPeople, deferredQuery),
     [deferredQuery, indexedPeople],
   )
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    const onFocusNewChat = () => {
+      destinationInputRef.current?.focus()
+      destinationInputRef.current?.select()
+    }
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    window.addEventListener(FOCUS_NEW_CHAT_EVENT, onFocusNewChat)
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+      window.removeEventListener(FOCUS_NEW_CHAT_EVENT, onFocusNewChat)
+    }
+  }, [])
 
   return (
     <Panel className="flex h-full min-h-0 flex-col">
@@ -52,6 +72,7 @@ export function PeoplePage() {
         }
       />
       <input
+        ref={searchInputRef}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
@@ -73,6 +94,7 @@ export function PeoplePage() {
         }}
       >
         <input
+          ref={destinationInputRef}
           value={destinationInput}
           onChange={(event) => {
             setDestinationInput(event.target.value)

@@ -16,6 +16,7 @@ export interface WeftPreferences {
   notificationSoundEnabled: boolean
   motionPreference: MotionPreference
   performanceHudEnabled: boolean
+  commandCenterEnabled: boolean
   pendingRoute?: string
 }
 
@@ -34,6 +35,7 @@ const DEFAULT_PREFERENCES: WeftPreferences = {
   notificationSoundEnabled: false,
   motionPreference: 'snappy',
   performanceHudEnabled: false,
+  commandCenterEnabled: false,
 }
 
 export function getWeftPreferences(): WeftPreferences {
@@ -151,6 +153,9 @@ function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPrefe
   }
   if ('performanceHudEnabled' in value) {
     out.performanceHudEnabled = parseBoolean(value.performanceHudEnabled, false)
+  }
+  if ('commandCenterEnabled' in value) {
+    out.commandCenterEnabled = parseBoolean(value.commandCenterEnabled, false)
   }
   if ('pendingRoute' in value) {
     out.pendingRoute = normalizeOptional(value.pendingRoute)

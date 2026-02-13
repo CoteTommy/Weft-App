@@ -10,6 +10,7 @@ export function buildConfigPayload(input: {
   autoStartDaemon: boolean
   notifications: SettingsSnapshot['notifications']
   performance: SettingsSnapshot['performance']
+  features: SettingsSnapshot['features']
 }): SettingsConfigPayload {
   return {
     mode: input.mode,
@@ -19,6 +20,7 @@ export function buildConfigPayload(input: {
     autoStartDaemon: input.autoStartDaemon,
     notifications: input.notifications,
     performance: input.performance,
+    features: input.features,
   }
 }
 

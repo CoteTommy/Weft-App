@@ -73,6 +73,9 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       motionPreference: preferences.motionPreference,
       hudEnabled: preferences.performanceHudEnabled,
     },
+    features: {
+      commandCenterEnabled: preferences.commandCenterEnabled,
+    },
     interop,
   }
 }
@@ -166,5 +169,13 @@ export function savePerformanceSettings(input: {
   updateWeftPreferences({
     motionPreference: input.motionPreference,
     performanceHudEnabled: input.hudEnabled,
+  })
+}
+
+export function saveFeatureSettings(input: {
+  commandCenterEnabled?: boolean
+}): void {
+  updateWeftPreferences({
+    commandCenterEnabled: input.commandCenterEnabled,
   })
 }

@@ -9,6 +9,7 @@ import { shortHash } from '../../../shared/utils/identity'
 import {
   saveConnectivitySettings,
   saveDisplayName,
+  saveFeatureSettings,
   saveNotificationSettings,
   saveOutboundPropagationNode,
   savePerformanceSettings,
@@ -42,6 +43,7 @@ export function SettingsPage() {
   )
   const [motionPreference, setMotionPreference] = useState<MotionPreference>('snappy')
   const [performanceHudEnabled, setPerformanceHudEnabled] = useState(false)
+  const [commandCenterEnabled, setCommandCenterEnabled] = useState(false)
   const [configPayload, setConfigPayload] = useState('')
   const [backupWorking, setBackupWorking] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
@@ -60,6 +62,7 @@ export function SettingsPage() {
     setNotificationSettings(settings.notifications)
     setMotionPreference(settings.performance.motionPreference)
     setPerformanceHudEnabled(settings.performance.hudEnabled)
+    setCommandCenterEnabled(settings.features.commandCenterEnabled)
     setConfigPayload(
       JSON.stringify(
         buildConfigPayload({
@@ -70,6 +73,7 @@ export function SettingsPage() {
           autoStartDaemon: settings.connectivity.autoStartDaemon,
           notifications: settings.notifications,
           performance: settings.performance,
+          features: settings.features,
         }),
         null,
         2,
@@ -96,6 +100,16 @@ export function SettingsPage() {
     setMotionPreference(next.motionPreference)
     setPerformanceHudEnabled(next.hudEnabled)
     savePerformanceSettings(next)
+    setSaveFeedback(feedback)
+  }
+
+  const updateFeatures = (patch: Partial<SettingsSnapshot['features']>, feedback: string) => {
+    const next = {
+      commandCenterEnabled,
+      ...patch,
+    }
+    setCommandCenterEnabled(next.commandCenterEnabled)
+    saveFeatureSettings(next)
     setSaveFeedback(feedback)
   }
 
@@ -502,6 +516,12 @@ export function SettingsPage() {
                                   setPerformanceHudEnabled(parsed.performance.hudEnabled)
                                 }
                               }
+                              if (parsed.features) {
+                                saveFeatureSettings(parsed.features)
+                                if (typeof parsed.features.commandCenterEnabled === 'boolean') {
+                                  setCommandCenterEnabled(parsed.features.commandCenterEnabled)
+                                }
+                              }
                               await refresh()
                               setSaveFeedback('Configuration imported.')
                             } catch (importError) {
@@ -543,6 +563,9 @@ export function SettingsPage() {
                             performance: {
                               motionPreference,
                               hudEnabled: performanceHudEnabled,
+                            },
+                            features: {
+                              commandCenterEnabled,
                             },
                           }
                           const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -608,6 +631,12 @@ export function SettingsPage() {
                                   }
                                   if (typeof parsed.performance.hudEnabled === 'boolean') {
                                     setPerformanceHudEnabled(parsed.performance.hudEnabled)
+                                  }
+                                }
+                                if (parsed.features) {
+                                  saveFeatureSettings(parsed.features)
+                                  if (typeof parsed.features.commandCenterEnabled === 'boolean') {
+                                    setCommandCenterEnabled(parsed.features.commandCenterEnabled)
                                   }
                                 }
                                 await refresh()
@@ -690,6 +719,24 @@ export function SettingsPage() {
                         Show FPS HUD
                       </label>
                     </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                    <p className="text-sm font-semibold text-slate-800">Features</p>
+                    <label className="mt-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={commandCenterEnabled}
+                        onChange={(event) => {
+                          updateFeatures(
+                            { commandCenterEnabled: event.target.checked },
+                            event.target.checked
+                              ? 'Command Center enabled.'
+                              : 'Command Center hidden.',
+                          )
+                        }}
+                      />
+                      Enable Command Center page (advanced)
+                    </label>
                   </div>
                 </div>
               ) : null}

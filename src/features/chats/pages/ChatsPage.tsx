@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ThreadListRow } from '../components/ThreadList'
 import { useChatsState } from '../state/ChatsProvider'
@@ -8,6 +8,7 @@ import { Panel } from '../../../shared/ui/Panel'
 import { ListSkeleton } from '../../../shared/ui/ListSkeleton'
 import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
 import { parseLxmfContactReference } from '../../../shared/utils/contactReference'
+import { FOCUS_NEW_CHAT_EVENT, FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
 
 export function ChatsPage() {
   const navigate = useNavigate()
@@ -24,6 +25,8 @@ export function ChatsPage() {
     [deferredQuery, indexedThreads],
   )
   const primaryThread = filteredThreads[0] ?? threads[0]
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const destinationInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     const fromAnnounce = searchParams.get('new_dest')
@@ -46,6 +49,23 @@ export function ChatsPage() {
       void navigate(`/chats/${threadId}`, { replace: true })
     }
   }, [createThread, navigate, searchParams])
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    const onFocusNewChat = () => {
+      destinationInputRef.current?.focus()
+      destinationInputRef.current?.select()
+    }
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    window.addEventListener(FOCUS_NEW_CHAT_EVENT, onFocusNewChat)
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+      window.removeEventListener(FOCUS_NEW_CHAT_EVENT, onFocusNewChat)
+    }
+  }, [])
 
   return (
     <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -93,6 +113,7 @@ export function ChatsPage() {
           }}
         >
           <input
+            ref={destinationInputRef}
             value={destinationInput}
             onChange={(event) => {
               setDestinationInput(event.target.value)
@@ -121,6 +142,7 @@ export function ChatsPage() {
           {composeError ? <p className="text-xs text-rose-700">{composeError}</p> : null}
         </form>
         <input
+          ref={searchInputRef}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"

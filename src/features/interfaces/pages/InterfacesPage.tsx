@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { daemonRestart } from '../../../lib/lxmf-api'
 import { type ConnectivityMode, updateWeftPreferences } from '../../../shared/runtime/preferences'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 import { matchesQuery } from '../../../shared/utils/search'
+import { FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
 import { useInterfaces } from '../state/useInterfaces'
 
 export function InterfacesPage() {
@@ -16,6 +17,7 @@ export function InterfacesPage() {
   const [wizardTransport, setWizardTransport] = useState('')
   const [applying, setApplying] = useState(false)
   const [wizardFeedback, setWizardFeedback] = useState<string | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const filteredInterfaces = useMemo(
     () =>
       interfaces.filter((iface) =>
@@ -23,6 +25,17 @@ export function InterfacesPage() {
       ),
     [interfaces, query],
   )
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    }
+  }, [])
 
   return (
     <Panel className="flex h-full min-h-0 flex-col">
@@ -138,6 +151,7 @@ export function InterfacesPage() {
         </div>
       </div>
       <input
+        ref={searchInputRef}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"

@@ -24,15 +24,17 @@ import {
 } from '../shared/runtime/preferences'
 
 export default function App() {
+  const initialPreferences = getWeftPreferences()
   const [onboardingCompleted, setOnboardingCompleted] = useState(() => hasCompletedOnboarding())
-  const [motionPreference, setMotionPreference] = useState<MotionPreference>(
-    () => getWeftPreferences().motionPreference,
-  )
+  const [motionPreference, setMotionPreference] = useState<MotionPreference>(initialPreferences.motionPreference)
+  const [commandCenterEnabled, setCommandCenterEnabled] = useState(initialPreferences.commandCenterEnabled)
 
   useEffect(() => {
     const handleUpdate = () => {
+      const preferences = getWeftPreferences()
       setOnboardingCompleted(hasCompletedOnboarding())
-      setMotionPreference(getWeftPreferences().motionPreference)
+      setMotionPreference(preferences.motionPreference)
+      setCommandCenterEnabled(preferences.commandCenterEnabled)
     }
     window.addEventListener(PREFERENCES_UPDATED_EVENT, handleUpdate)
     return () => {
@@ -62,7 +64,11 @@ export default function App() {
               <Route path="/people" element={<PeoplePage />} />
               <Route path="/map" element={<MapPage />} />
               <Route path="/network" element={<NetworkPage />} />
-              <Route path="/command-center" element={<CommandCenterPage />} />
+              {commandCenterEnabled ? (
+                <Route path="/command-center" element={<CommandCenterPage />} />
+              ) : (
+                <Route path="/command-center" element={<Navigate to="/settings?section=advanced" replace />} />
+              )}
               <Route path="/interfaces" element={<InterfacesPage />} />
               <Route path="/announces" element={<AnnouncesPage />} />
               <Route path="/files" element={<FilesPage />} />

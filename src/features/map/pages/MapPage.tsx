@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 import { matchesQuery } from '../../../shared/utils/search'
 import { parseLxmfContactReference } from '../../../shared/utils/contactReference'
+import { FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
 import { sendLocationToDestination } from '../services/mapService'
 import { useMapPoints } from '../state/useMapPoints'
 
@@ -14,6 +15,7 @@ export function MapPage() {
   const [locationLabel, setLocationLabel] = useState('My location')
   const [shareFeedback, setShareFeedback] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const filteredPoints = useMemo(
     () =>
       points.filter((point) =>
@@ -25,6 +27,17 @@ export function MapPage() {
     () => filteredPoints.find((point) => point.id === selectedId) ?? filteredPoints[0] ?? null,
     [filteredPoints, selectedId],
   )
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    }
+  }, [])
 
   return (
     <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -44,6 +57,7 @@ export function MapPage() {
           }
         />
         <input
+          ref={searchInputRef}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"

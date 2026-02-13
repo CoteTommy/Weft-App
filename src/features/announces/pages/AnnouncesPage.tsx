@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
 import { ListSkeleton } from '../../../shared/ui/ListSkeleton'
@@ -17,6 +17,7 @@ import {
 import { useAnnounces } from '../state/useAnnounces'
 import type { AnnounceItem } from '../../../shared/types/announces'
 import { sendHubJoin } from '../services/announcesService'
+import { FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
 
 export function AnnouncesPage() {
   const navigate = useNavigate()
@@ -28,6 +29,7 @@ export function AnnouncesPage() {
   const [sendingReply, setSendingReply] = useState(false)
   const [joiningHub, setJoiningHub] = useState(false)
   const [replyFeedback, setReplyFeedback] = useState<string | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const deferredQuery = useDeferredValue(query)
   const indexedAnnounces = useMemo(
     () =>
@@ -72,6 +74,17 @@ export function AnnouncesPage() {
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [closeModal, selectedAnnounce])
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    }
+  }, [])
 
   const handleSendReply = async () => {
     if (!selectedAnnounce) {
@@ -156,6 +169,7 @@ export function AnnouncesPage() {
           }
         />
         <input
+          ref={searchInputRef}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"

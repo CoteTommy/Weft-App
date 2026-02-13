@@ -12,6 +12,7 @@ export interface SettingsConfigPayload {
   notificationsEnabled?: boolean
   notifications?: Partial<SettingsSnapshot['notifications']>
   performance?: Partial<SettingsSnapshot['performance']>
+  features?: Partial<SettingsSnapshot['features']>
 }
 
 export interface BackupPayload {
@@ -29,5 +30,8 @@ export interface BackupPayload {
   performance?: {
     motionPreference?: MotionPreference
     hudEnabled?: boolean
+  }
+  features?: {
+    commandCenterEnabled?: boolean
   }
 }

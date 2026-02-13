@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
 import { NotificationToasts } from './NotificationToasts'
+import { CommandPalette } from './CommandPalette'
 import { PerformanceHud } from './PerformanceHud'
 import { SidebarNav } from './SidebarNav'
 import { TopBar } from './TopBar'
@@ -95,6 +96,7 @@ export function AppShell() {
         </main>
       </div>
       <PerformanceHud />
+      <CommandPalette />
       <NotificationToasts />
     </div>
   )

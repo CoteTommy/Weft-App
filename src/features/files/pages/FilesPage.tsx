@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { paperIngestUri } from '../../../lib/lxmf-api'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
+import { FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
 import { matchesQuery } from '../../../shared/utils/search'
 import { useFiles } from '../state/useFiles'
 import type { FileItem } from '../../../shared/types/files'
@@ -12,10 +13,22 @@ export function FilesPage() {
   const [paperUriInput, setPaperUriInput] = useState('')
   const [paperWorking, setPaperWorking] = useState(false)
   const [paperFeedback, setPaperFeedback] = useState<string | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const filteredFiles = useMemo(
     () => files.filter((file) => matchesQuery(query, [file.name, file.kind, file.owner, file.sizeLabel])),
     [files, query],
   )
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch)
+    }
+  }, [])
 
   return (
     <Panel className="flex h-full min-h-0 flex-col">
@@ -34,6 +47,7 @@ export function FilesPage() {
         }
       />
       <input
+        ref={searchInputRef}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
