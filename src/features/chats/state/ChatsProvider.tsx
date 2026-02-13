@@ -451,17 +451,37 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       if (!incomingMessage) {
         return
       }
+      const statusHints = extractEventStatusHints(event)
+      const mergedMessage: ChatMessage =
+        incomingMessage.sender !== 'self'
+          ? incomingMessage
+          : {
+              ...incomingMessage,
+              statusDetail: statusHints.statusDetail ?? incomingMessage.statusDetail,
+              status:
+                deriveReceiptStatus(
+                  'out',
+                  statusHints.statusDetail ?? incomingMessage.statusDetail ?? null,
+                ) ?? incomingMessage.status,
+              statusReasonCode:
+                statusHints.reasonCode ??
+                deriveReasonCode(statusHints.statusDetail ?? incomingMessage.statusDetail),
+              deliveryTrace: appendDeliveryTraceEntry(
+                incomingMessage,
+                statusHints.statusDetail,
+              ),
+            }
 
       const threadId = derivedThread.id
       const knownIds = knownMessageIdsRef.current.get(threadId) ?? new Set<string>()
-      const isNewMessage = !knownIds.has(incomingMessage.id)
+      const isNewMessage = !knownIds.has(mergedMessage.id)
       if (isNewMessage) {
-        knownIds.add(incomingMessage.id)
+        knownIds.add(mergedMessage.id)
       }
       knownMessageIdsRef.current.set(threadId, knownIds)
       draftThreadsRef.current.delete(threadId)
 
-      const isIncoming = incomingMessage.sender === 'peer' && isNewMessage
+      const isIncoming = mergedMessage.sender === 'peer' && isNewMessage
       if (isIncoming) {
         unreadCountsRef.current.set(
           threadId,
@@ -486,7 +506,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         }
 
         const existing = previous[index]
-        const messages = upsertThreadMessages(existing.messages, incomingMessage)
+        const messages = upsertThreadMessages(existing.messages, mergedMessage)
         const updatedThread = applyThreadMetadata({
           ...existing,
           preview: previewFromMessage(messages[messages.length - 1]),
@@ -503,14 +523,14 @@ export function ChatsProvider({ children }: PropsWithChildren) {
         publishAppNotification({
           kind: 'message',
           title: derivedThread.name,
-          body: incomingMessage.body || 'New incoming message',
+          body: mergedMessage.body || 'New incoming message',
           threadId,
         })
         void emitIncomingNotifications([
           {
             threadId,
             threadName: derivedThread.name,
-            latestBody: incomingMessage.body,
+            latestBody: mergedMessage.body,
             count: 1,
           },
         ])
@@ -800,4 +820,31 @@ function extractReceiptUpdate(
     status,
     reasonCode,
   }
+}
+
+function extractEventStatusHints(
+  event: LxmfRpcEvent,
+): { statusDetail?: string; reasonCode?: string } {
+  if (!event.payload || typeof event.payload !== 'object' || Array.isArray(event.payload)) {
+    return {}
+  }
+  const payload = event.payload as Record<string, unknown>
+  const reasonCode =
+    typeof payload.reason_code === 'string' && payload.reason_code.trim().length > 0
+      ? payload.reason_code.trim()
+      : undefined
+
+  if (typeof payload.error === 'string' && payload.error.trim().length > 0) {
+    return {
+      statusDetail: `failed: ${payload.error.trim()}`,
+      reasonCode: reasonCode ?? deriveReasonCode(payload.error.trim()),
+    }
+  }
+  if (typeof payload.method === 'string' && payload.method.trim().length > 0) {
+    return {
+      statusDetail: `sent: ${payload.method.trim()}`,
+      reasonCode,
+    }
+  }
+  return { reasonCode }
 }
