@@ -12,6 +12,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, State};
 
 #[tauri::command]
@@ -864,25 +865,22 @@ fn build_telemetry_value(telemetry_location: Option<Value>) -> Result<Option<rmp
         .ok_or_else(|| "telemetry_location.lat is required".to_string())?;
     let lon = read_finite_number(object, &["lon", "lng", "longitude"])
         .ok_or_else(|| "telemetry_location.lon is required".to_string())?;
+    let alt = read_finite_number(object, &["alt", "altitude"]).unwrap_or(0.0);
+    let speed = read_finite_number(object, &["speed"]).unwrap_or(0.0);
+    let bearing = read_finite_number(object, &["bearing", "heading"]).unwrap_or(0.0);
+    let accuracy = read_finite_number(object, &["accuracy"]).unwrap_or(0.0);
+    let updated = read_finite_number(object, &["updated", "last_update", "timestamp"])
+        .map(|value| value.round() as i64)
+        .unwrap_or_else(|| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_secs() as i64)
+                .unwrap_or(0)
+        });
 
-    let mut entries = vec![
-        (rmpv::Value::String("lat".into()), rmpv::Value::F64(lat)),
-        (rmpv::Value::String("lon".into()), rmpv::Value::F64(lon)),
-    ];
-    for (json_key, msgpack_key) in [("alt", "alt"), ("speed", "speed"), ("accuracy", "accuracy")] {
-        if let Some(value) = object
-            .get(json_key)
-            .and_then(Value::as_f64)
-            .filter(|value| value.is_finite())
-        {
-            entries.push((
-                rmpv::Value::String(msgpack_key.into()),
-                rmpv::Value::F64(value),
-            ));
-        }
-    }
-
-    Ok(Some(rmpv::Value::Map(entries)))
+    let packed =
+        pack_sideband_location_telemetry(lat, lon, alt, speed, bearing, accuracy, updated)?;
+    Ok(Some(rmpv::Value::Binary(packed)))
 }
 
 fn read_finite_number(object: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<f64> {
@@ -955,7 +953,7 @@ fn build_attachment_fields(attachments: &[RichAttachmentInput]) -> Result<Option
             ));
         }
         encoded_attachments.push(rmpv::Value::Array(vec![
-            rmpv::Value::Binary(name.into_bytes()),
+            rmpv::Value::String(name.into()),
             rmpv::Value::Binary(bytes),
         ]));
     }
@@ -970,6 +968,54 @@ fn build_attachment_fields(attachments: &[RichAttachmentInput]) -> Result<Option
     Ok(Some(json!({
         TRANSPORT_FIELDS_MSGPACK_B64_KEY: payload
     })))
+}
+
+fn pack_sideband_location_telemetry(
+    lat: f64,
+    lon: f64,
+    alt: f64,
+    speed: f64,
+    bearing: f64,
+    accuracy: f64,
+    updated: i64,
+) -> Result<Vec<u8>, String> {
+    const SID_TIME: u8 = 0x01;
+    const SID_LOCATION: u8 = 0x02;
+
+    let lat_raw = ((lat.clamp(-90.0, 90.0) * 1e6).round() as i32)
+        .to_be_bytes()
+        .to_vec();
+    let lon_raw = ((lon.clamp(-180.0, 180.0) * 1e6).round() as i32)
+        .to_be_bytes()
+        .to_vec();
+    let alt_raw = ((alt * 1e2).round() as i32).to_be_bytes().to_vec();
+    let speed_raw = ((speed.max(0.0) * 1e2).round() as u32)
+        .to_be_bytes()
+        .to_vec();
+    let bearing_raw = ((bearing * 1e2).round() as i32).to_be_bytes().to_vec();
+    let accuracy_raw = ((accuracy.max(0.0) * 1e2).round() as u16)
+        .to_be_bytes()
+        .to_vec();
+
+    let payload = rmpv::Value::Map(vec![
+        (
+            rmpv::Value::Integer((SID_TIME as i64).into()),
+            rmpv::Value::Integer(updated.into()),
+        ),
+        (
+            rmpv::Value::Integer((SID_LOCATION as i64).into()),
+            rmpv::Value::Array(vec![
+                rmpv::Value::Binary(lat_raw),
+                rmpv::Value::Binary(lon_raw),
+                rmpv::Value::Binary(alt_raw),
+                rmpv::Value::Binary(speed_raw),
+                rmpv::Value::Binary(bearing_raw),
+                rmpv::Value::Binary(accuracy_raw),
+                rmpv::Value::Integer(updated.into()),
+            ]),
+        ),
+    ]);
+    rmp_serde::to_vec(&payload).map_err(|err| format!("failed to encode telemetry payload: {err}"))
 }
 
 fn decode_attachment_bytes(value: &str) -> Result<Vec<u8>, String> {
@@ -1060,6 +1106,39 @@ mod tests {
         assert_eq!(map[0].0.as_i64(), Some(FIELD_FILE_ATTACHMENTS as i64));
         let entries = map[0].1.as_array().expect("attachment array");
         assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries[0].as_array().and_then(|entry| entry[0].as_str()),
+            Some("hello.txt")
+        );
+    }
+
+    #[test]
+    fn build_telemetry_value_encodes_sideband_telemeter_payload() {
+        let telemetry = build_telemetry_value(Some(json!({
+            "lat": 48.8566,
+            "lon": 2.3522,
+            "alt": 35.5,
+            "speed": 4.2,
+            "bearing": 180.0,
+            "accuracy": 3.4,
+            "updated": 1_770_855_315,
+        })))
+        .expect("telemetry value")
+        .expect("some telemetry");
+
+        let bytes = match &telemetry {
+            rmpv::Value::Binary(bytes) => bytes.as_slice(),
+            other => panic!("expected binary telemetry, got {other:?}"),
+        };
+        let decoded: rmpv::Value = rmp_serde::from_slice(bytes).expect("decode packed telemetry");
+        let map = decoded.as_map().expect("map");
+        assert!(map.iter().any(|(key, _)| key.as_i64() == Some(0x01)));
+        let location = map
+            .iter()
+            .find(|(key, _)| key.as_i64() == Some(0x02))
+            .and_then(|(_, value)| value.as_array())
+            .expect("location sensor");
+        assert_eq!(location.len(), 7);
     }
 
     #[test]

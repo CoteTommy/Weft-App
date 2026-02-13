@@ -1,5 +1,6 @@
 import { listLxmfMessages, sendLxmfMessage } from '../../../lib/lxmf-api'
 import type { LxmfMessageRecord } from '../../../lib/lxmf-payloads'
+import { parseMessageAssets } from '../../chats/services/chatMessageAssets'
 import { shortHash } from '../../../shared/utils/identity'
 
 export interface MapPoint {
@@ -31,6 +32,10 @@ export async function sendLocationToDestination(input: {
     destination: input.destination,
     title: 'Location',
     content,
+    telemetryLocation: {
+      lat: input.lat,
+      lon: input.lon,
+    },
     fields: {
       location: {
         lat: input.lat,
@@ -42,11 +47,30 @@ export async function sendLocationToDestination(input: {
 
 function extractPointsFromMessage(record: LxmfMessageRecord): MapPoint[] {
   const points = [
+    ...extractFieldLocationPoints(record),
     ...extractGeoUriPoints(record),
     ...extractOsmPoints(record),
     ...extractGooglePoints(record),
   ]
   return dedupePoints(points)
+}
+
+function extractFieldLocationPoints(record: LxmfMessageRecord): MapPoint[] {
+  const location = parseMessageAssets(record.fields).location
+  if (!location || !isValidCoordinate(location.lat, location.lon)) {
+    return []
+  }
+  return [
+    {
+      id: `${record.id}:${normalizeTimestampMs(record.timestamp)}:${location.lat.toFixed(5)}:${location.lon.toFixed(5)}`,
+      label: record.title.trim() || firstLine(record.content) || 'Location point',
+      lat: location.lat,
+      lon: location.lon,
+      source: shortHash(record.direction === 'out' ? record.destination : record.source, 8),
+      when: formatWhen(record.timestamp),
+      direction: record.direction === 'out' ? 'out' : record.direction === 'in' ? 'in' : 'unknown',
+    },
+  ]
 }
 
 function extractGeoUriPoints(record: LxmfMessageRecord): MapPoint[] {
