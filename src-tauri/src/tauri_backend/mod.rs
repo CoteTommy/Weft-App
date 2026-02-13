@@ -20,6 +20,8 @@ const TRAY_ICON_ID: &str = "weft-tray";
 const TRAY_MENU_OPEN: &str = "open";
 const TRAY_MENU_RECONNECT: &str = "reconnect";
 const TRAY_MENU_QUIT: &str = "quit";
+const TRAY_TEMPLATE_ICON: tauri::image::Image<'_> =
+    tauri::include_image!("./icons/tray-template.png");
 
 #[derive(Default)]
 pub(crate) struct EventPumpControl {
@@ -209,9 +211,7 @@ fn setup_status_tray(app: &tauri::AppHandle, actor: RuntimeActor) -> Result<(), 
             _ => {}
         });
 
-    if let Some(icon) = app.default_window_icon().cloned() {
-        tray_builder = tray_builder.icon(icon);
-    }
+    tray_builder = tray_builder.icon(TRAY_TEMPLATE_ICON);
     #[cfg(target_os = "macos")]
     {
         tray_builder = tray_builder.icon_as_template(true);
