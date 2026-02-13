@@ -2,7 +2,7 @@
 
 This file mirrors:
 
-- `/Users/tommy/Documents/TAK/LXMF-rs/docs/payload-contract.md`
+- `LXMF-rs/docs/payload-contract.md`
 
 It defines the frontend/runtime contract used by Weft Tauri.
 
@@ -13,19 +13,19 @@ It defines the frontend/runtime contract used by Weft Tauri.
 
 ## Canonical Field Coverage
 
-| Domain | Field | Hex | JSON key form |
-| --- | --- | --- | --- |
-| telemetry | `FIELD_TELEMETRY` | `0x02` | `"2"` |
-| attachments | `FIELD_FILE_ATTACHMENTS` | `0x05` | `"5"` |
-| commands | `FIELD_COMMANDS` | `0x09` | `"9"` |
-| ticket | `FIELD_TICKET` | `0x0C` | `"12"` |
-| refs | `FIELD_RNR_REFS` | `0x0E` | `"14"` |
-| app extensions | extension map | `0x10` | `"16"` |
+| Domain         | Field                    | Hex    | JSON key form |
+| -------------- | ------------------------ | ------ | ------------- |
+| telemetry      | `FIELD_TELEMETRY`        | `0x02` | `"2"`         |
+| attachments    | `FIELD_FILE_ATTACHMENTS` | `0x05` | `"5"`         |
+| commands       | `FIELD_COMMANDS`         | `0x09` | `"9"`         |
+| ticket         | `FIELD_TICKET`           | `0x0C` | `"12"`        |
+| refs           | `FIELD_RNR_REFS`         | `0x0E` | `"14"`        |
+| app extensions | extension map            | `0x10` | `"16"`        |
 
 ## Schema Artifacts
 
-- `/Users/tommy/Documents/TAK/Weft-Web/docs/schemas/contract-v2/payload-envelope.schema.json`
-- `/Users/tommy/Documents/TAK/Weft-Web/docs/schemas/contract-v2/event-payload.schema.json`
+- `Weft-Web/docs/schemas/contract-v2/payload-envelope.schema.json`
+- `Weft-Web/docs/schemas/contract-v2/event-payload.schema.json`
 
 ## Message Envelope
 
