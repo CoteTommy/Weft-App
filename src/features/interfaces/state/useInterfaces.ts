@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { InterfaceItem, InterfaceMetrics } from '../../../shared/types/interfaces'
+import type { InterfaceItem, InterfaceMetrics } from '@shared/types/interfaces'
 import { fetchInterfaceSnapshot } from '../services/interfacesService'
 
 interface UseInterfacesState {

@@ -1,5 +1,5 @@
 import type { ConnectivityMode, MotionPreference } from '../runtime/preferences'
-import type { DesktopAppearance } from '../../lib/desktop-shell-api'
+import type { DesktopAppearance } from '@lib/desktop-shell-api'
 
 export interface SettingsSnapshot {
   displayName: string

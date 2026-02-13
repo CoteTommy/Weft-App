@@ -1,9 +1,9 @@
-import type { ChatThread } from '../../../shared/types/chat'
+import type { ChatThread } from '@shared/types/chat'
 import {
   filterIndexedItems,
   indexSearchItems,
   type IndexedSearchItem,
-} from '../../../shared/utils/search'
+} from '@shared/utils/search'
 
 export function indexThreads(threads: ChatThread[]): IndexedSearchItem<ChatThread>[] {
   return indexSearchItems(

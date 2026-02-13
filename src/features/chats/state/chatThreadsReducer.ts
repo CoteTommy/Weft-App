@@ -1,5 +1,5 @@
 import { deriveReasonCode, deriveReceiptStatus } from '../services/chatThreadBuilders'
-import type { ChatMessage, ChatThread } from '../../../shared/types/chat'
+import type { ChatMessage, ChatThread } from '@shared/types/chat'
 
 export interface RuntimeMessageReducerInput {
   derivedThread: ChatThread

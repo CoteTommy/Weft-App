@@ -1,11 +1,11 @@
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import type { ConnectivityMode, MotionPreference } from '../../../shared/runtime/preferences'
-import type { SettingsSnapshot } from '../../../shared/types/settings'
-import { Panel } from '../../../shared/ui/Panel'
-import { PageHeading } from '../../../shared/ui/PageHeading'
-import { shortHash } from '../../../shared/utils/identity'
+import type { ConnectivityMode, MotionPreference } from '@shared/runtime/preferences'
+import type { SettingsSnapshot } from '@shared/types/settings'
+import { Panel } from '@shared/ui/Panel'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { shortHash } from '@shared/utils/identity'
 import {
   saveConnectivitySettings,
   saveDesktopShellSettings,

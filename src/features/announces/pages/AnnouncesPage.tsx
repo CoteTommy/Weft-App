@@ -1,23 +1,23 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
-import { ListSkeleton } from '../../../shared/ui/ListSkeleton'
-import { PageHeading } from '../../../shared/ui/PageHeading'
-import { Panel } from '../../../shared/ui/Panel'
-import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
-import type { AnnouncePriorityLabel } from '../../../shared/types/announces'
-import type { LxmfSendMessageOptions } from '../../../lib/lxmf-api'
-import { sendLxmfMessage } from '../../../lib/lxmf-api'
-import { shortHash } from '../../../shared/utils/identity'
-import { filterIndexedItems, indexSearchItems } from '../../../shared/utils/search'
+import { ListSkeleton } from '@shared/ui/ListSkeleton'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
+import { VirtualizedList } from '@shared/ui/VirtualizedList'
+import type { AnnouncePriorityLabel } from '@shared/types/announces'
+import type { LxmfSendMessageOptions } from '@lib/lxmf-api'
+import { sendLxmfMessage } from '@lib/lxmf-api'
+import { shortHash } from '@shared/utils/identity'
+import { filterIndexedItems, indexSearchItems } from '@shared/utils/search'
 import {
   buildNewChatHref,
   parseLxmfContactReference,
-} from '../../../shared/utils/contactReference'
+} from '@shared/utils/contactReference'
 import { useAnnounces } from '../state/useAnnounces'
-import type { AnnounceItem } from '../../../shared/types/announces'
+import type { AnnounceItem } from '@shared/types/announces'
 import { sendHubJoin } from '../services/announcesService'
-import { FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
+import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 
 export function AnnouncesPage() {
   const navigate = useNavigate()

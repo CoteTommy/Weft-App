@@ -4,7 +4,7 @@ import {
   getWeftPreferences,
   PREFERENCES_UPDATED_EVENT,
   type MotionPreference,
-} from '../../shared/runtime/preferences'
+} from '@shared/runtime/preferences'
 
 interface HudSnapshot {
   fps: number

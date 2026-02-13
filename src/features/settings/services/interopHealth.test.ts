@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import type { LxmfProbeReport } from '../../../lib/lxmf-contract'
-import type { LxmfMessageRecord } from '../../../lib/lxmf-payloads'
+import type { LxmfProbeReport } from '@lib/lxmf-contract'
+import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 import { buildInteropSnapshot } from './interopHealth'
 
 function makeProbe(partial?: Partial<LxmfProbeReport>): LxmfProbeReport {

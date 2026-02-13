@@ -1,6 +1,6 @@
 import clsx from 'clsx'
-import type { SettingsSnapshot } from '../../../shared/types/settings'
-import { shortHash } from '../../../shared/utils/identity'
+import type { SettingsSnapshot } from '@shared/types/settings'
+import { shortHash } from '@shared/utils/identity'
 
 interface OutboundPropagationRelayCardProps {
   settings: SettingsSnapshot

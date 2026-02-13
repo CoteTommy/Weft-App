@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { LxmfMessageRecord } from '../../../lib/lxmf-payloads'
+import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 import {
   extractFilesFromMessages,
   extractMapPointsFromMessages,

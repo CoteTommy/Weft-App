@@ -1,17 +1,17 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { Link, useNavigate } from 'react-router-dom'
-import { ListSkeleton } from '../../../shared/ui/ListSkeleton'
-import { PageHeading } from '../../../shared/ui/PageHeading'
-import { Panel } from '../../../shared/ui/Panel'
-import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
-import type { PersonTrust } from '../../../shared/types/people'
+import { ListSkeleton } from '@shared/ui/ListSkeleton'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
+import { VirtualizedList } from '@shared/ui/VirtualizedList'
+import type { PersonTrust } from '@shared/types/people'
 import {
   buildNewChatHref,
   parseLxmfContactReference,
-} from '../../../shared/utils/contactReference'
-import { filterIndexedItems, indexSearchItems } from '../../../shared/utils/search'
-import { FOCUS_NEW_CHAT_EVENT, FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
+} from '@shared/utils/contactReference'
+import { filterIndexedItems, indexSearchItems } from '@shared/utils/search'
+import { FOCUS_NEW_CHAT_EVENT, FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 import { usePeople } from '../state/usePeople'
 
 export function PeoplePage() {

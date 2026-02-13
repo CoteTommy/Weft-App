@@ -1,18 +1,18 @@
 import clsx from 'clsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { announceLxmfNow, daemonRestart } from '../../lib/lxmf-api'
-import { useChatsState } from '../../features/chats/state/ChatsProvider'
-import { publishAppNotification } from '../../shared/runtime/notifications'
+import { announceLxmfNow, daemonRestart } from '@lib/lxmf-api'
+import { useChatsState } from '@features/chats/state/ChatsProvider'
+import { publishAppNotification } from '@shared/runtime/notifications'
 import {
   getWeftPreferences,
   PREFERENCES_UPDATED_EVENT,
-} from '../../shared/runtime/preferences'
+} from '@shared/runtime/preferences'
 import {
   FOCUS_NEW_CHAT_EVENT,
   FOCUS_QUICK_REPLY_EVENT,
   FOCUS_SEARCH_EVENT,
-} from '../../shared/runtime/shortcuts'
+} from '@shared/runtime/shortcuts'
 
 interface PaletteAction {
   id: string

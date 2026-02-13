@@ -1,5 +1,5 @@
-import type { ConnectivityMode, MotionPreference } from '../../shared/runtime/preferences'
-import type { SettingsSnapshot } from '../../shared/types/settings'
+import type { ConnectivityMode, MotionPreference } from '@shared/runtime/preferences'
+import type { SettingsSnapshot } from '@shared/types/settings'
 
 export type SettingsSection = 'profile' | 'connectivity' | 'notifications' | 'data' | 'advanced'
 

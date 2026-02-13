@@ -12,18 +12,18 @@ import {
   Users,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
-import { useChatsState } from '../../features/chats/state/ChatsProvider'
-import { getLxmfProfile, probeLxmf } from '../../lib/lxmf-api'
+import { useChatsState } from '@features/chats/state/ChatsProvider'
+import { getLxmfProfile, probeLxmf } from '@lib/lxmf-api'
 import {
   getWeftPreferences,
   PREFERENCES_UPDATED_EVENT,
-} from '../../shared/runtime/preferences'
+} from '@shared/runtime/preferences'
 import {
   DISPLAY_NAME_UPDATED_EVENT,
   getStoredDisplayName,
   resolveDisplayName,
   shortHash,
-} from '../../shared/utils/identity'
+} from '@shared/utils/identity'
 
 const navItems = [
   { to: '/chats', label: 'Chats', icon: MessageSquare },

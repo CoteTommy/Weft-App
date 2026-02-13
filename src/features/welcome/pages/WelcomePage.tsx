@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
-import { daemonStart, setLxmfDisplayName } from '../../../lib/lxmf-api'
-import { getStoredDisplayName, setStoredDisplayName } from '../../../shared/utils/identity'
+import { daemonStart, setLxmfDisplayName } from '@lib/lxmf-api'
+import { getStoredDisplayName, setStoredDisplayName } from '@shared/utils/identity'
 import {
   consumePendingLaunchRoute,
   type ConnectivityMode,
   getWeftPreferences,
   updateWeftPreferences,
-} from '../../../shared/runtime/preferences'
+} from '@shared/runtime/preferences'
 
 type OnboardingStep = 0 | 1 | 2
 

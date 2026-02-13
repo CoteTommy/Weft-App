@@ -2,9 +2,9 @@ import clsx from 'clsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { BellRing, CircleAlert, MessageSquare, X } from 'lucide-react'
-import type { AppNotification } from '../../shared/runtime/notifications'
-import { formatRelativeFromNow } from '../../shared/utils/time'
-import { useChatsState } from '../../features/chats/state/ChatsProvider'
+import type { AppNotification } from '@shared/runtime/notifications'
+import { formatRelativeFromNow } from '@shared/utils/time'
+import { useChatsState } from '@features/chats/state/ChatsProvider'
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
 
 const MAX_TOASTS = 4

@@ -1,4 +1,4 @@
-import type { ChatMessage, ChatThread, OutboundMessageDraft } from '../../../shared/types/chat'
+import type { ChatMessage, ChatThread, OutboundMessageDraft } from '@shared/types/chat'
 
 export type OfflineQueueSource = 'send_error' | 'failed_message'
 export type OfflineQueueStatus = 'queued' | 'paused' | 'sending'

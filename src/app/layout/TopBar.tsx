@@ -26,19 +26,19 @@ import {
   listLxmfPropagationNodes,
   probeLxmf,
   setLxmfOutboundPropagationNode,
-} from '../../lib/lxmf-api'
-import type { LxmfProbeReport } from '../../lib/lxmf-contract'
-import type { LxmfMessageRecord } from '../../lib/lxmf-payloads'
-import { publishAppNotification } from '../../shared/runtime/notifications'
+} from '@lib/lxmf-api'
+import type { LxmfProbeReport } from '@lib/lxmf-contract'
+import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
+import { publishAppNotification } from '@shared/runtime/notifications'
 import {
   getRuntimeConnectionOptions,
   PREFERENCES_UPDATED_EVENT,
   updateWeftPreferences,
-} from '../../shared/runtime/preferences'
-import { formatRelativeFromNow } from '../../shared/utils/time'
+} from '@shared/runtime/preferences'
+import { formatRelativeFromNow } from '@shared/utils/time'
 import type { DeliveryDiagnosticsSnapshot, RecoveryEvent } from './DeliveryDiagnosticsDrawer'
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
-import { useChatsState } from '../../features/chats/state/ChatsProvider'
+import { useChatsState } from '@features/chats/state/ChatsProvider'
 
 const DeliveryDiagnosticsDrawer = lazy(() =>
   import('./DeliveryDiagnosticsDrawer').then((module) => ({ default: module.DeliveryDiagnosticsDrawer })),

@@ -2,16 +2,16 @@ import { useEffect, useMemo } from 'react'
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { CircleAlert, Loader2, ShieldCheck, Wrench } from 'lucide-react'
-import type { LxmfDaemonLocalStatus, LxmfProbeReport } from '../../lib/lxmf-contract'
+import type { LxmfDaemonLocalStatus, LxmfProbeReport } from '@lib/lxmf-contract'
 import type {
   LxmfDeliveryTraceEntry,
   LxmfInterfaceListResponse,
   LxmfOutboundPropagationNodeResponse,
   LxmfPropagationNodeListResponse,
-} from '../../lib/lxmf-payloads'
-import type { LxmfProfileInfo } from '../../lib/lxmf-api'
-import { formatRelativeFromNow } from '../../shared/utils/time'
-import type { OfflineQueueEntry } from '../../features/chats/state/offlineQueue'
+} from '@lib/lxmf-payloads'
+import type { LxmfProfileInfo } from '@lib/lxmf-api'
+import { formatRelativeFromNow } from '@shared/utils/time'
+import type { OfflineQueueEntry } from '@features/chats/state/offlineQueue'
 
 export interface DeliveryDiagnosticsSnapshot {
   capturedAtMs: number

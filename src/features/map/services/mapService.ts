@@ -1,8 +1,8 @@
-import { listLxmfMessages, sendLxmfMessage } from '../../../lib/lxmf-api'
+import { listLxmfMessages, sendLxmfMessage } from '@lib/lxmf-api'
 import {
   parseMapPointsOffThread,
   type ParsedMapPoint as MapPoint,
-} from '../../messages/services/payloadParseWorker'
+} from '@features/messages/services/payloadParseWorker'
 
 export type { MapPoint }
 

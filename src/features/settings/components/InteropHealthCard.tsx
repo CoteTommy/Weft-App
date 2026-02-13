@@ -1,6 +1,6 @@
 import clsx from 'clsx'
-import type { SettingsSnapshot } from '../../../shared/types/settings'
-import { formatRelativeFromNow } from '../../../shared/utils/time'
+import type { SettingsSnapshot } from '@shared/types/settings'
+import { formatRelativeFromNow } from '@shared/utils/time'
 
 interface InteropHealthCardProps {
   interop: SettingsSnapshot['interop']

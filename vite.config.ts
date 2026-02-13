@@ -19,6 +19,7 @@ export default defineConfig({
       '@shared': resolve(currentDir, 'src/shared'),
       '@lib': resolve(currentDir, 'src/lib'),
       '@runtime': resolve(currentDir, 'src/shared/runtime'),
+      '@platform': resolve(currentDir, 'src/platform'),
     },
   },
   server: {

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { daemonRestart } from '../../../lib/lxmf-api'
-import { type ConnectivityMode, updateWeftPreferences } from '../../../shared/runtime/preferences'
-import { PageHeading } from '../../../shared/ui/PageHeading'
-import { Panel } from '../../../shared/ui/Panel'
-import { matchesQuery } from '../../../shared/utils/search'
-import { FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
+import { daemonRestart } from '@lib/lxmf-api'
+import { type ConnectivityMode, updateWeftPreferences } from '@shared/runtime/preferences'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
+import { matchesQuery } from '@shared/utils/search'
+import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 import { useInterfaces } from '../state/useInterfaces'
 
 export function InterfacesPage() {

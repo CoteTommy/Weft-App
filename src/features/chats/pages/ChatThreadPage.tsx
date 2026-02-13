@@ -6,12 +6,12 @@ import { MessageTimeline } from '../components/MessageTimeline'
 import { ThreadListRow } from '../components/ThreadList'
 import { useChatsState } from '../state/ChatsProvider'
 import { filterThreadIndex, indexThreads } from '../utils/filterThreads'
-import { ListSkeleton } from '../../../shared/ui/ListSkeleton'
-import { PageHeading } from '../../../shared/ui/PageHeading'
-import { Panel } from '../../../shared/ui/Panel'
-import { matchesQuery } from '../../../shared/utils/search'
-import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
-import { FOCUS_QUICK_REPLY_EVENT, FOCUS_SEARCH_EVENT } from '../../../shared/runtime/shortcuts'
+import { ListSkeleton } from '@shared/ui/ListSkeleton'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
+import { matchesQuery } from '@shared/utils/search'
+import { VirtualizedList } from '@shared/ui/VirtualizedList'
+import { FOCUS_QUICK_REPLY_EVENT, FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 
 export function ChatThreadPage() {
   const { chatId } = useParams()

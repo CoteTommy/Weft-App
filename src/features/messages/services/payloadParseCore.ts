@@ -3,8 +3,8 @@ import type {
   LxmfMessageFields,
   LxmfMessageRecord,
   LxmfPaperPayload,
-} from '../../../lib/lxmf-payloads'
-import type { FileItem } from '../../../shared/types/files'
+} from '@lib/lxmf-payloads'
+import type { FileItem } from '@shared/types/files'
 
 export interface ParsedMapPoint {
   id: string

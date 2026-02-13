@@ -1,4 +1,4 @@
-import type { ChatThread } from '../../../shared/types/chat'
+import type { ChatThread } from '@shared/types/chat'
 
 export function selectThreadById(
   threads: ChatThread[],

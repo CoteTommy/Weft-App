@@ -10,19 +10,19 @@ import {
   useState,
 } from 'react'
 import { Outlet } from 'react-router-dom'
-import type { LxmfMessageRecord, LxmfRpcEvent } from '../../../lib/lxmf-payloads'
+import type { LxmfMessageRecord, LxmfRpcEvent } from '@lib/lxmf-payloads'
 import type {
   ChatThread,
   ChatMessage,
   OutboundMessageDraft,
   OutboundSendOutcome,
-} from '../../../shared/types/chat'
+} from '@shared/types/chat'
 import {
   DISPLAY_NAME_UPDATED_EVENT,
   getStoredDisplayName,
   shortHash,
-} from '../../../shared/utils/identity'
-import { publishAppNotification } from '../../../shared/runtime/notifications'
+} from '@shared/utils/identity'
+import { publishAppNotification } from '@shared/runtime/notifications'
 import { fetchChatThreads, postChatMessage, buildThreads } from '../services/chatService'
 import { deriveReasonCode, deriveReceiptStatus } from '../services/chatThreadBuilders'
 import {

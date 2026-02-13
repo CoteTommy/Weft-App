@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { ChatThread } from '../../../shared/types/chat'
+import type { ChatThread } from '@shared/types/chat'
 import {
   extendIgnoredFailedMessageIds,
   markQueueEntryAttemptFailed,

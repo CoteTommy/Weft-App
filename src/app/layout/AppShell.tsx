@@ -11,15 +11,15 @@ import {
   getDesktopShellPreferences,
   setDesktopShellPreferences,
   subscribeTrayActions,
-} from '../../lib/desktop-shell-api'
+} from '@lib/desktop-shell-api'
 import {
   getWeftPreferences,
   PREFERENCES_UPDATED_EVENT,
   updateWeftPreferences,
   type MotionPreference,
-} from '../../shared/runtime/preferences'
-import { FOCUS_NEW_CHAT_EVENT } from '../../shared/runtime/shortcuts'
-import { isRestorableMainRoute } from '../../shared/runtime/sessionRestore'
+} from '@shared/runtime/preferences'
+import { FOCUS_NEW_CHAT_EVENT } from '@shared/runtime/shortcuts'
+import { isRestorableMainRoute } from '@shared/runtime/sessionRestore'
 
 export function AppShell() {
   const navigate = useNavigate()

@@ -1,6 +1,6 @@
-import { announceLxmfNow, listLxmfAnnounces, sendLxmfCommand } from '../../../lib/lxmf-api'
-import type { LxmfAnnounceRecord } from '../../../lib/lxmf-payloads'
-import type { AnnounceItem, AnnouncePriorityLabel } from '../../../shared/types/announces'
+import { announceLxmfNow, listLxmfAnnounces, sendLxmfCommand } from '@lib/lxmf-api'
+import type { LxmfAnnounceRecord } from '@lib/lxmf-payloads'
+import type { AnnounceItem, AnnouncePriorityLabel } from '@shared/types/announces'
 
 interface DerivedAnnounce extends AnnounceItem {
   postedAtMs: number

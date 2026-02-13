@@ -1,5 +1,5 @@
-import type { LxmfMessageRecord } from '../../../lib/lxmf-payloads'
-import type { ChatAttachment, ChatMessage, ChatPaperMeta } from '../../../shared/types/chat'
+import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
+import type { ChatAttachment, ChatMessage, ChatPaperMeta } from '@shared/types/chat'
 
 export interface ParsedMessageAssets {
   attachments: ChatAttachment[]

@@ -13,7 +13,8 @@
       "@features/*": ["src/features/*"],
       "@shared/*": ["src/shared/*"],
       "@lib/*": ["src/lib/*"],
-      "@runtime/*": ["src/shared/runtime/*"]
+      "@runtime/*": ["src/shared/runtime/*"],
+      "@platform/*": ["src/platform/*"]
     },
 
     /* Bundler mode */

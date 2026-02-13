@@ -4,7 +4,7 @@ import type {
   OutboundAttachmentDraft,
   OutboundMessageDraft,
   OutboundSendOutcome,
-} from '../../../shared/types/chat'
+} from '@shared/types/chat'
 import {
   clearComposerSession,
   readComposerSession,

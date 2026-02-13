@@ -15,7 +15,7 @@ import {
   type AppNotificationInput,
   getStoredAppNotifications,
   persistAppNotifications,
-} from '../../shared/runtime/notifications'
+} from '@shared/runtime/notifications'
 
 interface NotificationCenterState {
   notifications: AppNotification[]

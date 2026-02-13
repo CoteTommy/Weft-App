@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { PersonItem } from '../../../shared/types/people'
+import type { PersonItem } from '@shared/types/people'
 import { fetchPeople } from '../services/peopleService'
 
 interface UsePeopleState {

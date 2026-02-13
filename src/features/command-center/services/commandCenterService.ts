@@ -9,9 +9,9 @@ import {
   listLxmfPropagationNodes,
   probeLxmf,
   sendLxmfCommand,
-} from '../../../lib/lxmf-api'
-import type { LxmfAnnounceRecord, LxmfPeerRecord, LxmfPropagationNodeRecord } from '../../../lib/lxmf-payloads'
-import type { LxmfDaemonLocalStatus, LxmfProbeReport } from '../../../lib/lxmf-contract'
+} from '@lib/lxmf-api'
+import type { LxmfAnnounceRecord, LxmfPeerRecord, LxmfPropagationNodeRecord } from '@lib/lxmf-payloads'
+import type { LxmfDaemonLocalStatus, LxmfProbeReport } from '@lib/lxmf-contract'
 
 export interface CommandCenterSnapshot {
   status: LxmfDaemonLocalStatus

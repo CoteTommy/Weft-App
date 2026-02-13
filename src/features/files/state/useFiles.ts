@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { FileItem } from '../../../shared/types/files'
+import type { FileItem } from '@shared/types/files'
 import { fetchFiles } from '../services/filesService'
 
 interface UseFilesState {

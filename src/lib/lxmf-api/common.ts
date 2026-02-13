@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { parseLxmfDaemonLocalStatus, type LxmfDaemonLocalStatus } from '../lxmf-contract'
-import { getRuntimeConnectionOptions, getRuntimeTransportOption } from '../../shared/runtime/preferences'
+import { getRuntimeConnectionOptions, getRuntimeTransportOption } from '@shared/runtime/preferences'
 import type {
   DaemonControlOptions,
   LxmfEventPumpStatus,

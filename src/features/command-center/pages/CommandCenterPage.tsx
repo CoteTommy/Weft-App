@@ -1,15 +1,15 @@
 import clsx from 'clsx'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { PageHeading } from '../../../shared/ui/PageHeading'
-import { Panel } from '../../../shared/ui/Panel'
-import { shortHash } from '../../../shared/utils/identity'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
+import { shortHash } from '@shared/utils/identity'
 import {
   dispatchRawCommand,
   fetchCommandCenterSnapshot,
   runCommandCenterAction,
   type CommandCenterSnapshot,
 } from '../services/commandCenterService'
-import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
+import { VirtualizedList } from '@shared/ui/VirtualizedList'
 
 const COMMAND_PRESETS = ['join', 'status', 'sync', 'ping']
 

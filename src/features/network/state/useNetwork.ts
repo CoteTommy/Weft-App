@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { NetworkPeerItem } from '../../../shared/types/network'
+import type { NetworkPeerItem } from '@shared/types/network'
 import { fetchNetworkPeers } from '../services/networkService'
 
 interface UseNetworkState {
