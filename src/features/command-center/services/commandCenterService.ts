@@ -10,8 +10,8 @@ import {
   probeLxmf,
   sendLxmfCommand,
 } from '@lib/lxmf-api'
-import type { LxmfAnnounceRecord, LxmfPeerRecord, LxmfPropagationNodeRecord } from '@lib/lxmf-payloads'
 import type { LxmfDaemonLocalStatus, LxmfProbeReport } from '@lib/lxmf-contract'
+import type { LxmfAnnounceRecord, LxmfPeerRecord, LxmfPropagationNodeRecord } from '@lib/lxmf-payloads'
 
 export interface CommandCenterSnapshot {
   status: LxmfDaemonLocalStatus

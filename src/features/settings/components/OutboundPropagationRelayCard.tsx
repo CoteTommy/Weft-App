@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+
 import type { SettingsSnapshot } from '@shared/types/settings'
 import { shortHash } from '@shared/utils/identity'
 

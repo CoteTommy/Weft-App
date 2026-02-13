@@ -1,8 +1,9 @@
-import { unstable_batchedUpdates } from 'react-dom'
 import { useCallback, useEffect, useRef } from 'react'
+import { unstable_batchedUpdates } from 'react-dom'
 
 import { startLxmfEventPump, subscribeLxmfEvents } from '@lib/lxmf-api'
 import type { LxmfRpcEvent } from '@lib/lxmf-payloads'
+
 import {
   CHAT_EVENT_BATCH_MS,
   CHAT_WATCHDOG_INTERVAL_MS,

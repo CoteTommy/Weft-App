@@ -1,5 +1,6 @@
-import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 import type { FileItem } from '@shared/types/files'
+import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
+
 import {
   extractFilesFromMessages,
   extractMapPointsFromMessages,

@@ -1,4 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -13,7 +15,15 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+
+import { useChatsState } from '@features/chats/state/ChatsProvider'
+import { publishAppNotification } from '@shared/runtime/notifications'
+import {
+  getRuntimeConnectionOptions,
+  PREFERENCES_UPDATED_EVENT,
+  updateWeftPreferences,
+} from '@shared/runtime/preferences'
+import { formatRelativeFromNow } from '@shared/utils/time'
 import {
   daemonRestart,
   daemonStart,
@@ -29,16 +39,9 @@ import {
 } from '@lib/lxmf-api'
 import type { LxmfProbeReport } from '@lib/lxmf-contract'
 import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
-import { publishAppNotification } from '@shared/runtime/notifications'
-import {
-  getRuntimeConnectionOptions,
-  PREFERENCES_UPDATED_EVENT,
-  updateWeftPreferences,
-} from '@shared/runtime/preferences'
-import { formatRelativeFromNow } from '@shared/utils/time'
-import type { DeliveryDiagnosticsSnapshot, RecoveryEvent } from './DeliveryDiagnosticsDrawer'
+
 import { useNotificationCenter } from '../state/NotificationCenterProvider'
-import { useChatsState } from '@features/chats/state/ChatsProvider'
+import type { DeliveryDiagnosticsSnapshot, RecoveryEvent } from './DeliveryDiagnosticsDrawer'
 
 const DeliveryDiagnosticsDrawer = lazy(() =>
   import('./DeliveryDiagnosticsDrawer').then((module) => ({ default: module.DeliveryDiagnosticsDrawer })),

@@ -1,7 +1,8 @@
-import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 import type { ChatMessage, ChatThread } from '@shared/types/chat'
 import { shortHash } from '@shared/utils/identity'
 import { formatClockTime, formatRelativeFromNow } from '@shared/utils/time'
+import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
+
 import { parseMessageAssets } from './chatMessageAssets'
 
 export function buildThreads(

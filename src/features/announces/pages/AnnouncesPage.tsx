@@ -1,23 +1,24 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
+
+import clsx from 'clsx'
+
+import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
+import type { AnnounceItem, AnnouncePriorityLabel } from '@shared/types/announces'
 import { ListSkeleton } from '@shared/ui/ListSkeleton'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
 import { VirtualizedList } from '@shared/ui/VirtualizedList'
-import type { AnnouncePriorityLabel } from '@shared/types/announces'
-import type { LxmfSendMessageOptions } from '@lib/lxmf-api'
-import { sendLxmfMessage } from '@lib/lxmf-api'
-import { shortHash } from '@shared/utils/identity'
-import { filterIndexedItems, indexSearchItems } from '@shared/utils/search'
 import {
   buildNewChatHref,
   parseLxmfContactReference,
 } from '@shared/utils/contactReference'
-import { useAnnounces } from '../state/useAnnounces'
-import type { AnnounceItem } from '@shared/types/announces'
+import { shortHash } from '@shared/utils/identity'
+import { filterIndexedItems, indexSearchItems } from '@shared/utils/search'
+import { type LxmfSendMessageOptions,sendLxmfMessage } from '@lib/lxmf-api'
+
 import { sendHubJoin } from '../services/announcesService'
-import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
+import { useAnnounces } from '../state/useAnnounces'
 
 export function AnnouncesPage() {
   const navigate = useNavigate()

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { startLxmfEventPump, subscribeLxmfEvents } from '@lib/lxmf-api'
+
 import type { AnnounceItem } from '@shared/types/announces'
+import { startLxmfEventPump, subscribeLxmfEvents } from '@lib/lxmf-api'
+
 import {
   fetchAnnouncesPage,
   mapAnnounceEventPayload,

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+
 import type { SettingsSnapshot } from '@shared/types/settings'
+
 import { fetchSettingsSnapshot } from '../services/settingsService'
 
 interface UseSettingsState {

@@ -1,10 +1,10 @@
+import type { FileItem } from '@shared/types/files'
 import type {
   LxmfAttachmentPayload,
   LxmfMessageFields,
   LxmfMessageRecord,
   LxmfPaperPayload,
 } from '@lib/lxmf-payloads'
-import type { FileItem } from '@shared/types/files'
 
 export interface ParsedMapPoint {
   id: string

@@ -1,19 +1,20 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { MotionConfig } from 'framer-motion'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
+import { MotionConfig } from 'framer-motion'
+
 import { AppShell } from '@app/layout/AppShell'
-import { prefetchRouteChunks } from '@app/routing/prefetch'
 import { MAIN_ROUTES, sanitizeMainRoute } from '@app/routing/mainRoutes'
-import { transitionForMotionPreference } from '@app/runtime/motion'
+import { prefetchRouteChunks } from '@app/routing/prefetch'
 import { DeepLinkBridge } from '@app/runtime/DeepLinkBridge'
+import { transitionForMotionPreference } from '@app/runtime/motion'
 import { NotificationCenterProvider } from '@app/state/NotificationCenterProvider'
 import { ChatsStateLayout } from '@features/chats/state/ChatsProvider'
 import {
   getWeftPreferences,
   hasCompletedOnboarding,
-  PREFERENCES_UPDATED_EVENT,
   type MotionPreference,
+  PREFERENCES_UPDATED_EVENT,
 } from '@shared/runtime/preferences'
 import { normalizeMainRoute } from '@shared/runtime/sessionRestore'
 

@@ -10,10 +10,11 @@ import {
   useState,
 } from 'react'
 import { Outlet } from 'react-router-dom'
-import type { LxmfMessageRecord, LxmfRpcEvent } from '@lib/lxmf-payloads'
+
+import { publishAppNotification } from '@shared/runtime/notifications'
 import type {
-  ChatThread,
   ChatMessage,
+  ChatThread,
   OutboundMessageDraft,
   OutboundSendOutcome,
 } from '@shared/types/chat'
@@ -22,24 +23,10 @@ import {
   getStoredDisplayName,
   shortHash,
 } from '@shared/utils/identity'
-import { publishAppNotification } from '@shared/runtime/notifications'
-import { fetchChatThreads, postChatMessage, buildThreads } from '../services/chatService'
+import type { LxmfMessageRecord, LxmfRpcEvent } from '@lib/lxmf-payloads'
+
+import { buildThreads,fetchChatThreads, postChatMessage } from '../services/chatService'
 import { deriveReasonCode, deriveReceiptStatus } from '../services/chatThreadBuilders'
-import {
-  clearOfflineQueue,
-  enqueueSendError,
-  extendIgnoredFailedMessageIds,
-  getIgnoredFailedMessageIds,
-  markQueueEntryAttemptFailed,
-  markQueueEntryDelivered,
-  markQueueEntrySending,
-  pauseQueueEntry,
-  persistIgnoredFailedMessageIds,
-  removeQueueEntry,
-  resumeQueueEntry,
-  retryQueueEntryNow,
-  type OfflineQueueEntry,
-} from './offlineQueue'
 import { selectThreadById } from './chatSelectors'
 import {
   appendDeliveryTraceEntry,
@@ -54,6 +41,21 @@ import {
   reduceSetThreadPinned,
 } from './chatThreadsReducer'
 import {
+  clearOfflineQueue,
+  enqueueSendError,
+  extendIgnoredFailedMessageIds,
+  getIgnoredFailedMessageIds,
+  markQueueEntryAttemptFailed,
+  markQueueEntryDelivered,
+  markQueueEntrySending,
+  type OfflineQueueEntry,
+  pauseQueueEntry,
+  persistIgnoredFailedMessageIds,
+  removeQueueEntry,
+  resumeQueueEntry,
+  retryQueueEntryNow,
+} from './offlineQueue'
+import {
   getStoredThreadPreferences,
   persistThreadPreferences,
   resolveThreadPreference,
@@ -63,10 +65,10 @@ import {
   type ChatsState,
   type IncomingNotificationItem,
 } from './types'
-import { useChatOfflineQueue } from './useChatOfflineQueue'
 import { useChatIncomingNotifications } from './useChatIncomingNotifications'
-import { useChatRuntimeEventPump } from './useChatRuntimeEventPump'
+import { useChatOfflineQueue } from './useChatOfflineQueue'
 import { useChatQueueRetryScheduler } from './useChatQueueRetryScheduler'
+import { useChatRuntimeEventPump } from './useChatRuntimeEventPump'
 
 const ChatsContext = createContext<ChatsState | undefined>(undefined)
 

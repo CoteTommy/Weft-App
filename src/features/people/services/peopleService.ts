@@ -1,8 +1,8 @@
-import { listLxmfPeers } from '@lib/lxmf-api'
-import type { LxmfPeerRecord } from '@lib/lxmf-payloads'
 import type { PersonItem, PersonTrust } from '@shared/types/people'
 import { shortHash } from '@shared/utils/identity'
 import { formatRelativeFromNow } from '@shared/utils/time'
+import { listLxmfPeers } from '@lib/lxmf-api'
+import type { LxmfPeerRecord } from '@lib/lxmf-payloads'
 
 export async function fetchPeople(): Promise<PersonItem[]> {
   const response = await listLxmfPeers()

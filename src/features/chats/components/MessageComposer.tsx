@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+
 import { Paperclip, StickyNote, X } from 'lucide-react'
+
 import type {
   OutboundAttachmentDraft,
   OutboundMessageDraft,
   OutboundSendOutcome,
 } from '@shared/types/chat'
+
 import {
   clearComposerSession,
   readComposerSession,

@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+
 import type { ChatMessage, ChatThread } from '@shared/types/chat'
+
 import {
   reduceReceiptUpdate,
   reduceRuntimeMessage,

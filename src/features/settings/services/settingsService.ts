@@ -1,4 +1,16 @@
 import {
+  type ConnectivityMode,
+  getWeftPreferences,
+  type MotionPreference,
+  updateWeftPreferences,
+} from '@shared/runtime/preferences'
+import type { SettingsSnapshot } from '@shared/types/settings'
+import { resolveDisplayName, setStoredDisplayName } from '@shared/utils/identity'
+import {
+  getDesktopShellPreferences,
+  setDesktopShellPreferences,
+} from '@lib/desktop-shell-api'
+import {
   daemonRestart,
   daemonStatus,
   getLxmfOutboundPropagationNode,
@@ -6,21 +18,10 @@ import {
   listLxmfMessages,
   listLxmfPropagationNodes,
   probeLxmf,
-  setLxmfOutboundPropagationNode,
   setLxmfDisplayName,
+  setLxmfOutboundPropagationNode,
 } from '@lib/lxmf-api'
-import {
-  getDesktopShellPreferences,
-  setDesktopShellPreferences,
-} from '@lib/desktop-shell-api'
-import type { SettingsSnapshot } from '@shared/types/settings'
-import {
-  type MotionPreference,
-  type ConnectivityMode,
-  getWeftPreferences,
-  updateWeftPreferences,
-} from '@shared/runtime/preferences'
-import { resolveDisplayName, setStoredDisplayName } from '@shared/utils/identity'
+
 import { buildInteropSnapshot } from './interopHealth'
 
 export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {

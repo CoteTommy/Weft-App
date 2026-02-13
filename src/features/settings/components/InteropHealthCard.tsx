@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+
 import type { SettingsSnapshot } from '@shared/types/settings'
 import { formatRelativeFromNow } from '@shared/utils/time'
 

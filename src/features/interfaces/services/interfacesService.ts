@@ -1,6 +1,6 @@
-import { listLxmfInterfaces, lxmfInterfaceMetrics } from '@lib/lxmf-api'
-import type { LxmfInterfaceRecord, LxmfInterfaceMetricsResponse } from '@lib/lxmf-payloads'
 import type { InterfaceItem, InterfaceMetrics } from '@shared/types/interfaces'
+import { listLxmfInterfaces, lxmfInterfaceMetrics } from '@lib/lxmf-api'
+import type { LxmfInterfaceMetricsResponse,LxmfInterfaceRecord } from '@lib/lxmf-payloads'
 
 export interface InterfaceSnapshot {
   interfaces: InterfaceItem[]

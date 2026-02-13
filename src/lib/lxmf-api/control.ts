@@ -1,6 +1,6 @@
-import { parseLxmfDaemonLocalStatus, parseLxmfProbeReport, type LxmfDaemonLocalStatus, type LxmfProbeReport } from '../lxmf-contract'
-import type { DaemonControlOptions, ProbeOptions } from './types'
+import { type LxmfDaemonLocalStatus, type LxmfProbeReport,parseLxmfDaemonLocalStatus, parseLxmfProbeReport } from '../lxmf-contract'
 import { daemonControlAction, invokeWithProbe } from './common'
+import type { DaemonControlOptions, ProbeOptions } from './types'
 
 export async function probeLxmf(options: ProbeOptions = {}): Promise<LxmfProbeReport> {
   const payload = await invokeWithProbe<unknown>('daemon_probe', options)

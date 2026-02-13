@@ -1,25 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
-import { Outlet } from 'react-router-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
-import { NotificationToasts } from './NotificationToasts'
-import { CommandPalette } from './CommandPalette'
-import { PerformanceHud } from './PerformanceHud'
-import { SidebarNav } from './SidebarNav'
-import { TopBar } from './TopBar'
+
+import {
+  getWeftPreferences,
+  type MotionPreference,
+  PREFERENCES_UPDATED_EVENT,
+  updateWeftPreferences,
+} from '@shared/runtime/preferences'
+import { isRestorableMainRoute } from '@shared/runtime/sessionRestore'
+import { FOCUS_NEW_CHAT_EVENT } from '@shared/runtime/shortcuts'
 import {
   getDesktopShellPreferences,
   setDesktopShellPreferences,
   subscribeTrayActions,
 } from '@lib/desktop-shell-api'
-import {
-  getWeftPreferences,
-  PREFERENCES_UPDATED_EVENT,
-  updateWeftPreferences,
-  type MotionPreference,
-} from '@shared/runtime/preferences'
-import { FOCUS_NEW_CHAT_EVENT } from '@shared/runtime/shortcuts'
-import { isRestorableMainRoute } from '@shared/runtime/sessionRestore'
+
+import { CommandPalette } from './CommandPalette'
+import { NotificationToasts } from './NotificationToasts'
+import { PerformanceHud } from './PerformanceHud'
+import { SidebarNav } from './SidebarNav'
+import { TopBar } from './TopBar'
 
 export function AppShell() {
   const navigate = useNavigate()

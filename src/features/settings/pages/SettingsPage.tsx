@@ -1,11 +1,19 @@
-import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+
+import clsx from 'clsx'
+
 import type { ConnectivityMode, MotionPreference } from '@shared/runtime/preferences'
 import type { SettingsSnapshot } from '@shared/types/settings'
-import { Panel } from '@shared/ui/Panel'
 import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
 import { shortHash } from '@shared/utils/identity'
+
+import { InteropHealthCard } from '../components/InteropHealthCard'
+import { NotificationToggle } from '../components/NotificationToggle'
+import { OutboundPropagationRelayCard } from '../components/OutboundPropagationRelayCard'
+import { SettingsRow } from '../components/SettingsRow'
+import { CONNECTIVITY_OPTIONS, DEFAULT_NOTIFICATION_SETTINGS, SETTINGS_SECTIONS } from '../constants'
 import {
   saveConnectivitySettings,
   saveDesktopShellSettings,
@@ -16,11 +24,6 @@ import {
   savePerformanceSettings,
 } from '../services/settingsService'
 import { useSettings } from '../state/useSettings'
-import { DEFAULT_NOTIFICATION_SETTINGS, CONNECTIVITY_OPTIONS, SETTINGS_SECTIONS } from '../constants'
-import { InteropHealthCard } from '../components/InteropHealthCard'
-import { NotificationToggle } from '../components/NotificationToggle'
-import { OutboundPropagationRelayCard } from '../components/OutboundPropagationRelayCard'
-import { SettingsRow } from '../components/SettingsRow'
 import type { BackupPayload, SettingsConfigPayload } from '../types'
 import { buildConfigPayload, mergeNotificationSettings, parseSettingsSection } from '../utils'
 

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type RefObject, type SetStateAction } from 'react'
+import { type Dispatch, type MutableRefObject, type RefObject, type SetStateAction,useEffect, useRef, useState } from 'react'
 
 import type { ChatThread } from '@shared/types/chat'
-import { getStoredOfflineQueue, persistOfflineQueue, syncQueueFromThreads, type OfflineQueueEntry } from './offlineQueue'
+
+import { getStoredOfflineQueue, type OfflineQueueEntry,persistOfflineQueue, syncQueueFromThreads } from './offlineQueue'
 
 export type UseChatOfflineQueueParams = {
   threads: ChatThread[]

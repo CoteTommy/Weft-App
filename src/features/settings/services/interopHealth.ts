@@ -1,6 +1,6 @@
+import type { SettingsSnapshot } from '@shared/types/settings'
 import type { LxmfProbeReport } from '@lib/lxmf-contract'
 import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
-import type { SettingsSnapshot } from '@shared/types/settings'
 
 export function buildInteropSnapshot(input: {
   expectedProfile?: string

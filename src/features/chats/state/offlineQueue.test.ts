@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'bun:test'
+
 import type { ChatThread } from '@shared/types/chat'
+
 import {
   extendIgnoredFailedMessageIds,
   markQueueEntryAttemptFailed,
   MAX_AUTO_RETRY_ATTEMPTS,
-  syncQueueFromThreads,
   retryDelayMs,
+  syncQueueFromThreads,
 } from './offlineQueue'
 
 function makeThread(messageId: string): ChatThread {

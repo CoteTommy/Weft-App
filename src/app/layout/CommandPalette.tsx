@@ -1,7 +1,8 @@
-import clsx from 'clsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { announceLxmfNow, daemonRestart } from '@lib/lxmf-api'
+
+import clsx from 'clsx'
+
 import { useChatsState } from '@features/chats/state/ChatsProvider'
 import { publishAppNotification } from '@shared/runtime/notifications'
 import {
@@ -13,6 +14,7 @@ import {
   FOCUS_QUICK_REPLY_EVENT,
   FOCUS_SEARCH_EVENT,
 } from '@shared/runtime/shortcuts'
+import { announceLxmfNow, daemonRestart } from '@lib/lxmf-api'
 
 interface PaletteAction {
   id: string

@@ -1,9 +1,11 @@
-import clsx from 'clsx'
 import { useEffect, useMemo, useState } from 'react'
+
+import clsx from 'clsx'
+
 import {
   getWeftPreferences,
-  PREFERENCES_UPDATED_EVENT,
   type MotionPreference,
+  PREFERENCES_UPDATED_EVENT,
 } from '@shared/runtime/preferences'
 
 interface HudSnapshot {

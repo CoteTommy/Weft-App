@@ -1,5 +1,6 @@
 import type { ConnectivityMode } from '@shared/runtime/preferences'
 import type { SettingsSnapshot } from '@shared/types/settings'
+
 import type { SettingsConfigPayload, SettingsSection } from './types'
 
 export function buildConfigPayload(input: {

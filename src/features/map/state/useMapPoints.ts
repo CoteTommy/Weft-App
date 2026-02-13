@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { MapPoint } from '../services/mapService'
-import { fetchMapPoints } from '../services/mapService'
+
+import { fetchMapPoints, type MapPoint } from '../services/mapService'
 
 interface UseMapPointsState {
   points: MapPoint[]

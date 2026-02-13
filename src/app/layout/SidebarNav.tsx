@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { NavLink } from 'react-router-dom'
+
 import clsx from 'clsx'
 import {
   Activity,
@@ -11,9 +13,8 @@ import {
   Settings,
   Users,
 } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+
 import { useChatsState } from '@features/chats/state/ChatsProvider'
-import { getLxmfProfile, probeLxmf } from '@lib/lxmf-api'
 import {
   getWeftPreferences,
   PREFERENCES_UPDATED_EVENT,
@@ -24,6 +25,7 @@ import {
   resolveDisplayName,
   shortHash,
 } from '@shared/utils/identity'
+import { getLxmfProfile, probeLxmf } from '@lib/lxmf-api'
 
 const navItems = [
   { to: '/chats', label: 'Chats', icon: MessageSquare },

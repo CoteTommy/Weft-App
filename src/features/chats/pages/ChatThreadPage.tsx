@@ -1,17 +1,20 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, BellOff, Pin, PinOff } from 'lucide-react'
 import { Navigate, useParams } from 'react-router-dom'
+
+import { Bell, BellOff, Pin, PinOff } from 'lucide-react'
+
+import { FOCUS_QUICK_REPLY_EVENT, FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
+import { ListSkeleton } from '@shared/ui/ListSkeleton'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
+import { VirtualizedList } from '@shared/ui/VirtualizedList'
+import { matchesQuery } from '@shared/utils/search'
+
 import { MessageComposer } from '../components/MessageComposer'
 import { MessageTimeline } from '../components/MessageTimeline'
 import { ThreadListRow } from '../components/ThreadList'
 import { useChatsState } from '../state/ChatsProvider'
 import { filterThreadIndex, indexThreads } from '../utils/filterThreads'
-import { ListSkeleton } from '@shared/ui/ListSkeleton'
-import { PageHeading } from '@shared/ui/PageHeading'
-import { Panel } from '@shared/ui/Panel'
-import { matchesQuery } from '@shared/utils/search'
-import { VirtualizedList } from '@shared/ui/VirtualizedList'
-import { FOCUS_QUICK_REPLY_EVENT, FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 
 export function ChatThreadPage() {
   const { chatId } = useParams()

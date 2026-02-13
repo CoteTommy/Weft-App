@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { paperIngestUri } from '@lib/lxmf-api'
+
+import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
+import type { FileItem } from '@shared/types/files'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
-import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 import { matchesQuery } from '@shared/utils/search'
+import { paperIngestUri } from '@lib/lxmf-api'
+
 import { useFiles } from '../state/useFiles'
-import type { FileItem } from '@shared/types/files'
 
 export function FilesPage() {
   const { files, loading, error, refresh } = useFiles()

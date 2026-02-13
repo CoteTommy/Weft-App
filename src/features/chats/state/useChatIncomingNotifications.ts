@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 
 import { getWeftPreferences, PREFERENCES_UPDATED_EVENT } from '@shared/runtime/preferences'
+
 import type { IncomingNotificationItem } from './types'
 
 export type UseChatIncomingNotificationsResult = {

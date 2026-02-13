@@ -1,5 +1,6 @@
-import type { OfflineQueueEntry } from './offlineQueue'
 import type { ChatThread, OutboundMessageDraft, OutboundSendOutcome } from '@shared/types/chat'
+
+import type { OfflineQueueEntry } from './offlineQueue'
 
 export interface ChatsState {
   threads: ChatThread[]

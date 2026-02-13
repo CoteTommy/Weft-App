@@ -1,14 +1,16 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+
+import { FOCUS_NEW_CHAT_EVENT, FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
+import { ListSkeleton } from '@shared/ui/ListSkeleton'
+import { PageHeading } from '@shared/ui/PageHeading'
+import { Panel } from '@shared/ui/Panel'
+import { VirtualizedList } from '@shared/ui/VirtualizedList'
+import { parseLxmfContactReference } from '@shared/utils/contactReference'
+
 import { ThreadListRow } from '../components/ThreadList'
 import { useChatsState } from '../state/ChatsProvider'
 import { filterThreadIndex, indexThreads } from '../utils/filterThreads'
-import { PageHeading } from '@shared/ui/PageHeading'
-import { Panel } from '@shared/ui/Panel'
-import { ListSkeleton } from '@shared/ui/ListSkeleton'
-import { VirtualizedList } from '@shared/ui/VirtualizedList'
-import { parseLxmfContactReference } from '@shared/utils/contactReference'
-import { FOCUS_NEW_CHAT_EVENT, FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 
 export function ChatsPage() {
   const navigate = useNavigate()

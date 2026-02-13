@@ -1,10 +1,10 @@
+import { invokeWithProbe, parseLxmfSendMessageResponse } from './common'
 import type {
   LxmfSendCommandOptions,
   LxmfSendMessageOptions,
   LxmfSendMessageResponse,
   LxmfSendRichMessageOptions,
 } from './types'
-import { invokeWithProbe, parseLxmfSendMessageResponse } from './common'
 
 export async function sendLxmfMessage(
   options: LxmfSendMessageOptions,

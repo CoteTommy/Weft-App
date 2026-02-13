@@ -1,8 +1,10 @@
 import { useEffect } from 'react'
-import { listen } from '@tauri-apps/api/event'
 import { useNavigate } from 'react-router-dom'
-import { buildNewChatHref, parseLxmfContactReference } from '@shared/utils/contactReference'
+
+import { listen } from '@tauri-apps/api/event'
+
 import { setPendingLaunchRoute } from '@shared/runtime/preferences'
+import { buildNewChatHref, parseLxmfContactReference } from '@shared/utils/contactReference'
 
 interface DeepLinkBridgeProps {
   onboardingCompleted: boolean

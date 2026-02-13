@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
-import { matchesQuery } from '@shared/utils/search'
 import { parseLxmfContactReference } from '@shared/utils/contactReference'
-import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
+import { matchesQuery } from '@shared/utils/search'
+
 import { sendLocationToDestination } from '../services/mapService'
 import { useMapPoints } from '../state/useMapPoints'
 

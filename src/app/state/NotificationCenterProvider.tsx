@@ -8,11 +8,12 @@ import {
   useMemo,
   useState,
 } from 'react'
+
 import {
   APP_NOTIFICATION_EVENT,
-  createAppNotification,
   type AppNotification,
   type AppNotificationInput,
+  createAppNotification,
   getStoredAppNotifications,
   persistAppNotifications,
 } from '@shared/runtime/notifications'

@@ -1,3 +1,5 @@
+import type { OutboundMessageDraft, OutboundSendOutcome } from '@shared/types/chat'
+import { getStoredDisplayName, shortHash } from '@shared/utils/identity'
 import {
   getLxmfProfile,
   listLxmfMessages,
@@ -5,8 +7,7 @@ import {
   sendLxmfMessage,
   sendLxmfRichMessage,
 } from '@lib/lxmf-api'
-import type { OutboundMessageDraft, OutboundSendOutcome } from '@shared/types/chat'
-import { getStoredDisplayName, shortHash } from '@shared/utils/identity'
+
 import { buildThreads } from './chatThreadBuilders'
 
 export async function fetchChatThreads() {

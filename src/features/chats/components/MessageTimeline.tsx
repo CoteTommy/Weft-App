@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
-import { getLxmfMessageDeliveryTrace } from '@lib/lxmf-api'
+
+import clsx from 'clsx'
+
 import type { ChatMessage } from '@shared/types/chat'
+import { getLxmfMessageDeliveryTrace } from '@lib/lxmf-api'
 
 interface MessageTimelineProps {
   messages: ChatMessage[]

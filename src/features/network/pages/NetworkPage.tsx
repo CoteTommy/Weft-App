@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
 import clsx from 'clsx'
+
+import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
 import { matchesQuery } from '@shared/utils/search'
-import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
+
 import { useNetwork } from '../state/useNetwork'
 
 export function NetworkPage() {
