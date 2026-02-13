@@ -6,6 +6,7 @@ import { MessageTimeline } from '../components/MessageTimeline'
 import { ThreadListRow } from '../components/ThreadList'
 import { useChatsState } from '../state/ChatsProvider'
 import { filterThreadIndex, indexThreads } from '../utils/filterThreads'
+import { ListSkeleton } from '../../../shared/ui/ListSkeleton'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 import { matchesQuery } from '../../../shared/utils/search'
@@ -59,9 +60,15 @@ export function ChatThreadPage() {
           className="mb-3 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
           placeholder="Filter threads"
         />
+        {loading ? (
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <ListSkeleton rows={6} />
+          </div>
+        ) : null}
         {!loading && filteredThreads.length === 0 ? (
           <p className="text-sm text-slate-500">No matching threads.</p>
-        ) : (
+        ) : null}
+        {!loading && filteredThreads.length > 0 ? (
           <VirtualizedList
             items={filteredThreads}
             estimateItemHeight={92}
@@ -74,12 +81,15 @@ export function ChatThreadPage() {
               </div>
             )}
           />
-        )}
+        ) : null}
       </Panel>
 
       <Panel className="flex min-h-0 flex-col">
         {loading || !thread ? (
-          <p className="text-sm text-slate-500">Loading thread...</p>
+          <div className="min-h-0 flex-1">
+            <p className="mb-3 text-sm text-slate-500">Loading thread...</p>
+            <ListSkeleton rows={8} rowClassName="h-20" className="pr-1" />
+          </div>
         ) : (
           <>
             <PageHeading
@@ -111,11 +121,12 @@ export function ChatThreadPage() {
               placeholder="Search messages in this thread"
             />
             {error ? <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
-            <div className="mb-4 min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="mb-4 min-h-0 flex-1 pr-1">
               {thread.messages.length > 0 && filteredMessages.length === 0 ? (
                 <p className="text-sm text-slate-500">No messages match your search.</p>
               ) : (
                 <MessageTimeline
+                  className="h-full"
                   messages={filteredMessages}
                   onRetry={(message) => {
                     const attachments = message.attachments

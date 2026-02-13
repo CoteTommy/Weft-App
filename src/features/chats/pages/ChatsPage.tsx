@@ -5,6 +5,7 @@ import { useChatsState } from '../state/ChatsProvider'
 import { filterThreadIndex, indexThreads } from '../utils/filterThreads'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
+import { ListSkeleton } from '../../../shared/ui/ListSkeleton'
 import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
 import { parseLxmfContactReference } from '../../../shared/utils/contactReference'
 
@@ -125,10 +126,14 @@ export function ChatsPage() {
           className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
           placeholder="Search chats by name, destination, or latest message"
         />
-        {loading ? <p className="text-sm text-slate-500">Loading chats...</p> : null}
         {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
         {!loading && threads.length === 0 ? (
           <p className="text-sm text-slate-500">No chats yet. Send your first message from People.</p>
+        ) : null}
+        {loading ? (
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <ListSkeleton rows={7} />
+          </div>
         ) : null}
         {!loading && threads.length > 0 ? (
           filteredThreads.length === 0 ? (

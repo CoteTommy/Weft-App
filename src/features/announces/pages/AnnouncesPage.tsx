@@ -1,6 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
+import { ListSkeleton } from '../../../shared/ui/ListSkeleton'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
@@ -30,15 +31,19 @@ export function AnnouncesPage() {
   const deferredQuery = useDeferredValue(query)
   const indexedAnnounces = useMemo(
     () =>
-      indexSearchItems(announces, (announce) => [
-        announce.title,
-        announce.body,
-        announce.audience,
-        announce.source,
-        announce.capabilities.join(' '),
-        announce.priority,
-        announce.postedAt,
-      ]),
+      indexSearchItems(
+        announces,
+        (announce) => [
+          announce.title,
+          announce.body,
+          announce.audience,
+          announce.source,
+          announce.capabilities.join(' '),
+          announce.priority,
+          announce.postedAt,
+        ],
+        { cacheKey: 'announces' },
+      ),
     [announces],
   )
   const filteredAnnounces = useMemo(
@@ -156,7 +161,6 @@ export function AnnouncesPage() {
           className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
           placeholder="Search announces by title, source, audience, or body"
         />
-        {loading ? <p className="text-sm text-slate-500">Loading announcements...</p> : null}
         {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
         {!loading && announces.length === 0 ? (
           <p className="text-sm text-slate-500">No announce payloads have been seen yet.</p>
@@ -166,46 +170,52 @@ export function AnnouncesPage() {
         ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <VirtualizedList
-            items={filteredAnnounces}
-            estimateItemHeight={106}
-            className="min-h-0 flex-1 overflow-y-auto pr-1"
-            listClassName="pb-1"
-            getKey={(announce) => announce.id}
-            renderItem={(announce) => (
-              <div className="py-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedAnnounce(announce)
-                    setReplyFeedback(null)
-                  }}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition-colors hover:border-slate-300 hover:bg-slate-50/70"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{announce.title}</p>
-                      <p className="mt-1 max-h-10 overflow-hidden text-sm text-slate-600">{announce.body}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Audience: {announce.audience} • Source: {shortHash(announce.source, 8)}
-                      </p>
+          {loading ? (
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <ListSkeleton rows={7} />
+            </div>
+          ) : (
+            <VirtualizedList
+              items={filteredAnnounces}
+              estimateItemHeight={106}
+              className="min-h-0 flex-1 overflow-y-auto pr-1"
+              listClassName="pb-1"
+              getKey={(announce) => announce.id}
+              renderItem={(announce) => (
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAnnounce(announce)
+                      setReplyFeedback(null)
+                    }}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition-colors hover:border-slate-300 hover:bg-slate-50/70"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{announce.title}</p>
+                        <p className="mt-1 max-h-10 overflow-hidden text-sm text-slate-600">{announce.body}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Audience: {announce.audience} • Source: {shortHash(announce.source, 8)}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span
+                          className={clsx(
+                            'rounded-full px-2 py-1 text-xs font-semibold',
+                            priorityBadgeClass(announce.priority),
+                          )}
+                        >
+                          {announce.priority}
+                        </span>
+                        <span className="text-xs text-slate-500">{announce.postedAt}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span
-                        className={clsx(
-                          'rounded-full px-2 py-1 text-xs font-semibold',
-                          priorityBadgeClass(announce.priority),
-                        )}
-                      >
-                        {announce.priority}
-                      </span>
-                      <span className="text-xs text-slate-500">{announce.postedAt}</span>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            )}
-          />
+                  </button>
+                </div>
+              )}
+            />
+          )}
           {!loading && hasMore ? (
             <div className="mt-3 flex justify-center">
               <button

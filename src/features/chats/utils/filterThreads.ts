@@ -6,12 +6,16 @@ import {
 } from '../../../shared/utils/search'
 
 export function indexThreads(threads: ChatThread[]): IndexedSearchItem<ChatThread>[] {
-  return indexSearchItems(threads, (thread) => [
-    thread.name,
-    thread.destination,
-    thread.preview,
-    thread.lastActivity,
-  ])
+  return indexSearchItems(
+    threads,
+    (thread) => [
+      thread.name,
+      thread.destination,
+      thread.preview,
+      thread.lastActivity,
+    ],
+    { cacheKey: 'threads' },
+  )
 }
 
 export function filterThreadIndex(

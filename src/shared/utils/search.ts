@@ -5,6 +5,12 @@ export interface IndexedSearchItem<T> {
   searchText: string
 }
 
+interface SearchIndexOptions {
+  cacheKey?: string
+}
+
+const searchTextCache = new WeakMap<object, Map<string, string>>()
+
 export function normalizeSearchText(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -39,13 +45,15 @@ export function matchesQuery(query: string, values: SearchValue[]): boolean {
   return matchesSearchTokens(tokenizeQuery(query), buildSearchText(values))
 }
 
-export function indexSearchItems<T>(
+export function indexSearchItems<T extends object>(
   items: T[],
   toSearchValues: (item: T) => SearchValue[],
+  options?: SearchIndexOptions,
 ): IndexedSearchItem<T>[] {
+  const cacheKey = options?.cacheKey ?? 'default'
   return items.map((item) => ({
     item,
-    searchText: buildSearchText(toSearchValues(item)),
+    searchText: getCachedSearchText(item, cacheKey, toSearchValues),
   }))
 }
 
@@ -60,4 +68,22 @@ export function filterIndexedItems<T>(
   return items
     .filter((entry) => matchesSearchTokens(tokens, entry.searchText))
     .map((entry) => entry.item)
+}
+
+function getCachedSearchText<T extends object>(
+  item: T,
+  cacheKey: string,
+  toSearchValues: (item: T) => SearchValue[],
+): string {
+  const existingCache = searchTextCache.get(item)
+  if (existingCache?.has(cacheKey)) {
+    return existingCache.get(cacheKey) as string
+  }
+  const computed = buildSearchText(toSearchValues(item))
+  if (existingCache) {
+    existingCache.set(cacheKey, computed)
+  } else {
+    searchTextCache.set(item, new Map([[cacheKey, computed]]))
+  }
+  return computed
 }

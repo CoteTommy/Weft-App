@@ -6,10 +6,11 @@ import type { ChatMessage } from '../../../shared/types/chat'
 
 interface MessageTimelineProps {
   messages: ChatMessage[]
+  className?: string
   onRetry?: (message: ChatMessage) => Promise<void> | void
 }
 
-export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
+export function MessageTimeline({ messages, className, onRetry }: MessageTimelineProps) {
   const navigate = useNavigate()
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
@@ -19,7 +20,12 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
   const [deliveryTraceLoading, setDeliveryTraceLoading] = useState(false)
   const holdTimeoutRef = useRef<number | null>(null)
   const holdTriggeredRef = useRef(false)
-  const bottomAnchorRef = useRef<HTMLDivElement | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [viewportHeight, setViewportHeight] = useState(0)
+  const [stickToBottom, setStickToBottom] = useState(true)
+  const estimatedMessageHeight = 118
+  const overscan = 8
   const selectedMessage = useMemo(
     () => messages.find((message) => message.id === selectedMessageId) ?? null,
     [messages, selectedMessageId],
@@ -57,6 +63,25 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
     [selectedReasonCode],
   )
   const latestMessageId = messages[messages.length - 1]?.id ?? null
+  const visibleCount = Math.max(1, Math.ceil(viewportHeight / estimatedMessageHeight))
+  const startIndex = Math.max(0, Math.floor(scrollTop / estimatedMessageHeight) - overscan)
+  const endIndex = Math.min(messages.length, startIndex + visibleCount + overscan * 2)
+  const topPadding = startIndex * estimatedMessageHeight
+  const bottomPadding = Math.max(0, (messages.length - endIndex) * estimatedMessageHeight)
+  const visibleMessages = useMemo(
+    () => messages.slice(startIndex, endIndex),
+    [endIndex, messages, startIndex],
+  )
+  const setTimelineContainerRef = useCallback((node: HTMLDivElement | null) => {
+    scrollContainerRef.current = node
+    if (!node) {
+      setViewportHeight(0)
+      setScrollTop(0)
+      return
+    }
+    setViewportHeight(node.clientHeight)
+    setScrollTop(node.scrollTop)
+  }, [])
 
   const closeModal = useCallback(() => {
     setSelectedMessageId(null)
@@ -97,6 +122,23 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
     },
     [],
   )
+
+  useEffect(() => {
+    const node = scrollContainerRef.current
+    if (!node) {
+      return
+    }
+    if (typeof ResizeObserver === 'undefined') {
+      return
+    }
+    const resizeObserver = new ResizeObserver(() => {
+      setViewportHeight(node.clientHeight)
+    })
+    resizeObserver.observe(node)
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [])
 
   useEffect(() => {
     if (!selectedMessage) {
@@ -160,57 +202,80 @@ export function MessageTimeline({ messages, onRetry }: MessageTimelineProps) {
   }, [selectedMessage])
 
   useLayoutEffect(() => {
-    bottomAnchorRef.current?.scrollIntoView({ block: 'end' })
-  }, [latestMessageId, messages.length])
+    const node = scrollContainerRef.current
+    if (!node) {
+      return
+    }
+    if (!stickToBottom) {
+      return
+    }
+    node.scrollTop = node.scrollHeight
+    setScrollTop(node.scrollTop)
+  }, [latestMessageId, messages.length, stickToBottom])
 
   return (
     <>
-      <div className="space-y-3">
-        {messages.map((message) => (
-          <article
-            key={message.id}
-            className={clsx('flex', message.sender === 'self' ? 'justify-end' : 'justify-start')}
-          >
-            <button
-              type="button"
-              onPointerDown={() => startHold(message)}
-              onPointerUp={clearHoldTimer}
-              onPointerCancel={clearHoldTimer}
-              onPointerLeave={clearHoldTimer}
-              onClick={() => openDetails(message)}
-              className={clsx(
-                'max-w-[80%] rounded-2xl px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300',
-                message.sender === 'self'
-                  ? 'bg-blue-600 text-white hover:bg-blue-500'
-                  : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50',
-              )}
+      <div
+        ref={setTimelineContainerRef}
+        onScroll={(event) => {
+          const node = event.currentTarget
+          setScrollTop(node.scrollTop)
+          setStickToBottom(node.scrollHeight - node.clientHeight - node.scrollTop <= 96)
+        }}
+        className={clsx('min-h-0 overflow-y-auto', className)}
+      >
+        <div
+          className="space-y-3"
+          style={{
+            paddingTop: `${topPadding}px`,
+            paddingBottom: `${bottomPadding}px`,
+          }}
+        >
+          {visibleMessages.map((message) => (
+            <article
+              key={message.id}
+              className={clsx('flex', message.sender === 'self' ? 'justify-end' : 'justify-start')}
             >
-              <p className="text-sm leading-relaxed">{message.body}</p>
-              {message.attachments.length > 0 ? (
-                <div className="mt-2 space-y-1">
-                  {message.attachments.map((attachment, index) => (
-                    <p
-                      key={`${attachment.name}:${index}`}
-                      className="truncate text-[11px] font-semibold opacity-80"
-                    >
-                      Attachment: {attachment.name} ({formatBytes(attachment.sizeBytes)})
-                    </p>
-                  ))}
+              <button
+                type="button"
+                onPointerDown={() => startHold(message)}
+                onPointerUp={clearHoldTimer}
+                onPointerCancel={clearHoldTimer}
+                onPointerLeave={clearHoldTimer}
+                onClick={() => openDetails(message)}
+                className={clsx(
+                  'max-w-[80%] rounded-2xl px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300',
+                  message.sender === 'self'
+                    ? 'bg-blue-600 text-white hover:bg-blue-500'
+                    : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50',
+                )}
+              >
+                <p className="text-sm leading-relaxed">{message.body}</p>
+                {message.attachments.length > 0 ? (
+                  <div className="mt-2 space-y-1">
+                    {message.attachments.map((attachment, index) => (
+                      <p
+                        key={`${attachment.name}:${index}`}
+                        className="truncate text-[11px] font-semibold opacity-80"
+                      >
+                        Attachment: {attachment.name} ({formatBytes(attachment.sizeBytes)})
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+                {message.paper ? (
+                  <p className="mt-2 text-[11px] font-semibold opacity-80">
+                    Paper note{message.paper.title ? `: ${message.paper.title}` : ''}
+                  </p>
+                ) : null}
+                <div className="mt-2 flex items-center justify-end gap-2 text-[11px] opacity-75">
+                  <span>{message.sentAt}</span>
+                  {message.sender === 'self' && message.status ? <span>{renderStatus(message.status)}</span> : null}
                 </div>
-              ) : null}
-              {message.paper ? (
-                <p className="mt-2 text-[11px] font-semibold opacity-80">
-                  Paper note{message.paper.title ? `: ${message.paper.title}` : ''}
-                </p>
-              ) : null}
-              <div className="mt-2 flex items-center justify-end gap-2 text-[11px] opacity-75">
-                <span>{message.sentAt}</span>
-                {message.sender === 'self' && message.status ? <span>{renderStatus(message.status)}</span> : null}
-              </div>
-            </button>
-          </article>
-        ))}
-        <div ref={bottomAnchorRef} aria-hidden className="h-0 w-full" />
+              </button>
+            </article>
+          ))}
+        </div>
       </div>
 
       {selectedMessage ? (

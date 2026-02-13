@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { Link, useNavigate } from 'react-router-dom'
+import { ListSkeleton } from '../../../shared/ui/ListSkeleton'
 import { PageHeading } from '../../../shared/ui/PageHeading'
 import { Panel } from '../../../shared/ui/Panel'
 import { VirtualizedList } from '../../../shared/ui/VirtualizedList'
@@ -22,12 +23,11 @@ export function PeoplePage() {
   const deferredQuery = useDeferredValue(query)
   const indexedPeople = useMemo(
     () =>
-      indexSearchItems(people, (person) => [
-        person.name,
-        person.id,
-        person.lastSeen,
-        person.trust,
-      ]),
+      indexSearchItems(
+        people,
+        (person) => [person.name, person.id, person.lastSeen, person.trust],
+        { cacheKey: 'people' },
+      ),
     [people],
   )
   const filteredPeople = useMemo(
@@ -101,7 +101,6 @@ export function PeoplePage() {
         {createError ? <p className="text-xs text-rose-700">{createError}</p> : null}
       </form>
 
-      {loading ? <p className="text-sm text-slate-500">Loading people...</p> : null}
       {error ? <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p> : null}
       {!loading && people.length === 0 ? (
         <p className="text-sm text-slate-500">No peers discovered yet. Keep Weft connected to the network.</p>
@@ -110,34 +109,40 @@ export function PeoplePage() {
         <p className="text-sm text-slate-500">No peers match your search.</p>
       ) : null}
 
-      <VirtualizedList
-        items={filteredPeople}
-        estimateItemHeight={82}
-        className="min-h-0 flex-1 overflow-y-auto pr-1"
-        listClassName="pb-1"
-        getKey={(person) => person.id}
-        renderItem={(person) => (
-          <div className="py-1">
-            <Link
-              to={buildNewChatHref(person.id, person.name)}
-              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300 hover:bg-slate-50/70"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900">{person.name}</p>
-                <p className="mt-0.5 text-xs text-slate-500">Last seen {person.lastSeen}</p>
-              </div>
-              <span
-                className={clsx(
-                  'rounded-full px-2 py-1 text-xs font-medium',
-                  trustBadgeClasses(person.trust),
-                )}
+      {loading ? (
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <ListSkeleton rows={8} />
+        </div>
+      ) : (
+        <VirtualizedList
+          items={filteredPeople}
+          estimateItemHeight={82}
+          className="min-h-0 flex-1 overflow-y-auto pr-1"
+          listClassName="pb-1"
+          getKey={(person) => person.id}
+          renderItem={(person) => (
+            <div className="py-1">
+              <Link
+                to={buildNewChatHref(person.id, person.name)}
+                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300 hover:bg-slate-50/70"
               >
-                {person.trust}
-              </span>
-            </Link>
-          </div>
-        )}
-      />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">{person.name}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Last seen {person.lastSeen}</p>
+                </div>
+                <span
+                  className={clsx(
+                    'rounded-full px-2 py-1 text-xs font-medium',
+                    trustBadgeClasses(person.trust),
+                  )}
+                >
+                  {person.trust}
+                </span>
+              </Link>
+            </div>
+          )}
+        />
+      )}
     </Panel>
   )
 }
