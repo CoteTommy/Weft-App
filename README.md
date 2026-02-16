@@ -30,6 +30,25 @@ Build desktop application:
 bun run build:desktop
 ```
 
+## Windows Profile Bootstrap
+
+To create/select profile `default` and add a TCP client interface for `rmap.world:4242`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-default-profile.ps1
+```
+
+Override defaults if needed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-default-profile.ps1 `
+  -Profile default `
+  -Rpc 127.0.0.1:4243 `
+  -InterfaceName rmap_world `
+  -InterfaceHost rmap.world `
+  -Port 4242
+```
+
 ## LXMF Desktop Plumbing
 
 Backend is fully in-process:
