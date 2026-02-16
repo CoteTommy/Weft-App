@@ -66,7 +66,8 @@ export default defineConfig({
           if (id.includes('/@tauri-apps/')) {
             return 'vendor-tauri'
           }
-          return 'vendor'
+          // Let Rollup place remaining deps to avoid cross-vendor cycles.
+          return
         },
       },
     },
