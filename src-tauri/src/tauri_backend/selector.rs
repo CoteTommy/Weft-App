@@ -1,5 +1,6 @@
 use lxmf::cli::profile::{
-    load_profile_settings, resolve_runtime_profile_name, selected_profile_name, ProfileSettings,
+    init_profile, load_profile_settings, resolve_runtime_profile_name, selected_profile_name,
+    ProfileSettings,
 };
 use std::env;
 
@@ -22,8 +23,19 @@ impl RuntimeSelector {
             .unwrap_or_else(|| "default".to_string());
         validate_profile(&requested_profile)?;
 
-        let profile_name = resolve_runtime_profile_name(&requested_profile)
-            .map_err(|err| format!("failed to resolve profile '{requested_profile}': {err}"))?;
+        let profile_name = match resolve_runtime_profile_name(&requested_profile) {
+            Ok(name) => name,
+            Err(err) if requested_profile == "default" => {
+                init_profile(&requested_profile, false, None)
+                    .map_err(|init_err| {
+                        format!("failed to initialize profile '{requested_profile}': {init_err}")
+                    })
+                    .map(|_| requested_profile.clone())?
+            }
+            Err(err) => {
+                return Err(format!("failed to resolve profile '{requested_profile}': {err}"));
+            }
+        };
         let mut profile_settings =
             load_profile_settings(&profile_name).map_err(|err| err.to_string())?;
 
