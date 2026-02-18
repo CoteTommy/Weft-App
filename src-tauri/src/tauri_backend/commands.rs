@@ -803,21 +803,42 @@ pub(crate) fn lxmf_get_profile(
 
 #[tauri::command]
 pub(crate) fn lxmf_set_display_name(
+    actor: State<'_, RuntimeActor>,
     profile: Option<String>,
     rpc: Option<String>,
     display_name: Option<String>,
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
     let profile_name = selector.profile_name.clone();
+    let settings_profile = selector.profile_settings.clone();
     let mut settings = load_profile_settings(&profile_name).map_err(|err| err.to_string())?;
+    let previous_display_name = settings.display_name.clone();
     settings.display_name = clean_arg(display_name);
     save_profile_settings(&settings).map_err(|err| err.to_string())?;
+
+    if previous_display_name.as_deref() != settings.display_name.as_deref() {
+        let currently_running = actor
+            .request(ActorCommand::Status {
+                selector: selector.clone(),
+            })
+            .ok()
+            .and_then(|status| status.get("running").and_then(Value::as_bool))
+            .unwrap_or(false);
+        if currently_running {
+            if let Err(err) = actor.request(ActorCommand::Restart {
+                selector: selector.clone(),
+                transport: None,
+            }) {
+                log::warn!("failed to restart runtime after display name change: {err}");
+            }
+        }
+    }
 
     Ok(json!({
         "profile": profile_name,
         "display_name": settings.display_name,
-        "rpc": settings.rpc,
-        "managed": settings.managed,
+        "rpc": settings_profile.rpc,
+        "managed": settings_profile.managed,
     }))
 }
 
