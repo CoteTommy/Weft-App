@@ -157,7 +157,7 @@ function asOptionalNumber(value: unknown, path: string): number | undefined {
   if (value === null || value === undefined) {
     return undefined
   }
-  return expectNullableNumber(value, path)
+  return expectFiniteNumber(value, path)
 }
 
 function asOptionalStringArray(value: unknown, path: string): string[] | undefined {
@@ -170,6 +170,13 @@ function asOptionalStringArray(value: unknown, path: string): string[] | undefin
 function expectBoolean(value: unknown, path: string): boolean {
   if (typeof value !== 'boolean') {
     throw new Error(`${path} must be a boolean`)
+  }
+  return value
+}
+
+function expectFiniteNumber(value: unknown, path: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${path} must be a finite number`)
   }
   return value
 }
