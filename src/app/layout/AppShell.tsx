@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
-import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
+import clsx from 'clsx'
 
 import { OPEN_THREAD_EVENT } from '@app/config/events'
 import { APP_ROUTES } from '@app/config/routes'
+import { markWeftInteractive } from '@app/runtime/perfHarness'
 import {
   getWeftPreferences,
   type MotionPreference,
@@ -20,17 +21,22 @@ import {
 } from '@lib/desktop-shell-api'
 
 import { CommandPalette } from './CommandPalette'
-import { NotificationToasts } from './NotificationToasts'
 import { PerformanceHud } from './PerformanceHud'
 import { SidebarNav } from './SidebarNav'
 import { TopBar } from './TopBar'
 
+const NotificationToasts = lazy(() =>
+  import('./NotificationToasts').then(module => ({ default: module.NotificationToasts }))
+)
+
 export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
-  const reduceMotion = useReducedMotion()
-  const pageMotion = useAnimationControls()
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+  const [routeTransitioning, setRouteTransitioning] = useState(false)
+  const hasMountedRouteRef = useRef(false)
   const routeAnimationFrameRef = useRef<number | null>(null)
+  const routeAnimationTimeoutRef = useRef<number | null>(null)
   const lastPersistedRouteRef = useRef<string>(
     getWeftPreferences().lastMainRoute ?? APP_ROUTES.chats
   )
@@ -65,36 +71,64 @@ export function AppShell() {
   }, [])
 
   useEffect(() => {
-    if (reduceMotion) {
-      pageMotion.set({ opacity: 1 })
+    const frameId = window.requestAnimationFrame(() => {
+      markWeftInteractive('app-shell-mounted')
+    })
+    return () => {
+      window.cancelAnimationFrame(frameId)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
       return
     }
-    if (motionPreference === 'off') {
-      pageMotion.set({ opacity: 1 })
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const syncPreference = () => {
+      setPrefersReducedMotion(media.matches)
+    }
+    syncPreference()
+    media.addEventListener('change', syncPreference)
+    return () => {
+      media.removeEventListener('change', syncPreference)
+    }
+  }, [])
+
+  useEffect(() => {
+    const disableMotion = prefersReducedMotion || motionPreference === 'off'
+    if (disableMotion) {
+      return
+    }
+    if (!hasMountedRouteRef.current) {
+      hasMountedRouteRef.current = true
       return
     }
     if (routeAnimationFrameRef.current !== null) {
       window.cancelAnimationFrame(routeAnimationFrameRef.current)
     }
-    pageMotion.set({
-      opacity: motionPreference === 'smooth' ? 0.955 : 0.975,
-    })
+    if (routeAnimationTimeoutRef.current !== null) {
+      window.clearTimeout(routeAnimationTimeoutRef.current)
+      routeAnimationTimeoutRef.current = null
+    }
+    const durationMs = motionPreference === 'smooth' ? 200 : 120
     routeAnimationFrameRef.current = window.requestAnimationFrame(() => {
-      void pageMotion.start({
-        opacity: 1,
-        transition: {
-          duration: motionPreference === 'smooth' ? 0.2 : 0.12,
-          ease: [0.22, 1, 0.36, 1],
-        },
-      })
+      setRouteTransitioning(true)
+      routeAnimationTimeoutRef.current = window.setTimeout(() => {
+        setRouteTransitioning(false)
+        routeAnimationTimeoutRef.current = null
+      }, durationMs)
     })
     return () => {
       if (routeAnimationFrameRef.current !== null) {
         window.cancelAnimationFrame(routeAnimationFrameRef.current)
         routeAnimationFrameRef.current = null
       }
+      if (routeAnimationTimeoutRef.current !== null) {
+        window.clearTimeout(routeAnimationTimeoutRef.current)
+        routeAnimationTimeoutRef.current = null
+      }
     }
-  }, [location.pathname, motionPreference, pageMotion, reduceMotion])
+  }, [location.pathname, motionPreference, prefersReducedMotion])
 
   useEffect(() => {
     const route = `${location.pathname}${location.search}`.trim()
@@ -209,24 +243,38 @@ export function AppShell() {
     }
   }, [])
 
+  const disableMotion = prefersReducedMotion || motionPreference === 'off'
+  const pageTransitionClass = disableMotion
+    ? 'opacity-100 duration-0'
+    : routeTransitioning
+      ? motionPreference === 'smooth'
+        ? 'opacity-[0.955] duration-200'
+        : 'opacity-[0.975] duration-120'
+      : motionPreference === 'smooth'
+        ? 'opacity-100 duration-200'
+        : 'opacity-100 duration-120'
+
   return (
     <div className="motion-gpu relative h-screen overflow-hidden bg-(--app-bg) text-slate-900">
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[94rem] gap-4 px-3 py-4 sm:px-4 lg:px-6 lg:py-6">
         <SidebarNav />
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <TopBar />
-          <motion.div
-            className="motion-gpu min-h-0 flex-1 overflow-hidden"
-            initial={false}
-            animate={reduceMotion ? undefined : pageMotion}
+          <div
+            className={clsx(
+              'motion-gpu min-h-0 flex-1 overflow-hidden transition-opacity ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
+              pageTransitionClass
+            )}
           >
             <Outlet />
-          </motion.div>
+          </div>
         </main>
       </div>
       <PerformanceHud />
       <CommandPalette />
-      <NotificationToasts />
+      <Suspense fallback={null}>
+        <NotificationToasts />
+      </Suspense>
     </div>
   )
 }

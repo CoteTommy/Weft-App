@@ -477,6 +477,7 @@ mod tests {
                 request: SendMessageRequest {
                     id: Some("tauri-smoke-msg-out-1".to_string()),
                     source: None,
+                    source_private_key: None,
                     destination: "cccccccccccccccccccccccccccccccc".to_string(),
                     title: "smoke".to_string(),
                     content: "hello outbound".to_string(),
@@ -484,6 +485,7 @@ mod tests {
                     method: None,
                     stamp_cost: None,
                     include_ticket: false,
+                    try_propagation_on_fail: false,
                 },
             })
             .expect("send message");
@@ -499,6 +501,7 @@ mod tests {
                     message: SendMessageRequest {
                         id: Some("tauri-smoke-msg-cmd-1".to_string()),
                         source: None,
+                        source_private_key: None,
                         destination: "dddddddddddddddddddddddddddddddd".to_string(),
                         title: String::new(),
                         content: String::new(),
@@ -506,6 +509,7 @@ mod tests {
                         method: None,
                         stamp_cost: None,
                         include_ticket: false,
+                        try_propagation_on_fail: false,
                     },
                     commands: vec![CommandEntry::from_text(1, "ping")],
                 },

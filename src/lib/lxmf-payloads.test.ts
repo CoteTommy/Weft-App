@@ -45,6 +45,14 @@ describe('lxmf payload parsers', () => {
     expect(parsed.meta?.profile).toBe('weft2')
   })
 
+  test('parses wrapped message delivery transitions', () => {
+    const parsed = parseLxmfMessageDeliveryTrace({
+      message_delivery_trace: fixture.message_delivery_trace,
+    })
+    expect(parsed.message_id).toBe('lxmf-interop-001')
+    expect(parsed.transitions).toHaveLength(3)
+  })
+
   test('parses message list with every payload domain fixture', () => {
     const parsed = parseLxmfMessageList(fixture.message_list)
 

@@ -31,15 +31,13 @@ rmpv = "1"
 rmp-serde = "1"
 serde_cbor = "0.11"
 lxmf = { path = "../../LXMF-rs/crates/lxmf", package = "lxmf", features = ["cli", "embedded-runtime"] }
-
-[patch.crates-io]
-reticulum-rs = { path = "../../Reticulum-rs/crates/reticulum", package = "reticulum-rs" }
+rusqlite = { version = "0.32", features = ["bundled", "modern_sqlite"] }
 
 [dev-dependencies]
 tempfile = "3.17.1"
 
 [profile.release]
-opt-level = "z"
+opt-level = 3
 lto = "thin"
 codegen-units = 1
 panic = "abort"

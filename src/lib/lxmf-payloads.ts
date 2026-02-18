@@ -198,6 +198,57 @@ export interface LxmfOutboundPropagationNodeResponse {
   meta: LxmfContractMeta | null
 }
 
+export interface LxmfClearResponse {
+  cleared: string
+}
+
+export interface LxmfSetInterfacesResponse {
+  updated: boolean
+}
+
+export interface LxmfReloadConfigResponse {
+  reloaded: boolean
+  timestamp: number
+}
+
+export interface LxmfPeerSyncResponse {
+  peer: string
+  synced: boolean
+}
+
+export interface LxmfPeerUnpeerResponse {
+  removed: boolean
+}
+
+export interface LxmfDeliveryPolicyResponse {
+  policy: LxmfDeliveryPolicy
+}
+
+export interface LxmfPropagationStatusResponse {
+  propagation: LxmfPropagationState
+}
+
+export interface LxmfPropagationIngestResponse {
+  ingestedCount: number
+  transientId: string
+}
+
+export interface LxmfPropagationFetchResponse {
+  transientId: string
+  payloadHex: string
+}
+
+export interface LxmfStampPolicyResponse {
+  stampPolicy: LxmfStampPolicy
+}
+
+export interface LxmfTicketGenerateResponse {
+  ticket: string
+  destination: string
+  expiresAt: number
+  ttlSecs: number
+}
+
 export interface LxmfDeliveryTraceEntry {
   status: string
   timestamp: number
@@ -291,11 +342,101 @@ export function parseLxmfOutboundPropagationNode(
   }
 }
 
+export function parseLxmfClearResponse(value: unknown): LxmfClearResponse {
+  const root = asWrappedPayload(value, 'clear_messages')
+  return {
+    cleared: asString(root.cleared, 'clear_messages.cleared'),
+  }
+}
+
+export function parseLxmfSetInterfacesResponse(value: unknown): LxmfSetInterfacesResponse {
+  const root = asWrappedPayload(value, 'set_interfaces')
+  return {
+    updated: asBoolean(root.updated, 'set_interfaces.updated'),
+  }
+}
+
+export function parseLxmfReloadConfigResponse(value: unknown): LxmfReloadConfigResponse {
+  const root = asWrappedPayload(value, 'reload_config')
+  return {
+    reloaded: asBoolean(root.reloaded, 'reload_config.reloaded'),
+    timestamp: asNumber(root.timestamp, 'reload_config.timestamp'),
+  }
+}
+
+export function parseLxmfPeerSyncResponse(value: unknown): LxmfPeerSyncResponse {
+  const root = asWrappedPayload(value, 'peer_sync')
+  return {
+    peer: asString(root.peer, 'peer_sync.peer'),
+    synced: asBoolean(root.synced, 'peer_sync.synced'),
+  }
+}
+
+export function parseLxmfPeerUnpeerResponse(value: unknown): LxmfPeerUnpeerResponse {
+  const root = asWrappedPayload(value, 'peer_unpeer')
+  return {
+    removed: asBoolean(root.removed, 'peer_unpeer.removed'),
+  }
+}
+
+export function parseLxmfDeliveryPolicyResponse(value: unknown): LxmfDeliveryPolicyResponse {
+  const root = asWrappedPayload(value, 'delivery_policy')
+  const source = root.policy ?? root
+  const policy = parseLxmfDeliveryPolicyRecord(source, 'delivery_policy.policy')
+  return { policy }
+}
+
+export function parseLxmfPropagationStatusResponse(value: unknown): LxmfPropagationStatusResponse {
+  const root = asWrappedPayload(value, 'propagation')
+  const source = root.propagation ?? root
+  const propagation = parseLxmfPropagationStateRecord(source, 'propagation')
+  return { propagation }
+}
+
+export function parseLxmfPropagationIngestResponse(value: unknown): LxmfPropagationIngestResponse {
+  const root = asWrappedPayload(value, 'propagation_ingest')
+  return {
+    ingestedCount: asNumber(root.ingested_count, 'propagation_ingest.ingested_count'),
+    transientId: asString(root.transient_id, 'propagation_ingest.transient_id'),
+  }
+}
+
+export function parseLxmfPropagationFetchResponse(value: unknown): LxmfPropagationFetchResponse {
+  const root = asWrappedPayload(value, 'propagation_fetch')
+  return {
+    transientId: asString(root.transient_id, 'propagation_fetch.transient_id'),
+    payloadHex: asString(root.payload_hex, 'propagation_fetch.payload_hex'),
+  }
+}
+
+export function parseLxmfStampPolicyResponse(value: unknown): LxmfStampPolicyResponse {
+  const root = asWrappedPayload(value, 'stamp_policy')
+  const source = root.stamp_policy ?? root
+  const policy = parseLxmfStampPolicyRecord(source, 'stamp_policy')
+  return { stampPolicy: policy }
+}
+
+export function parseLxmfTicketGenerateResponse(value: unknown): LxmfTicketGenerateResponse {
+  const root = asWrappedPayload(value, 'ticket_generate')
+  return {
+    ticket: asString(root.ticket, 'ticket_generate.ticket'),
+    destination: asString(root.destination, 'ticket_generate.destination'),
+    expiresAt: asNumber(root.expires_at, 'ticket_generate.expires_at'),
+    ttlSecs: asNumber(root.ttl_secs, 'ticket_generate.ttl_secs'),
+  }
+}
+
 export function parseLxmfMessageDeliveryTrace(value: unknown): LxmfMessageDeliveryTraceResponse {
   const root = asObject(value, 'message_delivery_trace')
-  const transitionsRaw = readArrayField(root, 'transitions') ?? []
+  const source =
+    root.message_delivery_trace &&
+    typeof root.message_delivery_trace === 'object' &&
+    !Array.isArray(root.message_delivery_trace)
+      ? asObject(root.message_delivery_trace, 'message_delivery_trace.message_delivery_trace')
+      : root
+  const transitionsRaw = readArrayField(source, 'transitions') ?? []
   return {
-    message_id: asString(root.message_id, 'message_delivery_trace.message_id'),
+    message_id: asString(source.message_id, 'message_delivery_trace.message_id'),
     transitions: transitionsRaw.map((entry, index) => {
       const trace = asObject(entry, `message_delivery_trace.transitions[${index}]`)
       return {
@@ -310,7 +451,7 @@ export function parseLxmfMessageDeliveryTrace(value: unknown): LxmfMessageDelive
         ),
       }
     }),
-    meta: asNullableContractMeta(root.meta, 'message_delivery_trace.meta'),
+    meta: asNullableContractMeta(source.meta, 'message_delivery_trace.meta'),
   }
 }
 
@@ -392,6 +533,45 @@ function parsePropagationNodeRecord(value: unknown, path: string): LxmfPropagati
   }
 }
 
+function parseLxmfDeliveryPolicyRecord(value: unknown, path: string): LxmfDeliveryPolicy {
+  const policy = asObject(value, `${path}`)
+  return {
+    auth_required: asBoolean(policy.auth_required, `${path}.auth_required`),
+    allowed_destinations: asStringArray(
+      policy.allowed_destinations,
+      `${path}.allowed_destinations`
+    ),
+    denied_destinations: asStringArray(policy.denied_destinations, `${path}.denied_destinations`),
+    ignored_destinations: asStringArray(
+      policy.ignored_destinations,
+      `${path}.ignored_destinations`
+    ),
+    prioritised_destinations: asStringArray(
+      policy.prioritised_destinations,
+      `${path}.prioritised_destinations`
+    ),
+  }
+}
+
+function parseLxmfPropagationStateRecord(value: unknown, path: string): LxmfPropagationState {
+  const state = asObject(value, path)
+  return {
+    enabled: asBoolean(state.enabled, `${path}.enabled`),
+    store_root: asNullableString(state.store_root, `${path}.store_root`),
+    target_cost: asNumber(state.target_cost, `${path}.target_cost`),
+    total_ingested: asNumber(state.total_ingested, `${path}.total_ingested`),
+    last_ingest_count: asNumber(state.last_ingest_count, `${path}.last_ingest_count`),
+  }
+}
+
+function parseLxmfStampPolicyRecord(value: unknown, path: string): LxmfStampPolicy {
+  const policy = asObject(value, path)
+  return {
+    target_cost: asNumber(policy.target_cost, `${path}.target_cost`),
+    flexibility: asNumber(policy.flexibility, `${path}.flexibility`),
+  }
+}
+
 function readArrayField(value: unknown, field: string): unknown[] | null {
   if (Array.isArray(value)) {
     return value
@@ -410,6 +590,20 @@ function asObject(value: unknown, path: string): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
+function asWrappedPayload(value: unknown, wrapperLabel: string): Record<string, unknown> {
+  const root = asObject(value, wrapperLabel)
+  const wrapped = root[wrapperLabel]
+  if (
+    wrapped !== null &&
+    wrapped !== undefined &&
+    typeof wrapped === 'object' &&
+    !Array.isArray(wrapped)
+  ) {
+    return asObject(wrapped, wrapperLabel)
+  }
+  return root
+}
+
 function asString(value: unknown, path: string): string {
   if (typeof value !== 'string') {
     throw new Error(`${path} must be a string`)
@@ -422,6 +616,13 @@ function asNullableString(value: unknown, path: string): string | null {
     return null
   }
   return asString(value, path)
+}
+
+function asStringArray(value: unknown, path: string): string[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${path} must be an array`)
+  }
+  return value.map((entry, index) => asString(entry, `${path}[${index}]`))
 }
 
 function asNumber(value: unknown, path: string): number {

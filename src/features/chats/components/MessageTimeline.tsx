@@ -6,7 +6,7 @@ import clsx from 'clsx'
 
 import { APP_ROUTES } from '@app/config/routes'
 import type { ChatMessage } from '@shared/types/chat'
-import { getLxmfMessageDeliveryTrace } from '@lib/lxmf-api'
+import { getLxmfMessageDeliveryTrace, lxmfGetAttachmentBlob } from '@lib/lxmf-api'
 
 interface MessageTimelineProps {
   messages: ChatMessage[]
@@ -27,6 +27,7 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const detailsDialogRef = useRef<HTMLDivElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const attachmentPayloadCacheRef = useRef<Map<string, string>>(new Map())
   const [stickToBottom, setStickToBottom] = useState(true)
   const estimatedMessageHeight = 118
   const overscan = 8
@@ -215,10 +216,52 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
     virtualizer.scrollToIndex(messages.length - 1, { align: 'end' })
   }, [latestMessageId, messages.length, stickToBottom, virtualizer])
 
+  const withAttachmentBlob = useCallback(
+    async (
+      messageId: string,
+      attachment: ChatMessage['attachments'][number],
+      action: (value: ChatMessage['attachments'][number]) => void
+    ) => {
+      let dataBase64 = attachment.dataBase64
+      const cacheKey = `${messageId}:${attachment.name}`
+
+      if (!dataBase64) {
+        const cached = attachmentPayloadCacheRef.current.get(cacheKey)
+        if (cached) {
+          dataBase64 = cached
+        }
+      }
+
+      if (!dataBase64) {
+        try {
+          const blob = await lxmfGetAttachmentBlob(messageId, attachment.name)
+          dataBase64 = blob.dataBase64
+        } catch (blobError) {
+          setCopyFeedback(blobError instanceof Error ? blobError.message : String(blobError))
+          return
+        }
+      }
+
+      if (!dataBase64) {
+        setCopyFeedback('Attachment payload unavailable.')
+        return
+      }
+
+      attachmentPayloadCacheRef.current.set(cacheKey, dataBase64)
+
+      action({
+        ...attachment,
+        dataBase64,
+      })
+    },
+    []
+  )
+
   return (
     <>
       <div
         ref={setTimelineContainerRef}
+        data-weft-message-scroll-container="true"
         onScroll={event => {
           const node = event.currentTarget
           setStickToBottom(node.scrollHeight - node.clientHeight - node.scrollTop <= 96)
@@ -384,16 +427,22 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         <button
                           type="button"
-                          disabled={!attachment.dataBase64}
-                          onClick={() => openAttachment(attachment)}
+                          onClick={() => {
+                            void withAttachmentBlob(selectedMessage.id, attachment, loaded => {
+                              openAttachment(loaded)
+                            })
+                          }}
                           className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
                         >
                           Open
                         </button>
                         <button
                           type="button"
-                          disabled={!attachment.dataBase64}
-                          onClick={() => saveAttachment(attachment)}
+                          onClick={() => {
+                            void withAttachmentBlob(selectedMessage.id, attachment, loaded => {
+                              saveAttachment(loaded)
+                            })
+                          }}
                           className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
                         >
                           Save
