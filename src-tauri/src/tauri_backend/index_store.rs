@@ -1606,7 +1606,9 @@ fn extract_map_points(
         points.push(build_map_point(message, lat, lon));
     }
 
-    if let Some((lat, lon)) = extract_geo_uri(message.body).or_else(|| extract_geo_uri(message.title)) {
+    if let Some((lat, lon)) =
+        extract_geo_uri(message.body).or_else(|| extract_geo_uri(message.title))
+    {
         points.push(build_map_point(message, lat, lon));
     }
 
@@ -1681,15 +1683,13 @@ fn extract_location_from_fields(fields: &Value) -> Option<(f64, f64)> {
     None
 }
 
-fn build_map_point(
-    message: &MapPointMessageContext<'_>,
-    lat: f64,
-    lon: f64,
-) -> IndexedMapPoint {
+fn build_map_point(message: &MapPointMessageContext<'_>, lat: f64, lon: f64) -> IndexedMapPoint {
     let label = if !message.title.trim().is_empty() {
         message.title.trim().to_string()
     } else if !message.body.trim().is_empty() {
-        message.body.lines()
+        message
+            .body
+            .lines()
             .next()
             .unwrap_or("Location point")
             .trim()
@@ -1698,7 +1698,11 @@ fn build_map_point(
         "Location point".to_string()
     };
 
-    let direction_label = if message.direction == "out" { "out" } else { "in" };
+    let direction_label = if message.direction == "out" {
+        "out"
+    } else {
+        "in"
+    };
     let who = if message.direction == "out" {
         message.destination
     } else {
