@@ -33,9 +33,6 @@ serde_cbor = "0.11"
 lxmf = { path = "../../LXMF-rs/crates/lxmf", package = "lxmf", features = ["cli", "embedded-runtime"] }
 rusqlite = { version = "0.32", features = ["bundled", "modern_sqlite"] }
 
-[patch.crates-io]
-reticulum-rs = { path = "../../Reticulum-rs/crates/reticulum", package = "reticulum-rs" }
-
 [dev-dependencies]
 tempfile = "3.17.1"
 

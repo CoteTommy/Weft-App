@@ -6156,7 +6156,3 @@ dependencies = [
  "syn 2.0.114",
  "winnow 0.7.14",
 ]
-
-[[patch.unused]]
-name = "reticulum-rs"
-version = "0.1.3"
