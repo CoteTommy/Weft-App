@@ -1,21 +1,18 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
-import { MotionConfig } from 'framer-motion'
-
 import { APP_ROUTES } from '@app/config/routes'
 import { AppShell } from '@app/layout/AppShell'
 import { MAIN_ROUTES, sanitizeMainRoute } from '@app/routing/mainRoutes'
 import { prefetchRouteChunks } from '@app/routing/prefetch'
 import { DeepLinkBridge } from '@app/runtime/DeepLinkBridge'
-import { transitionForMotionPreference } from '@app/runtime/motion'
+import { LxmfEventHubProvider } from '@app/state/LxmfEventHubProvider'
 import { NotificationCenterProvider } from '@app/state/NotificationCenterProvider'
 import { RuntimeHealthProvider } from '@app/state/RuntimeHealthProvider'
 import { ChatsStateLayout } from '@features/chats/state/ChatsProvider'
 import {
   getWeftPreferences,
   hasCompletedOnboarding,
-  type MotionPreference,
   PREFERENCES_UPDATED_EVENT,
 } from '@shared/runtime/preferences'
 import { normalizeMainRoute } from '@shared/runtime/sessionRestore'
@@ -27,9 +24,6 @@ const WelcomePage = lazy(() =>
 export default function App() {
   const initialPreferences = getWeftPreferences()
   const [onboardingCompleted, setOnboardingCompleted] = useState(() => hasCompletedOnboarding())
-  const [motionPreference, setMotionPreference] = useState<MotionPreference>(
-    initialPreferences.motionPreference
-  )
   const [commandCenterEnabled, setCommandCenterEnabled] = useState(
     initialPreferences.commandCenterEnabled
   )
@@ -41,7 +35,6 @@ export default function App() {
     const handleUpdate = () => {
       const preferences = getWeftPreferences()
       setOnboardingCompleted(hasCompletedOnboarding())
-      setMotionPreference(preferences.motionPreference)
       setCommandCenterEnabled(preferences.commandCenterEnabled)
       setLastMainRoute(sanitizeMainRoute(normalizeMainRoute(preferences.lastMainRoute)))
     }
@@ -56,10 +49,7 @@ export default function App() {
   }, [commandCenterEnabled])
 
   return (
-    <MotionConfig
-      reducedMotion={motionPreference === 'off' ? 'always' : 'user'}
-      transition={transitionForMotionPreference(motionPreference)}
-    >
+    <LxmfEventHubProvider>
       <RuntimeHealthProvider>
         <NotificationCenterProvider>
           <DeepLinkBridge onboardingCompleted={onboardingCompleted} />
@@ -101,7 +91,7 @@ export default function App() {
           </Suspense>
         </NotificationCenterProvider>
       </RuntimeHealthProvider>
-    </MotionConfig>
+    </LxmfEventHubProvider>
   )
 }
 

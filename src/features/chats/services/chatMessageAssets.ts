@@ -116,7 +116,6 @@ function parseCanonicalAttachments(value: unknown): ChatAttachment[] {
     out.push({
       name,
       sizeBytes: bytes.length,
-      dataBase64: bytesToBase64(bytes),
     })
   }
   return out
@@ -293,16 +292,6 @@ function decodeWireBytes(value: unknown): Uint8Array | null {
     bytes[index] = entry
   }
   return bytes
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = ''
-  const chunkSize = 0x8000
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize)
-    binary += String.fromCharCode(...chunk)
-  }
-  return btoa(binary)
 }
 
 function estimateBase64Size(value: string | undefined): number {

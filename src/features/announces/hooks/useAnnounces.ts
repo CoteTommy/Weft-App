@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { useLxmfEventHub } from '@app/state/LxmfEventHubProvider'
 import type { AnnounceItem } from '@shared/types/announces'
-import { startLxmfEventPump, subscribeLxmfEvents } from '@lib/lxmf-api'
 
 import {
   fetchAnnouncesPage,
@@ -27,6 +27,7 @@ interface UseAnnouncesState {
 }
 
 export function useAnnounces(): UseAnnouncesState {
+  const { subscribe, getLastEventAtMs } = useLxmfEventHub()
   const [announces, setAnnounces] = useState<AnnounceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -138,13 +139,9 @@ export function useAnnounces(): UseAnnouncesState {
   }, [refresh])
 
   useEffect(() => {
-    let unlisten: (() => void) | null = null
-    let disposed = false
+    listenerHealthyRef.current = true
     void refresh()
-    void startLxmfEventPump().catch(() => {
-      listenerHealthyRef.current = false
-    })
-    void subscribeLxmfEvents(event => {
+    const unlisten = subscribe(event => {
       lastEventAtRef.current = Date.now()
       if (event.event_type === 'announce_received') {
         const mapped = mapAnnounceEventPayload(event.payload)
@@ -155,25 +152,27 @@ export function useAnnounces(): UseAnnouncesState {
         scheduleRefresh()
         return
       }
-      if (event.event_type === 'announce_sent' || event.event_type === 'runtime_started') {
+      if (
+        event.event_type === 'announce_sent' ||
+        event.event_type === 'runtime_started' ||
+        event.event_type === 'runtime_stopped' ||
+        event.event_type === 'peer_sync' ||
+        event.event_type === 'peer_unpeer' ||
+        event.event_type === 'interfaces_updated' ||
+        event.event_type === 'config_reloaded' ||
+        event.event_type === 'propagation_node_selected'
+      ) {
         scheduleRefresh()
       }
     })
-      .then(stop => {
-        if (disposed) {
-          stop()
-          return
-        }
-        listenerHealthyRef.current = true
-        unlisten = stop
-      })
-      .catch(() => {
-        listenerHealthyRef.current = false
-      })
 
     const intervalId = window.setInterval(() => {
       const now = Date.now()
-      const freshestAt = Math.max(lastEventAtRef.current, lastRefreshAtRef.current)
+      const freshestAt = Math.max(
+        lastEventAtRef.current,
+        getLastEventAtMs(),
+        lastRefreshAtRef.current
+      )
       const staleMs = freshestAt === 0 ? Number.POSITIVE_INFINITY : now - freshestAt
       if (!listenerHealthyRef.current || staleMs >= ANNOUNCE_WATCHDOG_STALE_MS) {
         scheduleRefresh()
@@ -181,9 +180,8 @@ export function useAnnounces(): UseAnnouncesState {
     }, ANNOUNCE_WATCHDOG_INTERVAL_MS)
 
     return () => {
-      disposed = true
       listenerHealthyRef.current = false
-      unlisten?.()
+      unlisten()
       window.clearInterval(intervalId)
       if (refreshTimerRef.current !== null) {
         window.clearTimeout(refreshTimerRef.current)
@@ -195,7 +193,7 @@ export function useAnnounces(): UseAnnouncesState {
       }
       pendingAnnouncesRef.current = []
     }
-  }, [enqueueAnnounce, refresh, scheduleRefresh])
+  }, [enqueueAnnounce, getLastEventAtMs, refresh, scheduleRefresh, subscribe])
 
   return {
     announces,

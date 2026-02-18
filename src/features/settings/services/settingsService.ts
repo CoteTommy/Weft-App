@@ -14,10 +14,13 @@ import {
   getLxmfProfile,
   listLxmfMessages,
   listLxmfPropagationNodes,
+  lxmfQueryThreadMessages,
+  lxmfQueryThreads,
   probeLxmf,
   setLxmfDisplayName,
   setLxmfOutboundPropagationNode,
 } from '@lib/lxmf-api'
+import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 
 import { buildInteropSnapshot } from './interopHealth'
 
@@ -30,7 +33,7 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       getLxmfProfile().catch(() => null),
       listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
       getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
-      listLxmfMessages().catch(() => ({ messages: [], meta: null })),
+      loadInteropMessages().catch(() => []),
       getDesktopShellPreferences().catch(() => ({
         minimizeToTrayOnClose: true,
         startInTray: false,
@@ -53,7 +56,7 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
     probe,
     relaySelected: Boolean(outboundPropagationNode.peer),
     propagationNodes: propagationNodes.nodes.length,
-    messages: messages.messages,
+    messages,
     runtimeConnected: status.running,
   })
   return {
@@ -90,6 +93,43 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
     },
     interop,
   }
+}
+
+async function loadInteropMessages(): Promise<LxmfMessageRecord[]> {
+  try {
+    const threadPage = await lxmfQueryThreads({}, { limit: 50 })
+    if (threadPage.items.length === 0) {
+      return []
+    }
+    const batches = await Promise.all(
+      threadPage.items.slice(0, 20).map(thread =>
+        lxmfQueryThreadMessages(thread.threadId, {}, { limit: 120 }).catch(() => ({
+          items: [],
+          nextCursor: null,
+        }))
+      )
+    )
+    const out = batches.flatMap(batch =>
+      batch.items.map(item => ({
+        id: item.id,
+        source: item.source,
+        destination: item.destination,
+        title: item.title,
+        content: item.content,
+        timestamp: item.timestamp,
+        direction: item.direction,
+        fields: item.fields,
+        receipt_status: item.receiptStatus,
+      }))
+    )
+    if (out.length > 0) {
+      return out
+    }
+  } catch {
+    // Fall through to legacy query path.
+  }
+  const legacy = await listLxmfMessages().catch(() => ({ messages: [], meta: null }))
+  return legacy.messages
 }
 
 export async function saveOutboundPropagationNode(input: {

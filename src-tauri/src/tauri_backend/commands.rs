@@ -1,6 +1,10 @@
 use super::actor::{
     clean_required_arg, parse_command_entries, rpc_actor_call, ActorCommand, RuntimeActor,
 };
+use super::index_store::{
+    AttachmentBlobParams, FilesQueryParams, IndexStore, MapPointsQueryParams, SearchQueryParams,
+    ThreadMessageQueryParams, ThreadQueryParams,
+};
 use super::selector::{clean_arg, default_transport, RuntimeSelector};
 use super::{
     current_system_appearance, DesktopShellPreferencePatch, DesktopShellState, EventPumpControl,
@@ -15,7 +19,8 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
@@ -96,6 +101,207 @@ pub(crate) fn daemon_restart(
     })
 }
 
+pub(crate) fn reindex_index_store_from_runtime(
+    actor: &RuntimeActor,
+    index_store: &IndexStore,
+    selector: RuntimeSelector,
+) -> Result<(), String> {
+    let messages = rpc_actor_call(actor, selector.clone(), "list_messages", None)?;
+    let peers = rpc_actor_call(actor, selector, "list_peers", None)?;
+    index_store.reindex_from_runtime_payloads(&messages, &peers)
+}
+
+fn now_epoch_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+fn log_index_query_latency(command: &str, started_at: Instant, result: &Result<Value, String>) {
+    let elapsed_ms = started_at.elapsed().as_millis();
+    match result {
+        Ok(payload) => {
+            let item_count = payload
+                .get("items")
+                .and_then(Value::as_array)
+                .map(|items| items.len())
+                .unwrap_or(0);
+            log::debug!(
+                "index_query command={command} elapsed_ms={elapsed_ms} item_count={item_count}"
+            );
+        }
+        Err(error) => {
+            log::debug!("index_query command={command} elapsed_ms={elapsed_ms} error={error}");
+        }
+    }
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_index_status(index_store: State<'_, Arc<IndexStore>>) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let status = index_store.as_ref().index_status()?;
+    let freshness_ms = status
+        .last_sync_ms
+        .map(|last_sync_ms| now_epoch_ms().saturating_sub(last_sync_ms));
+    log::debug!(
+        "index_status ready={} message_count={} thread_count={} freshness_ms={} elapsed_ms={}",
+        status.ready,
+        status.message_count,
+        status.thread_count,
+        freshness_ms
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "unknown".to_string()),
+        started_at.elapsed().as_millis(),
+    );
+    serde_json::to_value(status).map_err(|err| format!("serialize index status failed: {err}"))
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_query_threads(
+    index_store: State<'_, Arc<IndexStore>>,
+    query: Option<String>,
+    limit: Option<usize>,
+    cursor: Option<String>,
+    pinned_only: Option<bool>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = index_store.as_ref().query_threads(ThreadQueryParams {
+        query,
+        limit,
+        cursor,
+        pinned_only,
+    });
+    log_index_query_latency("lxmf_query_threads", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_query_thread_messages(
+    index_store: State<'_, Arc<IndexStore>>,
+    thread_id: String,
+    limit: Option<usize>,
+    cursor: Option<String>,
+    query: Option<String>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = index_store
+        .as_ref()
+        .query_thread_messages(ThreadMessageQueryParams {
+            thread_id,
+            limit,
+            cursor,
+            query,
+        });
+    log_index_query_latency("lxmf_query_thread_messages", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_search_messages(
+    index_store: State<'_, Arc<IndexStore>>,
+    query: String,
+    thread_id: Option<String>,
+    limit: Option<usize>,
+    cursor: Option<String>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = index_store.as_ref().search_messages(SearchQueryParams {
+        query,
+        thread_id,
+        limit,
+        cursor,
+    });
+    log_index_query_latency("lxmf_search_messages", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_query_files(
+    index_store: State<'_, Arc<IndexStore>>,
+    query: Option<String>,
+    kind: Option<String>,
+    limit: Option<usize>,
+    cursor: Option<String>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = index_store.as_ref().query_files(FilesQueryParams {
+        query,
+        kind,
+        limit,
+        cursor,
+    });
+    log_index_query_latency("lxmf_query_files", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_query_map_points(
+    index_store: State<'_, Arc<IndexStore>>,
+    query: Option<String>,
+    limit: Option<usize>,
+    cursor: Option<String>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = index_store.as_ref().query_map_points(MapPointsQueryParams {
+        query,
+        limit,
+        cursor,
+    });
+    log_index_query_latency("lxmf_query_map_points", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_get_attachment_blob(
+    index_store: State<'_, Arc<IndexStore>>,
+    message_id: String,
+    attachment_name: String,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = index_store.as_ref().get_attachment_blob(AttachmentBlobParams {
+        message_id,
+        attachment_name,
+    });
+    log_index_query_latency("lxmf_get_attachment_blob", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_force_reindex(
+    actor: State<'_, RuntimeActor>,
+    index_store: State<'_, Arc<IndexStore>>,
+    profile: Option<String>,
+    rpc: Option<String>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    index_store.as_ref().force_reindex()?;
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    reindex_index_store_from_runtime(&actor, index_store.as_ref(), selector)?;
+    if let Ok(status) = index_store.as_ref().index_status() {
+        let freshness_ms = status
+            .last_sync_ms
+            .map(|last_sync_ms| now_epoch_ms().saturating_sub(last_sync_ms));
+        log::info!(
+            "index_reindex completed elapsed_ms={} message_count={} thread_count={} freshness_ms={}",
+            started_at.elapsed().as_millis(),
+            status.message_count,
+            status.thread_count,
+            freshness_ms
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        );
+    } else {
+        log::info!(
+            "index_reindex completed elapsed_ms={}",
+            started_at.elapsed().as_millis()
+        );
+    }
+    Ok(json!({
+        "started": true
+    }))
+}
+
 #[tauri::command]
 pub(crate) fn lxmf_list_messages(
     actor: State<'_, RuntimeActor>,
@@ -117,6 +323,26 @@ pub(crate) fn lxmf_list_peers(
 }
 
 #[tauri::command]
+pub(crate) fn lxmf_clear_messages(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(&actor, selector, "clear_messages", None)
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_clear_peers(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(&actor, selector, "clear_peers", None)
+}
+
+#[tauri::command]
 pub(crate) fn lxmf_list_interfaces(
     actor: State<'_, RuntimeActor>,
     profile: Option<String>,
@@ -124,6 +350,72 @@ pub(crate) fn lxmf_list_interfaces(
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
     rpc_actor_call(&actor, selector, "list_interfaces", None)
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_set_interfaces(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    interfaces: Vec<Value>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "set_interfaces",
+        Some(json!({
+            "interfaces": interfaces
+        })),
+    )
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_reload_config(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(&actor, selector, "reload_config", None)
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_peer_sync(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    peer: String,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    let peer = clean_required_arg(peer, "peer")?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "peer_sync",
+        Some(json!({
+            "peer": peer
+        })),
+    )
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_peer_unpeer(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    peer: String,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    let peer = clean_required_arg(peer, "peer")?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "peer_unpeer",
+        Some(json!({
+            "peer": peer
+        })),
+    )
 }
 
 #[tauri::command]
@@ -166,6 +458,113 @@ pub(crate) fn lxmf_list_announces(
 }
 
 #[tauri::command]
+pub(crate) fn lxmf_get_delivery_policy(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(&actor, selector, "get_delivery_policy", None)
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_set_delivery_policy(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    auth_required: Option<bool>,
+    allowed_destinations: Option<Vec<String>>,
+    denied_destinations: Option<Vec<String>>,
+    ignored_destinations: Option<Vec<String>>,
+    prioritised_destinations: Option<Vec<String>>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "set_delivery_policy",
+        Some(json!({
+            "auth_required": auth_required,
+            "allowed_destinations": allowed_destinations,
+            "denied_destinations": denied_destinations,
+            "ignored_destinations": ignored_destinations,
+            "prioritised_destinations": prioritised_destinations,
+        })),
+    )
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_propagation_status(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(&actor, selector, "propagation_status", None)
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_propagation_enable(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    enabled: bool,
+    store_root: Option<String>,
+    target_cost: Option<u32>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "propagation_enable",
+        Some(json!({
+            "enabled": enabled,
+            "store_root": clean_arg(store_root),
+            "target_cost": target_cost,
+        })),
+    )
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_propagation_ingest(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    transient_id: Option<String>,
+    payload_hex: Option<String>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "propagation_ingest",
+        Some(json!({
+            "transient_id": clean_arg(transient_id),
+            "payload_hex": clean_arg(payload_hex),
+        })),
+    )
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_propagation_fetch(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    transient_id: String,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    let transient_id = clean_required_arg(transient_id, "transient_id")?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "propagation_fetch",
+        Some(json!({
+            "transient_id": transient_id
+        })),
+    )
+}
+
+#[tauri::command]
 pub(crate) fn lxmf_interface_metrics(
     actor: State<'_, RuntimeActor>,
     profile: Option<String>,
@@ -197,6 +596,57 @@ pub(crate) fn lxmf_interface_metrics(
         "by_type": by_type,
         "interfaces": interfaces,
     }))
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_stamp_policy_get(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(&actor, selector, "stamp_policy_get", None)
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_stamp_policy_set(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    target_cost: Option<u32>,
+    flexibility: Option<u32>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "stamp_policy_set",
+        Some(json!({
+            "target_cost": target_cost,
+            "flexibility": flexibility,
+        })),
+    )
+}
+
+#[tauri::command]
+pub(crate) fn lxmf_ticket_generate(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    destination: String,
+    ttl_secs: Option<u64>,
+) -> Result<Value, String> {
+    let selector = RuntimeSelector::load(profile, rpc)?;
+    let destination = clean_required_arg(destination, "destination")?;
+    rpc_actor_call(
+        &actor,
+        selector,
+        "ticket_generate",
+        Some(json!({
+            "destination": destination,
+            "ttl_secs": ttl_secs,
+        })),
+    )
 }
 
 #[tauri::command]
@@ -299,6 +749,7 @@ pub(crate) fn lxmf_poll_event(
 pub(crate) fn lxmf_start_event_pump(
     app: AppHandle,
     actor: State<'_, RuntimeActor>,
+    index_store: State<'_, Arc<IndexStore>>,
     event_pump: State<'_, EventPumpControl>,
     profile: Option<String>,
     rpc: Option<String>,
@@ -306,10 +757,16 @@ pub(crate) fn lxmf_start_event_pump(
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
     let interval_ms = interval_ms.unwrap_or(DEFAULT_EVENT_PUMP_INTERVAL_MS);
-    event_pump.start(app, actor.inner().clone(), selector, interval_ms)?;
+    event_pump.start(
+        app,
+        actor.inner().clone(),
+        index_store.inner().clone(),
+        selector,
+        interval_ms,
+    )?;
     Ok(json!({
         "running": true,
-        "interval_ms": interval_ms.clamp(100, 5_000),
+        "interval_ms": interval_ms.clamp(150, 2_000),
     }))
 }
 
@@ -446,6 +903,7 @@ pub(crate) fn lxmf_send_message(
     let request = SendMessageRequest {
         id: clean_arg(id),
         source: clean_arg(source),
+        source_private_key: None,
         destination: destination.clone(),
         title: clean_arg(title).unwrap_or_default(),
         content,
@@ -453,6 +911,7 @@ pub(crate) fn lxmf_send_message(
         method: clean_arg(method),
         stamp_cost,
         include_ticket: include_ticket.unwrap_or(false),
+        try_propagation_on_fail: true,
     };
     let response = actor.request(ActorCommand::SendMessage { selector, request })?;
     let result = response.get("result").cloned().unwrap_or(Value::Null);
@@ -521,6 +980,7 @@ pub(crate) fn lxmf_send_rich_message(
     let request = SendMessageRequest {
         id: clean_arg(id),
         source: clean_arg(source),
+        source_private_key: None,
         destination: destination.clone(),
         title: clean_arg(title).unwrap_or_default(),
         content,
@@ -528,6 +988,7 @@ pub(crate) fn lxmf_send_rich_message(
         method: clean_arg(method),
         stamp_cost,
         include_ticket: include_ticket.unwrap_or(false),
+        try_propagation_on_fail: true,
     };
     let response = actor.request(ActorCommand::SendMessage { selector, request })?;
     let result = response.get("result").cloned().unwrap_or(Value::Null);
@@ -582,6 +1043,7 @@ pub(crate) fn lxmf_send_command(
         message: SendMessageRequest {
             id: clean_arg(id),
             source: clean_arg(source),
+            source_private_key: None,
             destination: destination.clone(),
             title: clean_arg(title).unwrap_or_default(),
             content: clean_arg(content).unwrap_or_default(),
@@ -589,6 +1051,7 @@ pub(crate) fn lxmf_send_command(
             method: clean_arg(method),
             stamp_cost,
             include_ticket: include_ticket.unwrap_or(false),
+            try_propagation_on_fail: true,
         },
         commands: command_entries,
     };

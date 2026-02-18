@@ -6,8 +6,9 @@ import {
   getLxmfOutboundPropagationNode,
   getLxmfProfile,
   listLxmfInterfaces,
-  listLxmfMessages,
   listLxmfPropagationNodes,
+  lxmfQueryThreadMessages,
+  lxmfQueryThreads,
   probeLxmf,
 } from '@lib/lxmf-api'
 import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
@@ -45,9 +46,9 @@ export function useDeliveryDiagnostics(): DeliveryDiagnosticsState {
           getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
           listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
           listLxmfInterfaces().catch(() => ({ interfaces: [], meta: null })),
-          listLxmfMessages().catch(() => ({ messages: [], meta: null })),
+          loadDiagnosticMessages().catch(() => []),
         ])
-      const messageCandidates = selectDiagnosticsMessages(messages.messages)
+      const messageCandidates = selectDiagnosticsMessages(messages)
       const traceResults = await Promise.all(
         messageCandidates.map(async message => {
           const trace = await getLxmfMessageDeliveryTrace(message.id).catch(() => null)
@@ -92,6 +93,34 @@ export function useDeliveryDiagnostics(): DeliveryDiagnosticsState {
     },
     loadDiagnostics,
   }
+}
+
+async function loadDiagnosticMessages(): Promise<LxmfMessageRecord[]> {
+  const threadPage = await lxmfQueryThreads({}, { limit: 40 })
+  if (threadPage.items.length === 0) {
+    return []
+  }
+  const pages = await Promise.all(
+    threadPage.items.slice(0, 18).map(thread =>
+      lxmfQueryThreadMessages(thread.threadId, {}, { limit: 80 }).catch(() => ({
+        items: [],
+        nextCursor: null,
+      }))
+    )
+  )
+  return pages.flatMap(page =>
+    page.items.map(item => ({
+      id: item.id,
+      source: item.source,
+      destination: item.destination,
+      title: item.title,
+      content: item.content,
+      timestamp: item.timestamp,
+      direction: item.direction,
+      fields: item.fields,
+      receipt_status: item.receiptStatus,
+    }))
+  )
 }
 
 function selectDiagnosticsMessages(messages: LxmfMessageRecord[]): LxmfMessageRecord[] {

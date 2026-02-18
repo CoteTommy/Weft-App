@@ -1,14 +1,19 @@
-import {
-  type ParsedMapPoint as MapPoint,
-  parseMapPointsOffThread,
-} from '@features/messages/services/payloadParseWorker'
-import { listLxmfMessages, sendLxmfMessage } from '@lib/lxmf-api'
+import { type ParsedMapPoint as MapPoint } from '@features/messages/services/payloadParseWorker'
+import { lxmfQueryMapPoints, sendLxmfMessage } from '@lib/lxmf-api'
 
 export type { MapPoint }
 
 export async function fetchMapPoints(): Promise<MapPoint[]> {
-  const response = await listLxmfMessages()
-  return await parseMapPointsOffThread(response.messages)
+  const response = await lxmfQueryMapPoints({}, { limit: 1500 })
+  return response.items.map(item => ({
+    id: item.id,
+    label: item.label,
+    lat: item.lat,
+    lon: item.lon,
+    source: item.source,
+    when: item.when,
+    direction: item.direction,
+  }))
 }
 
 export async function sendLocationToDestination(input: {

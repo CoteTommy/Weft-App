@@ -1,17 +1,19 @@
 mod actor;
 mod commands;
+mod index_store;
 mod selector;
 
 use actor::{ActorCommand, RuntimeActor};
+use index_store::IndexStore;
 use selector::{
     auto_daemon_enabled, default_profile, default_rpc, default_transport, RuntimeSelector,
 };
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{mpsc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, Theme};
@@ -19,7 +21,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 
 pub(crate) const LXMF_EVENT_CHANNEL: &str = "weft://lxmf-event";
 pub(crate) const TRAY_ACTION_CHANNEL: &str = "weft://tray-action";
-pub(crate) const DEFAULT_EVENT_PUMP_INTERVAL_MS: u64 = 300;
+pub(crate) const DEFAULT_EVENT_PUMP_INTERVAL_MS: u64 = 200;
 const TRAY_ICON_ID: &str = "weft-tray";
 const TRAY_MENU_OPEN: &str = "open";
 const TRAY_MENU_NEW_MESSAGE: &str = "new_message";
@@ -159,10 +161,11 @@ impl EventPumpControl {
         &self,
         app_handle: tauri::AppHandle,
         actor: RuntimeActor,
+        index_store: Arc<IndexStore>,
         selector: RuntimeSelector,
         interval_ms: u64,
     ) -> Result<(), String> {
-        let interval_ms = interval_ms.clamp(100, 5_000);
+        let interval_ms = interval_ms.clamp(150, 2_000);
         let profile = selector.profile_name.clone();
         let rpc = selector.profile_settings.rpc.clone();
 
@@ -185,8 +188,9 @@ impl EventPumpControl {
         let thread = thread::Builder::new()
             .name(format!("weft-event-pump-{}", selector.profile_name))
             .spawn(move || {
-                let interval = Duration::from_millis(interval_ms);
+                let mut current_interval = interval_ms.clamp(150, 300);
                 loop {
+                    let interval = Duration::from_millis(current_interval);
                     if stop_rx.recv_timeout(interval).is_ok() {
                         break;
                     }
@@ -195,13 +199,21 @@ impl EventPumpControl {
                         selector: thread_selector.clone(),
                     }) {
                         Ok(event) if !event.is_null() => {
+                            if let Some(event_lag_ms) = estimate_event_lag_ms(&event) {
+                                log::debug!("event_pump event_lag_ms={event_lag_ms}");
+                            }
+                            let _ = index_store.ingest_event_payload(&event);
                             let _ = app_handle.emit(LXMF_EVENT_CHANNEL, event);
+                            current_interval = interval_ms.clamp(150, 300);
                         }
-                        Ok(_) => {}
+                        Ok(_) => {
+                            current_interval = (current_interval + 150).clamp(150, 2_000);
+                        }
                         Err(err) => {
                             if !err.contains("runtime not started") {
                                 log::debug!("event pump poll error: {err}");
                             }
+                            current_interval = (current_interval + 200).clamp(150, 2_000);
                         }
                     }
                 }
@@ -232,6 +244,28 @@ fn stop_event_pump_locked(slot: &mut Option<EventPumpHandle>) {
             let _ = join.join();
         }
     }
+}
+
+fn now_epoch_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+fn estimate_event_lag_ms(event: &serde_json::Value) -> Option<i64> {
+    let payload = event.get("payload");
+    let timestamp_ms = payload
+        .and_then(|entry| entry.get("timestamp"))
+        .and_then(|value| value.as_i64())
+        .or_else(|| {
+            payload
+                .and_then(|entry| entry.get("ts_ms"))
+                .and_then(|value| value.as_i64())
+        })
+        .or_else(|| event.get("timestamp").and_then(|value| value.as_i64()))
+        .or_else(|| event.get("ts_ms").and_then(|value| value.as_i64()))?;
+    Some(now_epoch_ms().saturating_sub(timestamp_ms))
 }
 
 fn desktop_shell_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -449,9 +483,58 @@ fn setup_status_tray(
     Ok(())
 }
 
+fn default_index_store_path() -> PathBuf {
+    if let Some(explicit_path) = std::env::var_os("WEFT_INDEX_STORE_PATH") {
+        return PathBuf::from(explicit_path);
+    }
+    let base_dir = std::env::var_os("XDG_STATE_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("APPDATA").map(PathBuf::from))
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .map(PathBuf::from)
+                .map(|home| home.join(".local").join("state"))
+        })
+        .unwrap_or_else(std::env::temp_dir);
+    base_dir.join("weft-desktop").join("weft-index-v1.sqlite3")
+}
+
+fn spawn_index_backfill(
+    actor: RuntimeActor,
+    index_store: Arc<IndexStore>,
+    selector: RuntimeSelector,
+) {
+    std::thread::spawn(move || {
+        if let Err(err) =
+            commands::reindex_index_store_from_runtime(&actor, index_store.as_ref(), selector)
+        {
+            log::debug!("index backfill skipped: {err}");
+        } else {
+            if let Ok(status) = index_store.index_status() {
+                let freshness_ms = status
+                    .last_sync_ms
+                    .map(|last_sync_ms| now_epoch_ms().saturating_sub(last_sync_ms));
+                log::info!(
+                    "index backfill completed message_count={} thread_count={} freshness_ms={}",
+                    status.message_count,
+                    status.thread_count,
+                    freshness_ms
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "unknown".to_string())
+                );
+            } else {
+                log::info!("index backfill completed");
+            }
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let actor = RuntimeActor::spawn();
+    let index_store = Arc::new(
+        IndexStore::new(default_index_store_path()).expect("failed to initialize index store"),
+    );
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             log::info!("secondary instance forwarded args={argv:?} cwd={cwd}");
@@ -476,6 +559,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_deep_link::init())
         .manage(actor.clone())
+        .manage(index_store.clone())
         .manage(EventPumpControl::default())
         .manage(DesktopShellState::default())
         .setup(move |app| {
@@ -512,10 +596,12 @@ pub fn run() {
             }
 
             if let Ok(selector) = RuntimeSelector::load(default_profile(), default_rpc()) {
+                spawn_index_backfill(actor.clone(), index_store.clone(), selector.clone());
                 if let Some(control) = app.try_state::<EventPumpControl>() {
                     if let Err(err) = control.start(
                         app.handle().clone(),
                         actor.clone(),
+                        index_store.clone(),
                         selector,
                         DEFAULT_EVENT_PUMP_INTERVAL_MS,
                     ) {
@@ -558,10 +644,33 @@ pub fn run() {
             commands::daemon_start,
             commands::daemon_stop,
             commands::daemon_restart,
+            commands::lxmf_index_status,
+            commands::lxmf_query_threads,
+            commands::lxmf_query_thread_messages,
+            commands::lxmf_search_messages,
+            commands::lxmf_query_files,
+            commands::lxmf_query_map_points,
+            commands::lxmf_get_attachment_blob,
+            commands::lxmf_force_reindex,
             commands::lxmf_list_messages,
             commands::lxmf_list_peers,
             commands::lxmf_list_interfaces,
+            commands::lxmf_clear_messages,
+            commands::lxmf_clear_peers,
+            commands::lxmf_set_interfaces,
+            commands::lxmf_reload_config,
+            commands::lxmf_peer_sync,
+            commands::lxmf_peer_unpeer,
             commands::lxmf_list_announces,
+            commands::lxmf_get_delivery_policy,
+            commands::lxmf_set_delivery_policy,
+            commands::lxmf_propagation_status,
+            commands::lxmf_propagation_enable,
+            commands::lxmf_propagation_ingest,
+            commands::lxmf_propagation_fetch,
+            commands::lxmf_stamp_policy_get,
+            commands::lxmf_stamp_policy_set,
+            commands::lxmf_ticket_generate,
             commands::lxmf_interface_metrics,
             commands::lxmf_list_propagation_nodes,
             commands::lxmf_get_outbound_propagation_node,

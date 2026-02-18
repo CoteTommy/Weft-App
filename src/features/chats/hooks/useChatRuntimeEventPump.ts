@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { unstable_batchedUpdates } from 'react-dom'
 
-import { startLxmfEventPump, subscribeLxmfEvents } from '@lib/lxmf-api'
+import { useLxmfEventHub } from '@app/state/LxmfEventHubProvider'
 import type { LxmfRpcEvent } from '@lib/lxmf-payloads'
 
 import { CHAT_EVENT_BATCH_MS, CHAT_WATCHDOG_INTERVAL_MS, CHAT_WATCHDOG_STALE_MS } from '../types'
@@ -19,6 +19,7 @@ export function useChatRuntimeEventPump({
   scheduleRefresh,
   getLastRefreshAt,
 }: UseChatRuntimeEventPumpParams) {
+  const { subscribe, getLastEventAtMs } = useLxmfEventHub()
   const lastEventAtRef = useRef(0)
   const pendingEventsRef = useRef<LxmfRpcEvent[]>([])
   const eventBatchTimerRef = useRef<number | null>(null)
@@ -40,7 +41,15 @@ export function useChatRuntimeEventPump({
           applyReceiptEvent(event)
           continue
         }
-        if (event.event_type === 'runtime_started' || event.event_type === 'runtime_stopped') {
+        if (
+          event.event_type === 'runtime_started' ||
+          event.event_type === 'runtime_stopped' ||
+          event.event_type === 'peer_sync' ||
+          event.event_type === 'peer_unpeer' ||
+          event.event_type === 'interfaces_updated' ||
+          event.event_type === 'config_reloaded' ||
+          event.event_type === 'propagation_node_selected'
+        ) {
           scheduleRefresh()
         }
       }
@@ -62,35 +71,19 @@ export function useChatRuntimeEventPump({
   )
 
   useEffect(() => {
-    let unlisten: (() => void) | null = null
-    let disposed = false
-    void startLxmfEventPump().catch(() => {
-      // The provider keeps functioning without streaming event updates.
-    })
-    void subscribeLxmfEvents(event => {
+    const unlisten = subscribe(event => {
       enqueueRuntimeEvent(event)
     })
-      .then(stop => {
-        if (disposed) {
-          stop()
-          return
-        }
-        unlisten = stop
-      })
-      .catch(() => {
-        // If subscriptions fail, refresh will correct state on next render.
-      })
 
     return () => {
-      disposed = true
-      unlisten?.()
+      unlisten()
     }
-  }, [enqueueRuntimeEvent])
+  }, [enqueueRuntimeEvent, subscribe])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       const now = Date.now()
-      const freshestAt = Math.max(lastEventAtRef.current, getLastRefreshAt())
+      const freshestAt = Math.max(lastEventAtRef.current, getLastEventAtMs(), getLastRefreshAt())
       const staleMs = freshestAt === 0 ? Number.POSITIVE_INFINITY : now - freshestAt
       if (staleMs >= CHAT_WATCHDOG_STALE_MS) {
         scheduleRefresh()
@@ -99,7 +92,7 @@ export function useChatRuntimeEventPump({
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [getLastRefreshAt, scheduleRefresh])
+  }, [getLastEventAtMs, getLastRefreshAt, scheduleRefresh])
 
   useEffect(() => {
     return () => {
