@@ -808,13 +808,13 @@ pub(crate) fn lxmf_set_display_name(
     display_name: Option<String>,
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
-    let mut settings =
-        load_profile_settings(&selector.profile_name).map_err(|err| err.to_string())?;
+    let profile_name = selector.profile_name.clone();
+    let mut settings = load_profile_settings(&profile_name).map_err(|err| err.to_string())?;
     settings.display_name = clean_arg(display_name);
     save_profile_settings(&settings).map_err(|err| err.to_string())?;
 
     Ok(json!({
-        "profile": selector.profile_name,
+        "profile": profile_name,
         "display_name": settings.display_name,
         "rpc": settings.rpc,
         "managed": settings.managed,
