@@ -474,11 +474,7 @@ pub(crate) fn lxmf_set_delivery_policy(
     actor: State<'_, RuntimeActor>,
     profile: Option<String>,
     rpc: Option<String>,
-    auth_required: Option<bool>,
-    allowed_destinations: Option<Vec<String>>,
-    denied_destinations: Option<Vec<String>>,
-    ignored_destinations: Option<Vec<String>>,
-    prioritised_destinations: Option<Vec<String>>,
+    policy: LxmfDeliveryPolicyRequest,
 ) -> Result<Value, String> {
     let selector = RuntimeSelector::load(profile, rpc)?;
     rpc_actor_call(
@@ -486,13 +482,22 @@ pub(crate) fn lxmf_set_delivery_policy(
         selector,
         "set_delivery_policy",
         Some(json!({
-            "auth_required": auth_required,
-            "allowed_destinations": allowed_destinations,
-            "denied_destinations": denied_destinations,
-            "ignored_destinations": ignored_destinations,
-            "prioritised_destinations": prioritised_destinations,
+            "auth_required": policy.auth_required,
+            "allowed_destinations": policy.allowed_destinations,
+            "denied_destinations": policy.denied_destinations,
+            "ignored_destinations": policy.ignored_destinations,
+            "prioritised_destinations": policy.prioritised_destinations,
         })),
     )
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct LxmfDeliveryPolicyRequest {
+    auth_required: Option<bool>,
+    allowed_destinations: Option<Vec<String>>,
+    denied_destinations: Option<Vec<String>>,
+    ignored_destinations: Option<Vec<String>>,
+    prioritised_destinations: Option<Vec<String>>,
 }
 
 #[tauri::command]

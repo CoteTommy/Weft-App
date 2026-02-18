@@ -164,11 +164,13 @@ export async function setLxmfDeliveryPolicy(
   options: ProbeOptions = {}
 ): Promise<LxmfDeliveryPolicyResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_set_delivery_policy', options, {
-    auth_required: input.authRequired ?? null,
-    allowed_destinations: input.allowedDestinations ?? null,
-    denied_destinations: input.deniedDestinations ?? null,
-    ignored_destinations: input.ignoredDestinations ?? null,
-    prioritised_destinations: input.prioritisedDestinations ?? null,
+    policy: {
+      auth_required: input.authRequired ?? null,
+      allowed_destinations: input.allowedDestinations ?? null,
+      denied_destinations: input.deniedDestinations ?? null,
+      ignored_destinations: input.ignoredDestinations ?? null,
+      prioritised_destinations: input.prioritisedDestinations ?? null,
+    },
   })
   return parseLxmfDeliveryPolicyResponse(payload)
 }

@@ -3470,6 +3470,7 @@ dependencies = [
  "rand_core 0.6.4",
  "rmp",
  "rmp-serde",
+ "rmpv",
  "rusqlite",
  "serde",
  "serde_bytes",
@@ -6155,3 +6156,7 @@ dependencies = [
  "syn 2.0.114",
  "winnow 0.7.14",
 ]
+
+[[patch.unused]]
+name = "reticulum-rs"
+version = "0.1.3"

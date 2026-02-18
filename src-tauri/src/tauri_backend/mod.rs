@@ -509,22 +509,20 @@ fn spawn_index_backfill(
             commands::reindex_index_store_from_runtime(&actor, index_store.as_ref(), selector)
         {
             log::debug!("index backfill skipped: {err}");
+        } else if let Ok(status) = index_store.index_status() {
+            let freshness_ms = status
+                .last_sync_ms
+                .map(|last_sync_ms| now_epoch_ms().saturating_sub(last_sync_ms));
+            log::info!(
+                "index backfill completed message_count={} thread_count={} freshness_ms={}",
+                status.message_count,
+                status.thread_count,
+                freshness_ms
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "unknown".to_string())
+            );
         } else {
-            if let Ok(status) = index_store.index_status() {
-                let freshness_ms = status
-                    .last_sync_ms
-                    .map(|last_sync_ms| now_epoch_ms().saturating_sub(last_sync_ms));
-                log::info!(
-                    "index backfill completed message_count={} thread_count={} freshness_ms={}",
-                    status.message_count,
-                    status.thread_count,
-                    freshness_ms
-                        .map(|value| value.to_string())
-                        .unwrap_or_else(|| "unknown".to_string())
-                );
-            } else {
-                log::info!("index backfill completed");
-            }
+            log::info!("index backfill completed");
         }
     });
 }

@@ -167,6 +167,17 @@ struct MessageParseResult {
     attachments: Vec<AttachmentEntry>,
 }
 
+#[derive(Debug)]
+struct MapPointMessageContext<'a> {
+    message_id: &'a str,
+    source: &'a str,
+    destination: &'a str,
+    direction: &'a str,
+    title: &'a str,
+    body: &'a str,
+    ts_ms: i64,
+}
+
 pub(crate) struct IndexStore {
     conn: Mutex<Connection>,
     ready: AtomicBool,
@@ -859,16 +870,16 @@ impl IndexStore {
         for result in rows {
             let (message_id, source, destination, direction, title, body, ts_ms, fields) =
                 result.map_err(|err| format!("parse map row failed: {err}"))?;
-            let extracted = extract_map_points(
-                &message_id,
-                &source,
-                &destination,
-                &direction,
-                &title,
-                &body,
+            let context = MapPointMessageContext {
+                message_id: &message_id,
+                source: &source,
+                destination: &destination,
+                direction: &direction,
+                title: &title,
+                body: &body,
                 ts_ms,
-                &fields,
-            );
+            };
+            let extracted = extract_map_points(&context, &fields);
             for item in extracted {
                 if let Some(search) = query.as_deref() {
                     let haystack = format!(
@@ -1586,43 +1597,17 @@ fn extract_attachments_from_fields(fields: &Value) -> Vec<AttachmentEntry> {
 }
 
 fn extract_map_points(
-    message_id: &str,
-    source: &str,
-    destination: &str,
-    direction: &str,
-    title: &str,
-    body: &str,
-    ts_ms: i64,
+    message: &MapPointMessageContext<'_>,
     fields: &Value,
 ) -> Vec<IndexedMapPoint> {
     let mut points = Vec::new();
 
     if let Some((lat, lon)) = extract_location_from_fields(fields) {
-        points.push(build_map_point(
-            message_id,
-            lat,
-            lon,
-            source,
-            destination,
-            direction,
-            title,
-            body,
-            ts_ms,
-        ));
+        points.push(build_map_point(message, lat, lon));
     }
 
-    if let Some((lat, lon)) = extract_geo_uri(body).or_else(|| extract_geo_uri(title)) {
-        points.push(build_map_point(
-            message_id,
-            lat,
-            lon,
-            source,
-            destination,
-            direction,
-            title,
-            body,
-            ts_ms,
-        ));
+    if let Some((lat, lon)) = extract_geo_uri(message.body).or_else(|| extract_geo_uri(message.title)) {
+        points.push(build_map_point(message, lat, lon));
     }
 
     points
@@ -1697,20 +1682,14 @@ fn extract_location_from_fields(fields: &Value) -> Option<(f64, f64)> {
 }
 
 fn build_map_point(
-    message_id: &str,
+    message: &MapPointMessageContext<'_>,
     lat: f64,
     lon: f64,
-    source: &str,
-    destination: &str,
-    direction: &str,
-    title: &str,
-    body: &str,
-    ts_ms: i64,
 ) -> IndexedMapPoint {
-    let label = if !title.trim().is_empty() {
-        title.trim().to_string()
-    } else if !body.trim().is_empty() {
-        body.lines()
+    let label = if !message.title.trim().is_empty() {
+        message.title.trim().to_string()
+    } else if !message.body.trim().is_empty() {
+        message.body.lines()
             .next()
             .unwrap_or("Location point")
             .trim()
@@ -1719,20 +1698,20 @@ fn build_map_point(
         "Location point".to_string()
     };
 
-    let direction_label = if direction == "out" { "out" } else { "in" };
-    let who = if direction == "out" {
-        destination
+    let direction_label = if message.direction == "out" { "out" } else { "in" };
+    let who = if message.direction == "out" {
+        message.destination
     } else {
-        source
+        message.source
     };
 
     IndexedMapPoint {
-        id: format!("{}:{}:{}:{}", message_id, ts_ms, lat, lon),
+        id: format!("{}:{}:{}:{}", message.message_id, message.ts_ms, lat, lon),
         label,
         lat,
         lon,
         source: short_hash(who, 8),
-        when: format_timestamp(ts_ms),
+        when: format_timestamp(message.ts_ms),
         direction: direction_label.to_string(),
     }
 }
