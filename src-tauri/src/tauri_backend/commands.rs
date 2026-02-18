@@ -811,8 +811,7 @@ pub(crate) fn lxmf_set_display_name(
     let selector = RuntimeSelector::load(profile, rpc)?;
     let profile_name = selector.profile_name.clone();
     let settings_profile = selector.profile_settings.clone();
-    let mut settings =
-        load_profile_settings(&profile_name).map_err(|err| err.to_string())?;
+    let mut settings = load_profile_settings(&profile_name).map_err(|err| err.to_string())?;
     let previous_display_name = settings.display_name.clone();
     settings.display_name = clean_arg(display_name);
     save_profile_settings(&settings).map_err(|err| err.to_string())?;
