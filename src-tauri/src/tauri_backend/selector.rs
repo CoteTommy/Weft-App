@@ -28,7 +28,9 @@ impl RuntimeSelector {
         let profile_name = match resolve_runtime_profile_name(&requested_profile) {
             Ok(name) => name,
             Err(err) if requested_profile == "default" => {
-                let init_rpc = requested_rpc.clone().unwrap_or_else(|| DEFAULT_AUTOCREATE_RPC.to_string());
+                let init_rpc = requested_rpc
+                    .clone()
+                    .unwrap_or_else(|| DEFAULT_AUTOCREATE_RPC.to_string());
                 validate_rpc(&init_rpc)?;
                 init_profile(&requested_profile, false, Some(init_rpc))
                     .map_err(|init_err| {
@@ -37,7 +39,9 @@ impl RuntimeSelector {
                     .map(|_| requested_profile.clone())?
             }
             Err(err) => {
-                return Err(format!("failed to resolve profile '{requested_profile}': {err}"));
+                return Err(format!(
+                    "failed to resolve profile '{requested_profile}': {err}"
+                ));
             }
         };
         let mut profile_settings =

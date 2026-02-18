@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify payload contract mirrors LXMF-rs
         run: |
-          git clone --depth 1 https://github.com/FreeTAKTeam/LXMF-rs.git ../LXMF-rs
+          git clone --depth 1 -b codex/fix-namechange-restart https://github.com/FreeTAKTeam/LXMF-rs.git ../LXMF-rs
           if [ -f ../LXMF-rs/docs/payload-contract.md ]; then
             diff -u ../LXMF-rs/docs/payload-contract.md docs/payload-contract.md
           else
@@ -52,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Checkout LXMF-rs (workspace dependency)
-        run: git clone --depth 1 https://github.com/FreeTAKTeam/LXMF-rs.git ../LXMF-rs
+        run: git clone --depth 1 -b codex/fix-namechange-restart https://github.com/FreeTAKTeam/LXMF-rs.git ../LXMF-rs
       - name: Checkout Reticulum-rs (workspace patch dependency)
         run: git clone --depth 1 https://github.com/FreeTAKTeam/Reticulum-rs.git ../Reticulum-rs
       - uses: dtolnay/rust-toolchain@stable
