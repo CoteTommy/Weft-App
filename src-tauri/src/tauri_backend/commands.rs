@@ -259,10 +259,12 @@ pub(crate) fn lxmf_get_attachment_blob(
     attachment_name: String,
 ) -> Result<Value, String> {
     let started_at = Instant::now();
-    let result = index_store.as_ref().get_attachment_blob(AttachmentBlobParams {
-        message_id,
-        attachment_name,
-    });
+    let result = index_store
+        .as_ref()
+        .get_attachment_blob(AttachmentBlobParams {
+            message_id,
+            attachment_name,
+        });
     log_index_query_latency("lxmf_get_attachment_blob", started_at, &result);
     result
 }

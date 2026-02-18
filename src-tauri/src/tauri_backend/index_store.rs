@@ -204,10 +204,14 @@ impl IndexStore {
             .lock()
             .map_err(|_| "index lock poisoned".to_string())?;
         let message_count = conn
-            .query_row("SELECT COUNT(*) FROM messages", [], |row| row.get::<_, i64>(0))
+            .query_row("SELECT COUNT(*) FROM messages", [], |row| {
+                row.get::<_, i64>(0)
+            })
             .map_err(|err| format!("read message count failed: {err}"))?;
         let thread_count = conn
-            .query_row("SELECT COUNT(*) FROM threads", [], |row| row.get::<_, i64>(0))
+            .query_row("SELECT COUNT(*) FROM threads", [], |row| {
+                row.get::<_, i64>(0)
+            })
             .map_err(|err| format!("read thread count failed: {err}"))?;
         let last_sync_ms = conn
             .query_row(
@@ -287,7 +291,11 @@ impl IndexStore {
             tx.commit()
                 .map_err(|err| format!("commit event ingest failed: {err}"))?;
             rebuild_threads_table(&mut conn)?;
-            update_last_sync_state(&mut conn, parsed.row.ts_ms, Some(parsed.row.message_id.clone()))?;
+            update_last_sync_state(
+                &mut conn,
+                parsed.row.ts_ms,
+                Some(parsed.row.message_id.clone()),
+            )?;
             self.ready.store(true, Ordering::Relaxed);
         }
 
@@ -328,7 +336,11 @@ impl IndexStore {
 
         let rows = stmt
             .query_map(
-                params![if pinned_only { 1 } else { 0 }, (limit + 1) as i64, offset as i64],
+                params![
+                    if pinned_only { 1 } else { 0 },
+                    (limit + 1) as i64,
+                    offset as i64
+                ],
                 |row| {
                     Ok(IndexedThread {
                         thread_id: row.get::<_, String>(0)?,
@@ -420,25 +432,28 @@ impl IndexStore {
             .map_err(|err| format!("prepare message query failed: {err}"))?;
 
         let rows = stmt
-            .query_map(params![thread_id, (limit + 1) as i64, offset as i64], |row| {
-                let message_id = row.get::<_, String>(0)?;
-                let fields_json = row.get::<_, Option<String>>(8).ok().flatten();
-                let fields = fields_json
-                    .as_deref()
-                    .and_then(|value| serde_json::from_str::<Value>(value).ok())
-                    .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
-                Ok(IndexedMessage {
-                    id: message_id.clone(),
-                    source: row.get::<_, String>(1)?,
-                    destination: row.get::<_, String>(2)?,
-                    title: row.get::<_, String>(3)?,
-                    content: row.get::<_, String>(4)?,
-                    timestamp: row.get::<_, i64>(5)?,
-                    direction: row.get::<_, String>(6)?,
-                    fields: sanitize_fields_for_client(&conn, &message_id, fields),
-                    receipt_status: row.get::<_, Option<String>>(7).ok().flatten(),
-                })
-            })
+            .query_map(
+                params![thread_id, (limit + 1) as i64, offset as i64],
+                |row| {
+                    let message_id = row.get::<_, String>(0)?;
+                    let fields_json = row.get::<_, Option<String>>(8).ok().flatten();
+                    let fields = fields_json
+                        .as_deref()
+                        .and_then(|value| serde_json::from_str::<Value>(value).ok())
+                        .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+                    Ok(IndexedMessage {
+                        id: message_id.clone(),
+                        source: row.get::<_, String>(1)?,
+                        destination: row.get::<_, String>(2)?,
+                        title: row.get::<_, String>(3)?,
+                        content: row.get::<_, String>(4)?,
+                        timestamp: row.get::<_, i64>(5)?,
+                        direction: row.get::<_, String>(6)?,
+                        fields: sanitize_fields_for_client(&conn, &message_id, fields),
+                        receipt_status: row.get::<_, Option<String>>(7).ok().flatten(),
+                    })
+                },
+            )
             .map_err(|err| format!("run message query failed: {err}"))?;
 
         let mut items = Vec::new();
@@ -571,25 +586,28 @@ impl IndexStore {
                 )
                 .map_err(|err| format!("prepare fallback search failed: {err}"))?;
             let rows = stmt
-                .query_map(params![like, thread_id, (limit + 1) as i64, offset as i64], |row| {
-                    let message_id = row.get::<_, String>(0)?;
-                    let fields_json = row.get::<_, Option<String>>(8).ok().flatten();
-                    let fields = fields_json
-                        .as_deref()
-                        .and_then(|value| serde_json::from_str::<Value>(value).ok())
-                        .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
-                    Ok(IndexedMessage {
-                        id: message_id.clone(),
-                        source: row.get::<_, String>(1)?,
-                        destination: row.get::<_, String>(2)?,
-                        title: row.get::<_, String>(3)?,
-                        content: row.get::<_, String>(4)?,
-                        timestamp: row.get::<_, i64>(5)?,
-                        direction: row.get::<_, String>(6)?,
-                        fields: sanitize_fields_for_client(&conn, &message_id, fields),
-                        receipt_status: row.get::<_, Option<String>>(7).ok().flatten(),
-                    })
-                })
+                .query_map(
+                    params![like, thread_id, (limit + 1) as i64, offset as i64],
+                    |row| {
+                        let message_id = row.get::<_, String>(0)?;
+                        let fields_json = row.get::<_, Option<String>>(8).ok().flatten();
+                        let fields = fields_json
+                            .as_deref()
+                            .and_then(|value| serde_json::from_str::<Value>(value).ok())
+                            .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+                        Ok(IndexedMessage {
+                            id: message_id.clone(),
+                            source: row.get::<_, String>(1)?,
+                            destination: row.get::<_, String>(2)?,
+                            title: row.get::<_, String>(3)?,
+                            content: row.get::<_, String>(4)?,
+                            timestamp: row.get::<_, i64>(5)?,
+                            direction: row.get::<_, String>(6)?,
+                            fields: sanitize_fields_for_client(&conn, &message_id, fields),
+                            receipt_status: row.get::<_, Option<String>>(7).ok().flatten(),
+                        })
+                    },
+                )
                 .map_err(|err| format!("run fallback search failed: {err}"))?;
             for result in rows {
                 items.push(result.map_err(|err| format!("parse fallback row failed: {err}"))?);
@@ -685,7 +703,10 @@ impl IndexStore {
                     "{} {} {}",
                     item.name.to_ascii_lowercase(),
                     item.owner.to_ascii_lowercase(),
-                    item.mime.as_deref().unwrap_or_default().to_ascii_lowercase()
+                    item.mime
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase()
                 );
                 if !haystack.contains(search) {
                     continue;
@@ -725,7 +746,8 @@ impl IndexStore {
             .map_err(|err| format!("run paper query failed: {err}"))?;
 
         for result in paper_rows {
-            let (message_id, source, paper) = result.map_err(|err| format!("parse paper row failed: {err}"))?;
+            let (message_id, source, paper) =
+                result.map_err(|err| format!("parse paper row failed: {err}"))?;
             let Some(paper) = paper else {
                 continue;
             };
@@ -837,7 +859,16 @@ impl IndexStore {
         for result in rows {
             let (message_id, source, destination, direction, title, body, ts_ms, fields) =
                 result.map_err(|err| format!("parse map row failed: {err}"))?;
-            let extracted = extract_map_points(&message_id, &source, &destination, &direction, &title, &body, ts_ms, &fields);
+            let extracted = extract_map_points(
+                &message_id,
+                &source,
+                &destination,
+                &direction,
+                &title,
+                &body,
+                ts_ms,
+                &fields,
+            );
             for item in extracted {
                 if let Some(search) = query.as_deref() {
                     let haystack = format!(
@@ -874,7 +905,10 @@ impl IndexStore {
         .map_err(|err| format!("serialize map query failed: {err}"))
     }
 
-    pub(crate) fn get_attachment_blob(&self, params: AttachmentBlobParams) -> Result<Value, String> {
+    pub(crate) fn get_attachment_blob(
+        &self,
+        params: AttachmentBlobParams,
+    ) -> Result<Value, String> {
         let message_id = params.message_id.trim();
         let attachment_name = params.attachment_name.trim();
         if message_id.is_empty() || attachment_name.is_empty() {
@@ -913,7 +947,8 @@ impl IndexStore {
             return Err("attachment not found".to_string());
         };
 
-        let data_base64 = data_base64.ok_or_else(|| "attachment payload unavailable".to_string())?;
+        let data_base64 =
+            data_base64.ok_or_else(|| "attachment payload unavailable".to_string())?;
 
         Ok(json!({
             "mime": mime,
@@ -1015,7 +1050,11 @@ impl IndexStore {
         .map_err(|err| format!("apply receipt update failed: {err}"))?;
 
         rebuild_threads_table(&mut conn)?;
-        update_last_sync_state(&mut conn, current_timestamp_ms(), Some(message_id.to_string()))?;
+        update_last_sync_state(
+            &mut conn,
+            current_timestamp_ms(),
+            Some(message_id.to_string()),
+        )?;
         self.ready.store(true, Ordering::Relaxed);
         Ok(())
     }
@@ -1101,7 +1140,11 @@ fn upsert_message_row(
             &parsed.row.receipt_status,
             derive_reason_code(parsed.row.receipt_status.as_deref()),
             if parsed.attachments.is_empty() { 0 } else { 1 },
-            if has_paper_field(parsed.row.fields.as_ref()) { 1 } else { 0 },
+            if has_paper_field(parsed.row.fields.as_ref()) {
+                1
+            } else {
+                0
+            },
             parsed.row.fields.as_ref().map(|fields| fields.to_string()),
             current_timestamp_ms(),
         ],
@@ -1187,7 +1230,11 @@ fn rebuild_threads_from_messages(
     messages: &[MessageParseResult],
     peers: &[PeerSummary],
 ) -> Result<(), String> {
-    let rows = messages.iter().map(|entry| &entry.row).cloned().collect::<Vec<_>>();
+    let rows = messages
+        .iter()
+        .map(|entry| &entry.row)
+        .cloned()
+        .collect::<Vec<_>>();
     rebuild_threads_from_message_rows(conn, &rows, peers)
 }
 
@@ -1387,7 +1434,10 @@ fn parse_message_row(value: &Value) -> Result<MessageParseResult, String> {
         source.clone()
     };
     let receipt_status = read_optional_string(record, "receipt_status");
-    let fields = record.get("fields").cloned().filter(|value| !value.is_null());
+    let fields = record
+        .get("fields")
+        .cloned()
+        .filter(|value| !value.is_null());
 
     let attachments = fields
         .as_ref()
@@ -1446,7 +1496,12 @@ fn extract_attachments_from_fields(fields: &Value) -> Vec<AttachmentEntry> {
                 .get("size_bytes")
                 .and_then(Value::as_i64)
                 .or_else(|| record.get("size").and_then(Value::as_i64))
-                .unwrap_or_else(|| inline_base64.as_deref().map(estimate_base64_size).unwrap_or(0));
+                .unwrap_or_else(|| {
+                    inline_base64
+                        .as_deref()
+                        .map(estimate_base64_size)
+                        .unwrap_or(0)
+                });
             out.push(AttachmentEntry {
                 name,
                 mime,
@@ -1505,13 +1560,19 @@ fn extract_attachments_from_fields(fields: &Value) -> Vec<AttachmentEntry> {
             if parts.len() < 2 {
                 continue;
             }
-            let name = decode_wire_text(&parts[0]).unwrap_or_else(|| format!("Attachment {}", out.len() + 1));
+            let name = decode_wire_text(&parts[0])
+                .unwrap_or_else(|| format!("Attachment {}", out.len() + 1));
             let bytes = read_u8_array(&parts[1]);
             let inline_base64 = bytes.as_deref().map(encode_bytes_base64);
             let size_bytes = bytes
                 .as_ref()
                 .map(|value| value.len() as i64)
-                .unwrap_or_else(|| inline_base64.as_deref().map(estimate_base64_size).unwrap_or(0));
+                .unwrap_or_else(|| {
+                    inline_base64
+                        .as_deref()
+                        .map(estimate_base64_size)
+                        .unwrap_or(0)
+                });
             out.push(AttachmentEntry {
                 name,
                 mime: None,
@@ -1649,13 +1710,21 @@ fn build_map_point(
     let label = if !title.trim().is_empty() {
         title.trim().to_string()
     } else if !body.trim().is_empty() {
-        body.lines().next().unwrap_or("Location point").trim().to_string()
+        body.lines()
+            .next()
+            .unwrap_or("Location point")
+            .trim()
+            .to_string()
     } else {
         "Location point".to_string()
     };
 
     let direction_label = if direction == "out" { "out" } else { "in" };
-    let who = if direction == "out" { destination } else { source };
+    let who = if direction == "out" {
+        destination
+    } else {
+        source
+    };
 
     IndexedMapPoint {
         id: format!("{}:{}:{}:{}", message_id, ts_ms, lat, lon),
@@ -1733,7 +1802,8 @@ fn derive_reason_code(status_detail: Option<&str>) -> Option<String> {
     if status.contains("timeout") {
         return Some("timeout".to_string());
     }
-    if status.contains("no route") || status.contains("no path") || status.contains("no known path") {
+    if status.contains("no route") || status.contains("no path") || status.contains("no known path")
+    {
         return Some("no_path".to_string());
     }
     if status.contains("no propagation relay selected") {
@@ -1745,7 +1815,10 @@ fn derive_reason_code(status_detail: Option<&str>) -> Option<String> {
     None
 }
 
-fn read_required_string(record: &serde_json::Map<String, Value>, key: &str) -> Result<String, String> {
+fn read_required_string(
+    record: &serde_json::Map<String, Value>,
+    key: &str,
+) -> Result<String, String> {
     record
         .get(key)
         .and_then(Value::as_str)
@@ -1809,7 +1882,9 @@ fn decode_wire_text(value: &Value) -> Option<String> {
         }
     }
     let bytes = read_u8_array(value)?;
-    String::from_utf8(bytes).ok().map(|value| value.trim().to_string())
+    String::from_utf8(bytes)
+        .ok()
+        .map(|value| value.trim().to_string())
 }
 
 fn encode_bytes_base64(bytes: &[u8]) -> String {
@@ -1866,11 +1941,18 @@ fn short_hash(value: &str, visible: usize) -> String {
     if trimmed.len() <= visible * 2 {
         return trimmed.to_string();
     }
-    format!("{}...{}", &trimmed[..visible], &trimmed[trimmed.len().saturating_sub(visible)..])
+    format!(
+        "{}...{}",
+        &trimmed[..visible],
+        &trimmed[trimmed.len().saturating_sub(visible)..]
+    )
 }
 
 fn is_valid_coordinate(lat: f64, lon: f64) -> bool {
-    lat.is_finite() && lon.is_finite() && (-90.0..=90.0).contains(&lat) && (-180.0..=180.0).contains(&lon)
+    lat.is_finite()
+        && lon.is_finite()
+        && (-90.0..=90.0).contains(&lat)
+        && (-180.0..=180.0).contains(&lon)
 }
 
 const SCHEMA_SQL: &str = r#"
