@@ -6,6 +6,7 @@ export interface ThreadPreference {
 type StoredThreadPreferences = Record<string, ThreadPreference>
 
 const THREAD_PREFERENCES_KEY = 'weft.chat.thread-preferences.v1'
+export const THREAD_PREFERENCES_UPDATED_EVENT = 'weft://thread-preferences-updated'
 
 export function getStoredThreadPreferences(): Map<string, ThreadPreference> {
   if (typeof window === 'undefined') {
@@ -52,6 +53,7 @@ export function persistThreadPreferences(preferences: Map<string, ThreadPreferen
     }
   }
   window.localStorage.setItem(THREAD_PREFERENCES_KEY, JSON.stringify(serialized))
+  window.dispatchEvent(new Event(THREAD_PREFERENCES_UPDATED_EVENT))
 }
 
 export function resolveThreadPreference(
@@ -59,4 +61,26 @@ export function resolveThreadPreference(
   threadId: string
 ): ThreadPreference {
   return preferences.get(threadId) ?? { pinned: false, muted: false }
+}
+
+export function setStoredThreadMutedPreference(threadId: string, muted: boolean): void {
+  const normalizedThreadId = threadId.trim()
+  if (!normalizedThreadId) {
+    return
+  }
+  const preferences = getStoredThreadPreferences()
+  const current = resolveThreadPreference(preferences, normalizedThreadId)
+  if (current.muted === muted) {
+    return
+  }
+  const next = {
+    ...current,
+    muted,
+  }
+  if (!next.muted && !next.pinned) {
+    preferences.delete(normalizedThreadId)
+  } else {
+    preferences.set(normalizedThreadId, next)
+  }
+  persistThreadPreferences(preferences)
 }

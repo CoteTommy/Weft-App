@@ -1,9 +1,11 @@
 mod actor;
+mod attachment_handles;
 mod commands;
 mod index_store;
 mod selector;
 
 use actor::{ActorCommand, RuntimeActor};
+use attachment_handles::AttachmentHandleManager;
 use index_store::IndexStore;
 use selector::{
     auto_daemon_enabled, default_profile, default_rpc, default_transport, RuntimeSelector,
@@ -22,6 +24,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 pub(crate) const LXMF_EVENT_CHANNEL: &str = "weft://lxmf-event";
 pub(crate) const TRAY_ACTION_CHANNEL: &str = "weft://tray-action";
 pub(crate) const DEFAULT_EVENT_PUMP_INTERVAL_MS: u64 = 200;
+const INDEX_BACKFILL_FRESHNESS_THRESHOLD_MS: i64 = 15 * 60 * 1000;
 const TRAY_ICON_ID: &str = "weft-tray";
 const TRAY_MENU_OPEN: &str = "open";
 const TRAY_MENU_NEW_MESSAGE: &str = "new_message";
@@ -234,6 +237,21 @@ impl EventPumpControl {
         if let Ok(mut guard) = self.handle.lock() {
             stop_event_pump_locked(&mut guard);
         }
+    }
+
+    pub(crate) fn current_interval_ms(&self) -> Option<u64> {
+        self.handle
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|entry| entry.interval_ms))
+    }
+
+    pub(crate) fn current_target(&self) -> Option<(String, String)> {
+        self.handle.lock().ok().and_then(|guard| {
+            guard
+                .as_ref()
+                .map(|entry| (entry.profile.clone(), entry.rpc.clone()))
+        })
     }
 }
 
@@ -505,9 +523,35 @@ fn spawn_index_backfill(
     selector: RuntimeSelector,
 ) {
     std::thread::spawn(move || {
-        if let Err(err) =
-            commands::reindex_index_store_from_runtime(&actor, index_store.as_ref(), selector)
-        {
+        if let Ok(status) = index_store.index_status() {
+            let freshness_ms = status
+                .last_sync_ms
+                .map(|last_sync_ms| now_epoch_ms().saturating_sub(last_sync_ms));
+            let should_skip = status.message_count > 0
+                && status.thread_count > 0
+                && freshness_ms
+                    .map(|value| (0..=INDEX_BACKFILL_FRESHNESS_THRESHOLD_MS).contains(&value))
+                    .unwrap_or(false);
+            if should_skip {
+                index_store.mark_ready();
+                log::info!(
+                    "index backfill skipped message_count={} thread_count={} freshness_ms={} threshold_ms={}",
+                    status.message_count,
+                    status.thread_count,
+                    freshness_ms
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    INDEX_BACKFILL_FRESHNESS_THRESHOLD_MS
+                );
+                return;
+            }
+        }
+
+        if let Err(err) = commands::indexing::reindex_index_store_from_runtime(
+            &actor,
+            index_store.as_ref(),
+            selector,
+        ) {
             log::debug!("index backfill skipped: {err}");
         } else if let Ok(status) = index_store.index_status() {
             let freshness_ms = status
@@ -533,6 +577,7 @@ pub fn run() {
     let index_store = Arc::new(
         IndexStore::new(default_index_store_path()).expect("failed to initialize index store"),
     );
+    let attachment_handles = Arc::new(AttachmentHandleManager::default());
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             log::info!("secondary instance forwarded args={argv:?} cwd={cwd}");
@@ -558,6 +603,7 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .manage(actor.clone())
         .manage(index_store.clone())
+        .manage(attachment_handles.clone())
         .manage(EventPumpControl::default())
         .manage(DesktopShellState::default())
         .setup(move |app| {
@@ -575,6 +621,9 @@ pub fn run() {
                 if let Err(err) = shell_state.load_from_disk(app.handle()) {
                     log::warn!("desktop shell prefs load failed: {err}");
                 }
+            }
+            if let Err(err) = attachment_handles.configure_cache_dir(app.handle()) {
+                log::warn!("attachment handle cache setup failed: {err}");
             }
 
             if auto_daemon_enabled() {
@@ -642,20 +691,22 @@ pub fn run() {
             commands::daemon_start,
             commands::daemon_stop,
             commands::daemon_restart,
-            commands::lxmf_index_status,
-            commands::get_runtime_metrics,
-            commands::lxmf_query_threads,
-            commands::query_threads_page,
-            commands::lxmf_query_thread_messages,
-            commands::query_thread_messages_page,
-            commands::lxmf_search_messages,
-            commands::lxmf_query_files,
-            commands::query_files_page,
-            commands::lxmf_query_map_points,
-            commands::lxmf_get_attachment_blob,
-            commands::get_attachment_bytes,
-            commands::lxmf_force_reindex,
-            commands::rebuild_thread_summaries,
+            commands::indexing::lxmf_index_status,
+            commands::indexing::get_runtime_metrics,
+            commands::indexing::lxmf_query_threads,
+            commands::indexing::query_threads_page,
+            commands::indexing::lxmf_query_thread_messages,
+            commands::indexing::query_thread_messages_page,
+            commands::indexing::lxmf_search_messages,
+            commands::indexing::lxmf_query_files,
+            commands::indexing::query_files_page,
+            commands::indexing::lxmf_query_map_points,
+            commands::indexing::lxmf_get_attachment_blob,
+            commands::indexing::get_attachment_bytes,
+            commands::indexing::open_attachment_handle,
+            commands::indexing::close_attachment_handle,
+            commands::indexing::lxmf_force_reindex,
+            commands::indexing::rebuild_thread_summaries,
             commands::lxmf_list_messages,
             commands::lxmf_list_peers,
             commands::lxmf_list_interfaces,
@@ -684,11 +735,13 @@ pub fn run() {
             commands::lxmf_paper_ingest_uri,
             commands::lxmf_poll_event,
             commands::lxmf_start_event_pump,
+            commands::lxmf_set_event_pump_policy,
             commands::lxmf_stop_event_pump,
             commands::lxmf_get_profile,
             commands::lxmf_set_display_name,
             commands::lxmf_send_message,
             commands::lxmf_send_rich_message,
+            commands::lxmf_send_rich_message_refs,
             commands::lxmf_send_command,
             commands::desktop_get_shell_preferences,
             commands::desktop_set_shell_preferences

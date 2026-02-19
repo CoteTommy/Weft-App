@@ -3,21 +3,44 @@ import type { OutboundAttachmentDraft } from '@shared/types/chat'
 const DB_NAME = 'weft.chat.offline-attachments.v1'
 const DB_VERSION = 1
 const STORE_NAME = 'attachments'
-const MAX_ATTACHMENT_CACHE_BYTES = 48 * 1024 * 1024
+const MAX_ATTACHMENT_CACHE_BYTES = 64 * 1024 * 1024
 
 interface OfflineAttachmentRecord {
   key: string
   name: string
   mime?: string
   sizeBytes: number
-  dataBase64: string
+  blob?: Blob
+  dataBase64?: string
   updatedAtMs: number
+}
+
+type StoreOfflineAttachmentInput = Pick<
+  OutboundAttachmentDraft,
+  'name' | 'mime' | 'sizeBytes' | 'dataBase64'
+> & {
+  blob?: Blob
+}
+
+type OfflineAttachmentBlobEntry = {
+  name: string
+  mime?: string
+  sizeBytes: number
+  blob: Blob
+}
+
+export function isOfflineAttachmentStoreSupported(): boolean {
+  return typeof window !== 'undefined' && typeof indexedDB !== 'undefined'
 }
 
 export async function storeOfflineAttachment(
   key: string,
-  attachment: OutboundAttachmentDraft
+  attachment: StoreOfflineAttachmentInput
 ): Promise<boolean> {
+  const blob = await resolveAttachmentBlob(attachment)
+  if (!blob) {
+    return false
+  }
   const db = await openDb()
   if (!db) {
     return false
@@ -27,7 +50,7 @@ export async function storeOfflineAttachment(
     name: attachment.name,
     mime: attachment.mime,
     sizeBytes: attachment.sizeBytes,
-    dataBase64: attachment.dataBase64,
+    blob,
     updatedAtMs: Date.now(),
   }
   const ok = await putRecord(db, record)
@@ -38,7 +61,9 @@ export async function storeOfflineAttachment(
   return ok
 }
 
-export async function loadOfflineAttachment(key: string): Promise<OutboundAttachmentDraft | null> {
+export async function loadOfflineAttachment(
+  key: string
+): Promise<OfflineAttachmentBlobEntry | null> {
   const db = await openDb()
   if (!db) {
     return null
@@ -48,16 +73,39 @@ export async function loadOfflineAttachment(key: string): Promise<OutboundAttach
     db.close()
     return null
   }
-  await putRecord(db, {
+  const blob = await getRecordBlob(record)
+  if (!blob) {
+    db.close()
+    return null
+  }
+  const migratedRecord = {
     ...record,
+    blob,
+    dataBase64: undefined,
     updatedAtMs: Date.now(),
-  })
+  } satisfies OfflineAttachmentRecord
+  await putRecord(db, migratedRecord)
   db.close()
   return {
     name: record.name,
     mime: record.mime,
     sizeBytes: record.sizeBytes,
-    dataBase64: record.dataBase64,
+    blob,
+  }
+}
+
+export async function loadOfflineAttachmentAsBase64(
+  key: string
+): Promise<OutboundAttachmentDraft | null> {
+  const loaded = await loadOfflineAttachment(key)
+  if (!loaded) {
+    return null
+  }
+  return {
+    name: loaded.name,
+    mime: loaded.mime,
+    sizeBytes: loaded.sizeBytes,
+    dataBase64: await blobToBase64(loaded.blob),
   }
 }
 
@@ -78,7 +126,7 @@ export async function pruneOfflineAttachments(activeKeys: Set<string>): Promise<
 }
 
 async function openDb(): Promise<IDBDatabase | null> {
-  if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
+  if (!isOfflineAttachmentStoreSupported()) {
     return null
   }
   return await new Promise(resolve => {
@@ -118,7 +166,16 @@ async function getRecord(db: IDBDatabase, key: string): Promise<OfflineAttachmen
         resolve(null)
         return
       }
-      resolve(value as OfflineAttachmentRecord)
+      const record = value as OfflineAttachmentRecord
+      if (
+        typeof record.key !== 'string' ||
+        typeof record.name !== 'string' ||
+        typeof record.sizeBytes !== 'number'
+      ) {
+        resolve(null)
+        return
+      }
+      resolve(record)
     }
     request.onerror = () => {
       resolve(null)
@@ -178,4 +235,53 @@ async function enforceAttachmentCacheLimit(db: IDBDatabase, maxBytes: number): P
       total -= Math.max(record.sizeBytes, 0)
     }
   }
+}
+
+async function resolveAttachmentBlob(input: StoreOfflineAttachmentInput): Promise<Blob | null> {
+  if (input.blob instanceof Blob) {
+    return input.blob
+  }
+  const payload = input.dataBase64?.trim()
+  if (!payload) {
+    return null
+  }
+  return decodeBase64ToBlob(payload, input.mime)
+}
+
+async function getRecordBlob(record: OfflineAttachmentRecord): Promise<Blob | null> {
+  if (record.blob instanceof Blob) {
+    return record.blob
+  }
+  const payload = record.dataBase64?.trim()
+  if (!payload) {
+    return null
+  }
+  return decodeBase64ToBlob(payload, record.mime)
+}
+
+function decodeBase64ToBlob(payload: string, mime?: string): Blob | null {
+  try {
+    const binary = atob(payload)
+    const bytes = new Uint8Array(binary.length)
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index)
+    }
+    return new Blob([bytes], {
+      type: mime || 'application/octet-stream',
+    })
+  } catch {
+    return null
+  }
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize)
+    binary += String.fromCharCode(...chunk)
+  }
+  return btoa(binary)
 }

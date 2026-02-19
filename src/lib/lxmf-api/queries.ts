@@ -41,6 +41,7 @@ import { asObject, invokeWithProbe } from './common'
 import type {
   LxmfAttachmentBlobResponse,
   LxmfAttachmentBytesResponse,
+  LxmfAttachmentHandle,
   LxmfDeliveryPolicyUpdate,
   LxmfFilesQueryResponse,
   LxmfIndexStatus,
@@ -449,6 +450,31 @@ export async function getAttachmentBytes(
   return parseAttachmentBytesResponse(payload)
 }
 
+export async function openAttachmentHandle(
+  attachmentId: string,
+  disposition: 'preview' | 'download' = 'preview',
+  options: ProbeOptions = {}
+): Promise<LxmfAttachmentHandle> {
+  const payload = await invokeWithProbe<unknown>('open_attachment_handle', options, {
+    attachment_id: attachmentId,
+    disposition,
+  })
+  return parseAttachmentHandleResponse(payload)
+}
+
+export async function closeAttachmentHandle(
+  handleId: string,
+  options: ProbeOptions = {}
+): Promise<{ closed: boolean }> {
+  const payload = await invokeWithProbe<unknown>('close_attachment_handle', options, {
+    handle_id: handleId,
+  })
+  const root = asIndexedQueryPayload(payload, 'attachment_handle_close')
+  return {
+    closed: Boolean(root.closed),
+  }
+}
+
 export async function getRuntimeMetrics(options: ProbeOptions = {}): Promise<LxmfRuntimeMetrics> {
   const payload = await invokeWithProbe<unknown>('get_runtime_metrics', options)
   const root = asIndexedQueryPayload(payload, 'runtime_metrics')
@@ -458,6 +484,12 @@ export async function getRuntimeMetrics(options: ProbeOptions = {}): Promise<Lxm
     queueSize: asFiniteNumber(root.queue_size, 'runtime_metrics.queue_size'),
     messageCount: asFiniteNumber(root.message_count, 'runtime_metrics.message_count'),
     threadCount: asFiniteNumber(root.thread_count, 'runtime_metrics.thread_count'),
+    eventPumpIntervalMs: asNullableFiniteNumber(root.event_pump_interval_ms),
+    attachmentHandleCount: asFiniteNumber(
+      root.attachment_handle_count,
+      'runtime_metrics.attachment_handle_count'
+    ),
+    indexLastSyncMs: asNullableFiniteNumber(root.index_last_sync_ms),
   }
 }
 
@@ -630,6 +662,17 @@ function parseAttachmentBytesResponse(value: unknown): LxmfAttachmentBytesRespon
     mime: asNullableString(root.mime),
     sizeBytes: asFiniteNumber(root.size_bytes, 'attachment_bytes.size_bytes'),
     dataBase64: asString(root.data_base64, 'attachment_bytes.data_base64'),
+  }
+}
+
+function parseAttachmentHandleResponse(value: unknown): LxmfAttachmentHandle {
+  const root = asIndexedQueryPayload(value, 'attachment_handle')
+  return {
+    handleId: asString(root.handle_id, 'attachment_handle.handle_id'),
+    path: asString(root.path, 'attachment_handle.path'),
+    mime: asNullableString(root.mime),
+    sizeBytes: asFiniteNumber(root.size_bytes, 'attachment_handle.size_bytes'),
+    expiresAtMs: asFiniteNumber(root.expires_at_ms, 'attachment_handle.expires_at_ms'),
   }
 }
 

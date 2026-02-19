@@ -16,12 +16,21 @@ import { filterThreadIndex, indexThreads } from '../utils/filterThreads'
 export function ChatsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { threads, loading, error, refresh, markAllRead, createThread, selectThread } =
-    useChatsState()
+  const {
+    threads,
+    loading,
+    error,
+    refresh,
+    markAllRead,
+    createThread,
+    selectThread,
+    loadMoreThreads,
+  } = useChatsState()
   const [query, setQuery] = useState('')
   const [destinationInput, setDestinationInput] = useState('')
   const [nameInput, setNameInput] = useState('')
   const [composeError, setComposeError] = useState<string | null>(null)
+  const [loadingMoreThreads, setLoadingMoreThreads] = useState(false)
   const deferredQuery = useDeferredValue(query)
   const indexedThreads = useMemo(() => indexThreads(threads), [threads])
   const filteredThreads = useMemo(
@@ -173,18 +182,39 @@ export function ChatsPage() {
           filteredThreads.length === 0 ? (
             <p className="text-sm text-slate-500">No chats match your search.</p>
           ) : (
-            <VirtualizedList
-              items={filteredThreads}
-              estimateItemHeight={98}
-              className="min-h-0 flex-1 overflow-y-auto pr-1"
-              listClassName="pb-1"
-              getKey={thread => thread.id}
-              renderItem={thread => (
-                <div className="py-1">
-                  <ThreadListRow thread={thread} />
-                </div>
-              )}
-            />
+            <div className="flex min-h-0 flex-1 flex-col">
+              <VirtualizedList
+                items={filteredThreads}
+                estimateItemHeight={98}
+                className="min-h-0 flex-1 overflow-y-auto pr-1"
+                listClassName="pb-1"
+                getKey={thread => thread.id}
+                renderItem={thread => (
+                  <div className="py-1">
+                    <ThreadListRow thread={thread} />
+                  </div>
+                )}
+              />
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  disabled={loadingMoreThreads}
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        setLoadingMoreThreads(true)
+                        await loadMoreThreads()
+                      } finally {
+                        setLoadingMoreThreads(false)
+                      }
+                    })()
+                  }}
+                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                >
+                  {loadingMoreThreads ? 'Loading…' : 'Load more'}
+                </button>
+              </div>
+            </div>
           )
         ) : null}
       </Panel>

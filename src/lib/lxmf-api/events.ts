@@ -18,6 +18,17 @@ export async function startLxmfEventPump(
   return parseEventPumpStatus(payload)
 }
 
+export async function setLxmfEventPumpPolicy(
+  mode: 'foreground' | 'background' | 'hidden',
+  options: ProbeOptions & { intervalMs?: number } = {}
+): Promise<LxmfEventPumpStatus> {
+  const payload = await invokeWithProbe<unknown>('lxmf_set_event_pump_policy', options, {
+    mode,
+    interval_ms: options.intervalMs ?? null,
+  })
+  return parseEventPumpStatus(payload)
+}
+
 export async function stopLxmfEventPump(): Promise<LxmfEventPumpStatus> {
   const payload = await invokeWithProbe<unknown>('lxmf_stop_event_pump')
   return parseEventPumpStatus(payload)

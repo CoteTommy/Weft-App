@@ -13,6 +13,7 @@ import {
   readComposerSession,
   writeComposerSession,
 } from '../state/composerSession'
+import { storeOfflineAttachment } from '../state/offlineQueueAttachmentStore'
 
 interface MessageComposerProps {
   onSend?: (draft: OutboundMessageDraft) => Promise<OutboundSendOutcome> | void
@@ -146,17 +147,41 @@ export function MessageComposer({ onSend, focusToken = 0, sessionKey }: MessageC
           }
           void (async () => {
             try {
+              const selectedFiles = Array.from(files)
+              const existingSizeBytes = attachments.reduce(
+                (sum, attachment) => sum + Math.max(attachment.sizeBytes, 0),
+                0
+              )
+              const incomingSizeBytes = selectedFiles.reduce(
+                (sum, file) => sum + Math.max(file.size, 0),
+                0
+              )
+              if (existingSizeBytes + incomingSizeBytes > MAX_COMPOSER_ATTACHMENT_TOTAL_BYTES) {
+                throw new Error('Attachment limit is 8MB per message.')
+              }
+
               const incoming: OutboundAttachmentDraft[] = []
-              for (const file of Array.from(files)) {
-                if (file.size > 2 * 1024 * 1024) {
-                  throw new Error(`"${file.name}" is larger than 2MB.`)
-                }
+              for (const [index, file] of selectedFiles.entries()) {
+                const blobKey = buildComposerAttachmentBlobKey(sessionKey, index)
+                const stored = await storeOfflineAttachment(blobKey, {
+                  name: file.name,
+                  mime: file.type || undefined,
+                  sizeBytes: file.size,
+                  blob: file,
+                })
                 incoming.push({
                   name: file.name,
                   mime: file.type || undefined,
                   sizeBytes: file.size,
-                  dataBase64: await fileToBase64(file),
+                  ...(stored
+                    ? { blobKey }
+                    : file.size <= INLINE_ATTACHMENT_FALLBACK_BYTES
+                      ? { dataBase64: await fileToBase64(file) }
+                      : {}),
                 })
+                if (!stored && file.size > INLINE_ATTACHMENT_FALLBACK_BYTES) {
+                  throw new Error(`Failed to stage "${file.name}". Please try again.`)
+                }
               }
               setAttachments(previous => [...previous, ...incoming])
               setError(null)
@@ -278,3 +303,11 @@ async function fileToBase64(file: File): Promise<string> {
   }
   return btoa(binary)
 }
+
+function buildComposerAttachmentBlobKey(sessionKey: string | undefined, index: number): string {
+  const prefix = sessionKey?.trim() || 'composer'
+  return `${prefix}:attachment:${Date.now()}:${index}:${Math.random().toString(36).slice(2, 8)}`
+}
+
+const INLINE_ATTACHMENT_FALLBACK_BYTES = 4 * 1024
+const MAX_COMPOSER_ATTACHMENT_TOTAL_BYTES = 8 * 1024 * 1024

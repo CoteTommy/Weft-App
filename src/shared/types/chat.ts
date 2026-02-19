@@ -1,4 +1,5 @@
 export interface ChatAttachment {
+  id?: string
   name: string
   sizeBytes: number
   mime?: string
@@ -56,7 +57,8 @@ export interface OutboundAttachmentDraft {
   name: string
   mime?: string
   sizeBytes: number
-  dataBase64: string
+  dataBase64?: string
+  blobKey?: string
 }
 
 export interface OutboundPaperDraft {

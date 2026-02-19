@@ -8,7 +8,7 @@ import {
   useRef,
 } from 'react'
 
-import { startLxmfEventPump, subscribeLxmfEvents } from '@lib/lxmf-api'
+import { setLxmfEventPumpPolicy, startLxmfEventPump, subscribeLxmfEvents } from '@lib/lxmf-api'
 import type { LxmfRpcEvent } from '@lib/lxmf-payloads'
 
 interface LxmfEventHubContextValue {
@@ -21,6 +21,7 @@ const LxmfEventHubContext = createContext<LxmfEventHubContextValue | undefined>(
 export function LxmfEventHubProvider({ children }: PropsWithChildren) {
   const listenersRef = useRef<Set<(event: LxmfRpcEvent) => void>>(new Set())
   const lastEventAtRef = useRef(0)
+  const activePolicyRef = useRef<'foreground' | 'background' | 'hidden' | null>(null)
 
   const subscribe = useCallback((listener: (event: LxmfRpcEvent) => void) => {
     listenersRef.current.add(listener)
@@ -34,9 +35,32 @@ export function LxmfEventHubProvider({ children }: PropsWithChildren) {
     let disposed = false
     const listeners = listenersRef.current
 
+    const applyPolicy = async (mode: 'foreground' | 'background' | 'hidden') => {
+      if (activePolicyRef.current === mode) {
+        return
+      }
+      activePolicyRef.current = mode
+      await setLxmfEventPumpPolicy(mode).catch(() => {
+        // Keep existing subscription alive even if policy updates fail.
+      })
+    }
+
+    const syncPolicy = () => {
+      if (document.visibilityState === 'hidden') {
+        void applyPolicy('hidden')
+        return
+      }
+      if (typeof document.hasFocus === 'function' && !document.hasFocus()) {
+        void applyPolicy('background')
+        return
+      }
+      void applyPolicy('foreground')
+    }
+
     void startLxmfEventPump().catch(() => {
       // Runtime event stream stays best-effort.
     })
+    syncPolicy()
 
     void subscribeLxmfEvents(event => {
       lastEventAtRef.current = Date.now()
@@ -55,10 +79,17 @@ export function LxmfEventHubProvider({ children }: PropsWithChildren) {
         // Fallback polling paths still keep screens usable.
       })
 
+    document.addEventListener('visibilitychange', syncPolicy)
+    window.addEventListener('focus', syncPolicy)
+    window.addEventListener('blur', syncPolicy)
+
     return () => {
       disposed = true
       unlisten?.()
       listeners.clear()
+      document.removeEventListener('visibilitychange', syncPolicy)
+      window.removeEventListener('focus', syncPolicy)
+      window.removeEventListener('blur', syncPolicy)
     }
   }, [])
 

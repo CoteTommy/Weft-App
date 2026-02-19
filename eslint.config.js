@@ -65,4 +65,16 @@ export default defineConfig([
       },
     },
   },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/lib/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['@tauri-apps/api', '@tauri-apps/api/*'],
+        },
+      ],
+    },
+  },
 ])

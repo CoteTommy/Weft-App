@@ -90,6 +90,7 @@ function parseStructuredAttachments(value: unknown): ChatAttachment[] {
         ? Math.max(0, Math.trunc(attachment.size_bytes))
         : undefined
     out.push({
+      id: asNonEmptyString(attachment.id),
       name,
       mime: asNonEmptyString(attachment.mime),
       sizeBytes: sizeFromPayload ?? estimateBase64Size(dataBase64),

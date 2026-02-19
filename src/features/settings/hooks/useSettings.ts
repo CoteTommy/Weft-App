@@ -8,7 +8,7 @@ interface UseSettingsState {
   settings: SettingsSnapshot | null
   loading: boolean
   error: string | null
-  refresh: () => Promise<void>
+  refresh: (options?: { includeInteropMessages?: boolean }) => Promise<void>
 }
 
 export function useSettings(): UseSettingsState {
@@ -16,10 +16,10 @@ export function useSettings(): UseSettingsState {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options?: { includeInteropMessages?: boolean }) => {
     try {
       setError(null)
-      const snapshot = await fetchSettingsSnapshot()
+      const snapshot = await fetchSettingsSnapshot(options)
       setSettings(snapshot)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : String(loadError))
@@ -29,7 +29,7 @@ export function useSettings(): UseSettingsState {
   }, [])
 
   useEffect(() => {
-    void refresh()
+    void refresh({ includeInteropMessages: false })
   }, [refresh])
 
   return {

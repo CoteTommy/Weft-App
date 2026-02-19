@@ -28,8 +28,14 @@ import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 
 import { buildInteropSnapshot } from './interopHealth'
 
-export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
+export async function fetchSettingsSnapshot(
+  input: {
+    includeInteropMessages?: boolean
+  } = {}
+): Promise<SettingsSnapshot> {
   const preferences = getWeftPreferences()
+  const heapMetrics = readJsHeapMetrics()
+  const includeInteropMessages = input.includeInteropMessages === true
   const [
     status,
     probe,
@@ -45,7 +51,7 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
     getLxmfProfile().catch(() => null),
     listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
     getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
-    loadInteropMessages().catch(() => []),
+    (includeInteropMessages ? loadInteropMessages() : Promise.resolve([])).catch(() => []),
     getDesktopShellPreferences().catch(() => ({
       minimizeToTrayOnClose: true,
       startInTray: false,
@@ -60,6 +66,9 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       queueSize: 0,
       messageCount: 0,
       threadCount: 0,
+      eventPumpIntervalMs: null,
+      attachmentHandleCount: 0,
+      indexLastSyncMs: null,
     })),
   ])
   const displayName = resolveDisplayName(
@@ -108,13 +117,32 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
       threadPageSize: preferences.threadPageSize,
       messagePageSize: preferences.messagePageSize,
       attachmentPreviewMode: preferences.attachmentPreviewMode,
-      runtimeMetrics,
+      runtimeMetrics: {
+        ...runtimeMetrics,
+        jsHeapUsedBytes: heapMetrics.jsHeapUsedBytes,
+        jsHeapLimitBytes: heapMetrics.jsHeapLimitBytes,
+      },
     },
     desktop,
     features: {
       commandCenterEnabled: preferences.commandCenterEnabled,
     },
     interop,
+  }
+}
+
+function readJsHeapMetrics(): { jsHeapUsedBytes: number | null; jsHeapLimitBytes: number | null } {
+  const withMemory = performance as Performance & {
+    memory?: {
+      usedJSHeapSize?: number
+      jsHeapSizeLimit?: number
+    }
+  }
+  const used = withMemory.memory?.usedJSHeapSize
+  const limit = withMemory.memory?.jsHeapSizeLimit
+  return {
+    jsHeapUsedBytes: typeof used === 'number' && Number.isFinite(used) ? used : null,
+    jsHeapLimitBytes: typeof limit === 'number' && Number.isFinite(limit) ? limit : null,
   }
 }
 
@@ -254,7 +282,13 @@ export function savePerformanceSettings(input: {
 }
 
 export async function refreshRuntimeMetrics() {
-  return await getRuntimeMetrics()
+  const metrics = await getRuntimeMetrics()
+  const heap = readJsHeapMetrics()
+  return {
+    ...metrics,
+    jsHeapUsedBytes: heap.jsHeapUsedBytes,
+    jsHeapLimitBytes: heap.jsHeapLimitBytes,
+  }
 }
 
 export async function runSettingsMaintenance(input: {
