@@ -2372,6 +2372,7 @@ dependencies = [
 [[package]]
 name = "lxmf"
 version = "0.3.0"
+source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=fbd71beb05ec46454f53d412fc47f8f19b4f0518#fbd71beb05ec46454f53d412fc47f8f19b4f0518"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2394,6 +2395,13 @@ dependencies = [
  "toml 0.8.2",
  "ureq",
  "x25519-dalek",
+]
+
+[[package]]
+name = "lxmf_adapter"
+version = "0.1.0"
+dependencies = [
+ "lxmf",
 ]
 
 [[package]]
@@ -3457,6 +3465,7 @@ dependencies = [
 [[package]]
 name = "reticulum-rs"
 version = "0.1.3"
+source = "git+https://github.com/FreeTAKTeam/LXMF-rs.git?rev=fbd71beb05ec46454f53d412fc47f8f19b4f0518#fbd71beb05ec46454f53d412fc47f8f19b4f0518"
 dependencies = [
  "aes",
  "bzip2",
@@ -5346,7 +5355,7 @@ dependencies = [
  "base64 0.22.1",
  "hex",
  "log",
- "lxmf",
+ "lxmf_adapter",
  "rmp-serde",
  "rmpv",
  "rusqlite",

@@ -4,8 +4,8 @@ Tauri desktop client for LXMF operations.
 
 ## Requirements
 
-- Bun
-- Rust toolchain
+- Bun `1.3.x` (see `.bun-version`)
+- Rust toolchain `1.77.2` (see `rust-toolchain.toml`)
 - Tauri system dependencies for your OS
 
 ## Development
@@ -106,3 +106,6 @@ Payload contract reference:
 - `bun run typecheck`: TypeScript check
 - `bun run lint`: ESLint
 - `bun run test`: Bun tests
+- `bun run test:e2e`: Playwright smoke tests
+- `bun run contract:generate`: regenerate typed Tauri IPC v2 bindings
+- `bun run contract:check`: verify generated Tauri IPC v2 bindings are up to date

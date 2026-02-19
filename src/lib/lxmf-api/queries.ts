@@ -38,6 +38,7 @@ import {
   parseLxmfTicketGenerateResponse,
 } from '../lxmf-payloads'
 import { asObject, invokeWithProbe } from './common'
+import { TAURI_IPC_COMMANDS } from './generated/tauriIpcV2'
 import type {
   LxmfAttachmentBlobResponse,
   LxmfAttachmentBytesResponse,
@@ -63,29 +64,29 @@ import type {
 export async function listLxmfMessages(
   options: ProbeOptions = {}
 ): Promise<LxmfMessageListResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_list_messages', options)
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_LIST_MESSAGES, options)
   return parseLxmfMessageList(payload)
 }
 
 export async function listLxmfPeers(options: ProbeOptions = {}): Promise<LxmfPeerListResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_list_peers', options)
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_LIST_PEERS, options)
   return parseLxmfPeerList(payload)
 }
 
 export async function listLxmfInterfaces(
   options: ProbeOptions = {}
 ): Promise<LxmfInterfaceListResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_list_interfaces', options)
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_LIST_INTERFACES, options)
   return parseLxmfInterfaceList(payload)
 }
 
 export async function clearLxmfMessages(options: ProbeOptions = {}): Promise<LxmfClearResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_clear_messages', options)
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_CLEAR_MESSAGES, options)
   return parseLxmfClearResponse(payload)
 }
 
 export async function clearLxmfPeers(options: ProbeOptions = {}): Promise<LxmfClearResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_clear_peers', options)
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_CLEAR_PEERS, options)
   return parseLxmfClearResponse(payload)
 }
 
@@ -93,7 +94,7 @@ export async function setLxmfInterfaces(
   interfaces: LxmfSetInterfacesInput[],
   options: ProbeOptions = {}
 ): Promise<LxmfSetInterfacesResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_set_interfaces', options, {
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_SET_INTERFACES, options, {
     interfaces: interfaces.map(interfaceEntry => ({
       kind: interfaceEntry.kind,
       enabled: interfaceEntry.enabled,
@@ -107,7 +108,7 @@ export async function setLxmfInterfaces(
 export async function reloadLxmfConfig(
   options: ProbeOptions = {}
 ): Promise<LxmfReloadConfigResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_reload_config', options)
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_RELOAD_CONFIG, options)
   return parseLxmfReloadConfigResponse(payload)
 }
 
@@ -115,7 +116,7 @@ export async function syncLxmfPeer(
   peer: string,
   options: ProbeOptions = {}
 ): Promise<LxmfPeerSyncResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_peer_sync', options, {
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_PEER_SYNC, options, {
     peer,
   })
   return parseLxmfPeerSyncResponse(payload)
@@ -125,7 +126,7 @@ export async function unpeerLxmfPeer(
   peer: string,
   options: ProbeOptions = {}
 ): Promise<LxmfPeerUnpeerResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_peer_unpeer', options, {
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_PEER_UNPEER, options, {
     peer,
   })
   return parseLxmfPeerUnpeerResponse(payload)
@@ -151,14 +152,21 @@ export async function listLxmfAnnounces(
   if (typeof params.cursor === 'string' && params.cursor.trim().length > 0) {
     fields.cursor = params.cursor.trim()
   }
-  const payload = await invokeWithProbe<unknown>('lxmf_list_announces', options, fields)
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_LIST_ANNOUNCES,
+    options,
+    fields
+  )
   return parseLxmfAnnounceList(payload)
 }
 
 export async function getLxmfDeliveryPolicy(
   options: ProbeOptions = {}
 ): Promise<LxmfDeliveryPolicyResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_get_delivery_policy', options)
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_GET_DELIVERY_POLICY,
+    options
+  )
   return parseLxmfDeliveryPolicyResponse(payload)
 }
 
@@ -166,22 +174,29 @@ export async function setLxmfDeliveryPolicy(
   input: LxmfDeliveryPolicyUpdate,
   options: ProbeOptions = {}
 ): Promise<LxmfDeliveryPolicyResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_set_delivery_policy', options, {
-    policy: {
-      auth_required: input.authRequired ?? null,
-      allowed_destinations: input.allowedDestinations ?? null,
-      denied_destinations: input.deniedDestinations ?? null,
-      ignored_destinations: input.ignoredDestinations ?? null,
-      prioritised_destinations: input.prioritisedDestinations ?? null,
-    },
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_SET_DELIVERY_POLICY,
+    options,
+    {
+      policy: {
+        auth_required: input.authRequired ?? null,
+        allowed_destinations: input.allowedDestinations ?? null,
+        denied_destinations: input.deniedDestinations ?? null,
+        ignored_destinations: input.ignoredDestinations ?? null,
+        prioritised_destinations: input.prioritisedDestinations ?? null,
+      },
+    }
+  )
   return parseLxmfDeliveryPolicyResponse(payload)
 }
 
 export async function getLxmfPropagationStatus(
   options: ProbeOptions = {}
 ): Promise<LxmfPropagationStatusResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_propagation_status', options)
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_PROPAGATION_STATUS,
+    options
+  )
   return parseLxmfPropagationStatusResponse(payload)
 }
 
@@ -189,11 +204,15 @@ export async function setLxmfPropagationStatus(
   input: LxmfPropagationEnableInput,
   options: ProbeOptions = {}
 ): Promise<LxmfPropagationStatusResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_propagation_enable', options, {
-    enabled: input.enabled,
-    storeRoot: input.storeRoot ?? null,
-    targetCost: input.targetCost ?? null,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_PROPAGATION_ENABLE,
+    options,
+    {
+      enabled: input.enabled,
+      storeRoot: input.storeRoot ?? null,
+      targetCost: input.targetCost ?? null,
+    }
+  )
   return parseLxmfPropagationStatusResponse(payload)
 }
 
@@ -201,10 +220,14 @@ export async function ingestLxmfPropagation(
   input: LxmfPropagationIngestInput,
   options: ProbeOptions = {}
 ): Promise<LxmfPropagationIngestResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_propagation_ingest', options, {
-    transientId: input.transientId ?? null,
-    payloadHex: input.payloadHex ?? null,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_PROPAGATION_INGEST,
+    options,
+    {
+      transientId: input.transientId ?? null,
+      payloadHex: input.payloadHex ?? null,
+    }
+  )
   return parseLxmfPropagationIngestResponse(payload)
 }
 
@@ -212,23 +235,27 @@ export async function fetchLxmfPropagation(
   input: LxmfPropagationFetchInput,
   options: ProbeOptions = {}
 ): Promise<LxmfPropagationFetchResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_propagation_fetch', options, {
-    transientId: input.transientId,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_PROPAGATION_FETCH,
+    options,
+    {
+      transientId: input.transientId,
+    }
+  )
   return parseLxmfPropagationFetchResponse(payload)
 }
 
 export async function lxmfInterfaceMetrics(
   options: ProbeOptions = {}
 ): Promise<LxmfInterfaceMetricsResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_interface_metrics', options)
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_INTERFACE_METRICS, options)
   return parseLxmfInterfaceMetrics(payload)
 }
 
 export async function getLxmfStampPolicy(
   options: ProbeOptions = {}
 ): Promise<LxmfStampPolicyResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_stamp_policy_get', options)
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_STAMP_POLICY_GET, options)
   return parseLxmfStampPolicyResponse(payload)
 }
 
@@ -236,10 +263,14 @@ export async function setLxmfStampPolicy(
   input: LxmfStampPolicyUpdate,
   options: ProbeOptions = {}
 ): Promise<LxmfStampPolicyResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_stamp_policy_set', options, {
-    targetCost: input.targetCost ?? null,
-    flexibility: input.flexibility ?? null,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_STAMP_POLICY_SET,
+    options,
+    {
+      targetCost: input.targetCost ?? null,
+      flexibility: input.flexibility ?? null,
+    }
+  )
   return parseLxmfStampPolicyResponse(payload)
 }
 
@@ -247,7 +278,7 @@ export async function generateLxmfTicket(
   input: LxmfTicketGenerateInput,
   options: ProbeOptions = {}
 ): Promise<LxmfTicketGenerateResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_ticket_generate', options, {
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_TICKET_GENERATE, options, {
     destination: input.destination,
     ttlSecs: input.ttlSecs ?? null,
   })
@@ -257,14 +288,20 @@ export async function generateLxmfTicket(
 export async function listLxmfPropagationNodes(
   options: ProbeOptions = {}
 ): Promise<LxmfPropagationNodeListResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_list_propagation_nodes', options)
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_LIST_PROPAGATION_NODES,
+    options
+  )
   return parseLxmfPropagationNodeList(payload)
 }
 
 export async function getLxmfOutboundPropagationNode(
   options: ProbeOptions = {}
 ): Promise<LxmfOutboundPropagationNodeResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_get_outbound_propagation_node', options)
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_GET_OUTBOUND_PROPAGATION_NODE,
+    options
+  )
   return parseLxmfOutboundPropagationNode(payload)
 }
 
@@ -272,9 +309,13 @@ export async function setLxmfOutboundPropagationNode(
   peer: string | null,
   options: ProbeOptions = {}
 ): Promise<LxmfOutboundPropagationNodeResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_set_outbound_propagation_node', options, {
-    peer,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_SET_OUTBOUND_PROPAGATION_NODE,
+    options,
+    {
+      peer,
+    }
+  )
   return parseLxmfOutboundPropagationNode(payload)
 }
 
@@ -282,22 +323,29 @@ export async function getLxmfMessageDeliveryTrace(
   messageId: string,
   options: ProbeOptions = {}
 ): Promise<LxmfMessageDeliveryTraceResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_message_delivery_trace', options, {
-    messageId,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_MESSAGE_DELIVERY_TRACE,
+    options,
+    {
+      messageId,
+    }
+  )
   return parseLxmfMessageDeliveryTrace(payload)
 }
 
 export async function announceLxmfNow(options: ProbeOptions = {}): Promise<unknown> {
-  return await invokeWithProbe<unknown>('lxmf_announce_now', options)
+  return await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_ANNOUNCE_NOW, options)
 }
 
 export async function paperIngestUri(uri: string, options: ProbeOptions = {}): Promise<unknown> {
-  return await invokeWithProbe<unknown>('lxmf_paper_ingest_uri', options, { uri })
+  return await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_PAPER_INGEST_URI, options, { uri })
 }
 
 export async function lxmfIndexStatus(options: ProbeOptions = {}): Promise<LxmfIndexStatus> {
-  const payload = await invokeWithProbe<unknown>('lxmf_index_status', options)
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_LXMF_INDEX_STATUS,
+    options
+  )
   return parseIndexStatus(payload)
 }
 
@@ -322,12 +370,16 @@ export async function queryThreadsPage(
     pinnedOnly?: boolean
   } = {}
 ): Promise<LxmfThreadQueryResponse> {
-  const payload = await invokeWithProbe<unknown>('query_threads_page', options, {
-    query: params.query ?? null,
-    limit: params.limit ?? null,
-    cursor: params.cursor ?? null,
-    pinnedOnly: params.pinnedOnly ?? null,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_QUERY_THREADS_PAGE,
+    options,
+    {
+      query: params.query ?? null,
+      limit: params.limit ?? null,
+      cursor: params.cursor ?? null,
+      pinnedOnly: params.pinnedOnly ?? null,
+    }
+  )
   return parseThreadQueryResponse(payload)
 }
 
@@ -352,12 +404,16 @@ export async function queryThreadMessagesPage(
     cursor?: string
   } = {}
 ): Promise<LxmfThreadMessageQueryResponse> {
-  const payload = await invokeWithProbe<unknown>('query_thread_messages_page', options, {
-    threadId,
-    query: params.query ?? null,
-    limit: params.limit ?? null,
-    cursor: params.cursor ?? null,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_QUERY_THREAD_MESSAGES_PAGE,
+    options,
+    {
+      threadId,
+      query: params.query ?? null,
+      limit: params.limit ?? null,
+      cursor: params.cursor ?? null,
+    }
+  )
   return parseThreadMessageQueryResponse(payload)
 }
 
@@ -370,12 +426,16 @@ export async function lxmfSearchMessages(
     cursor?: string
   } = {}
 ): Promise<LxmfSearchResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_search_messages', options, {
-    query,
-    threadId: params.threadId ?? null,
-    limit: params.limit ?? null,
-    cursor: params.cursor ?? null,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_LXMF_SEARCH_MESSAGES,
+    options,
+    {
+      query,
+      threadId: params.threadId ?? null,
+      limit: params.limit ?? null,
+      cursor: params.cursor ?? null,
+    }
+  )
   return parseSearchResponse(payload)
 }
 
@@ -402,13 +462,17 @@ export async function queryFilesPage(
     includeBytes?: boolean
   } = {}
 ): Promise<LxmfFilesQueryResponse> {
-  const payload = await invokeWithProbe<unknown>('query_files_page', options, {
-    query: params.query ?? null,
-    kind: params.kind ?? null,
-    limit: params.limit ?? null,
-    cursor: params.cursor ?? null,
-    includeBytes: params.includeBytes ?? null,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_QUERY_FILES_PAGE,
+    options,
+    {
+      query: params.query ?? null,
+      kind: params.kind ?? null,
+      limit: params.limit ?? null,
+      cursor: params.cursor ?? null,
+      includeBytes: params.includeBytes ?? null,
+    }
+  )
   return parseFilesQueryResponse(payload)
 }
 
@@ -420,11 +484,15 @@ export async function lxmfQueryMapPoints(
     cursor?: string
   } = {}
 ): Promise<LxmfMapPointsQueryResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_query_map_points', options, {
-    query: params.query ?? null,
-    limit: params.limit ?? null,
-    cursor: params.cursor ?? null,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_LXMF_QUERY_MAP_POINTS,
+    options,
+    {
+      query: params.query ?? null,
+      limit: params.limit ?? null,
+      cursor: params.cursor ?? null,
+    }
+  )
   return parseMapPointsQueryResponse(payload)
 }
 
@@ -433,10 +501,14 @@ export async function lxmfGetAttachmentBlob(
   attachmentName: string,
   options: ProbeOptions = {}
 ): Promise<LxmfAttachmentBlobResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_get_attachment_blob', options, {
-    messageId,
-    attachmentName,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_LXMF_GET_ATTACHMENT_BLOB,
+    options,
+    {
+      messageId,
+      attachmentName,
+    }
+  )
   return parseAttachmentBlobResponse(payload)
 }
 
@@ -444,9 +516,13 @@ export async function getAttachmentBytes(
   attachmentId: string,
   options: ProbeOptions = {}
 ): Promise<LxmfAttachmentBytesResponse> {
-  const payload = await invokeWithProbe<unknown>('get_attachment_bytes', options, {
-    attachmentId,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_GET_ATTACHMENT_BYTES,
+    options,
+    {
+      attachmentId,
+    }
+  )
   return parseAttachmentBytesResponse(payload)
 }
 
@@ -455,10 +531,14 @@ export async function openAttachmentHandle(
   disposition: 'preview' | 'download' = 'preview',
   options: ProbeOptions = {}
 ): Promise<LxmfAttachmentHandle> {
-  const payload = await invokeWithProbe<unknown>('open_attachment_handle', options, {
-    attachmentId,
-    disposition,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_OPEN_ATTACHMENT_HANDLE,
+    options,
+    {
+      attachmentId,
+      disposition,
+    }
+  )
   return parseAttachmentHandleResponse(payload)
 }
 
@@ -466,9 +546,13 @@ export async function closeAttachmentHandle(
   handleId: string,
   options: ProbeOptions = {}
 ): Promise<{ closed: boolean }> {
-  const payload = await invokeWithProbe<unknown>('close_attachment_handle', options, {
-    handleId,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_CLOSE_ATTACHMENT_HANDLE,
+    options,
+    {
+      handleId,
+    }
+  )
   const root = asIndexedQueryPayload(payload, 'attachment_handle_close')
   return {
     closed: Boolean(root.closed),
@@ -476,7 +560,10 @@ export async function closeAttachmentHandle(
 }
 
 export async function getRuntimeMetrics(options: ProbeOptions = {}): Promise<LxmfRuntimeMetrics> {
-  const payload = await invokeWithProbe<unknown>('get_runtime_metrics', options)
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_GET_RUNTIME_METRICS,
+    options
+  )
   const root = asIndexedQueryPayload(payload, 'runtime_metrics')
   return {
     rssBytes: asNullableFiniteNumber(root.rss_bytes),
@@ -496,15 +583,21 @@ export async function getRuntimeMetrics(options: ProbeOptions = {}): Promise<Lxm
 export async function rebuildThreadSummaries(
   options: ProbeOptions = {}
 ): Promise<{ rebuilt: boolean }> {
-  const payload = await invokeWithProbe<unknown>('rebuild_thread_summaries', options)
-  const root = asIndexedQueryPayload(payload, 'rebuild_thread_summaries')
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_REBUILD_THREAD_SUMMARIES,
+    options
+  )
+  const root = asIndexedQueryPayload(payload, TAURI_IPC_COMMANDS.INDEXING_REBUILD_THREAD_SUMMARIES)
   return {
     rebuilt: Boolean(root.rebuilt),
   }
 }
 
 export async function lxmfForceReindex(options: ProbeOptions = {}): Promise<{ started: boolean }> {
-  const payload = await invokeWithProbe<unknown>('lxmf_force_reindex', options)
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.INDEXING_LXMF_FORCE_REINDEX,
+    options
+  )
   const root = asIndexedQueryPayload(payload, 'force_reindex')
   return {
     started: Boolean(root.started),

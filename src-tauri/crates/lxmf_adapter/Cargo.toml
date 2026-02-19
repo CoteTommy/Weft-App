@@ -1,0 +1,10 @@
+[package]
+name = "lxmf_adapter"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+license = "MIT"
+publish = false
+
+[dependencies]
+lxmf = { git = "https://github.com/FreeTAKTeam/LXMF-rs.git", rev = "fbd71beb05ec46454f53d412fc47f8f19b4f0518", package = "lxmf", features = ["cli", "embedded-runtime"] }

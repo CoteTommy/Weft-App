@@ -1,0 +1,11 @@
+{
+  "advisories": [
+    {
+      "id": 1113214,
+      "package": "ajv",
+      "ghsa": "GHSA-2g4f-4pwh-qvx6",
+      "expiresOn": "2026-05-31",
+      "reason": "Transitive eslint dependency currently pins an older ajv major API shape; migration is tracked and this advisory is reviewed weekly."
+    }
+  ]
+}

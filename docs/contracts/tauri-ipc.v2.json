@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "2.0.0",
+  "description": "Weft Desktop Tauri IPC v2 contract. Legacy commands remain for one release cycle.",
+  "generatedFrom": "src-tauri/src/tauri_backend/mod.rs",
+  "envelope": {
+    "ok": {
+      "data": "unknown",
+      "meta": {
+        "request_id": "string",
+        "schema_version": "v2"
+      }
+    },
+    "error": {
+      "code": "validation|runtime_unavailable|upstream_timeout|storage_quota|internal",
+      "message": "string",
+      "retryable": "boolean",
+      "request_id": "string"
+    }
+  },
+  "errorTaxonomy": [
+    "validation",
+    "runtime_unavailable",
+    "upstream_timeout",
+    "storage_quota",
+    "internal"
+  ],
+  "commands": {
+    "v2": [
+      {
+        "name": "v2_daemon_probe",
+        "legacyAdapter": "daemon_probe",
+        "request": {
+          "profile": "string|null",
+          "rpc": "string|null"
+        },
+        "response": "IpcV2Envelope<LxmfProbeReport>"
+      },
+      {
+        "name": "v2_daemon_status",
+        "legacyAdapter": "daemon_status",
+        "request": {
+          "profile": "string|null",
+          "rpc": "string|null"
+        },
+        "response": "IpcV2Envelope<LxmfDaemonLocalStatus>"
+      },
+      {
+        "name": "v2_daemon_start",
+        "legacyAdapter": "daemon_start",
+        "request": {
+          "profile": "string|null",
+          "rpc": "string|null",
+          "managed": "boolean|null",
+          "reticulumd": "string|null",
+          "transport": "string|null"
+        },
+        "response": "IpcV2Envelope<LxmfDaemonLocalStatus>"
+      },
+      {
+        "name": "v2_daemon_stop",
+        "legacyAdapter": "daemon_stop",
+        "request": {
+          "profile": "string|null",
+          "rpc": "string|null"
+        },
+        "response": "IpcV2Envelope<LxmfDaemonLocalStatus>"
+      },
+      {
+        "name": "v2_daemon_restart",
+        "legacyAdapter": "daemon_restart",
+        "request": {
+          "profile": "string|null",
+          "rpc": "string|null",
+          "managed": "boolean|null",
+          "reticulumd": "string|null",
+          "transport": "string|null"
+        },
+        "response": "IpcV2Envelope<LxmfDaemonLocalStatus>"
+      }
+    ],
+    "legacy": [
+      "daemon_probe",
+      "daemon_status",
+      "daemon_start",
+      "daemon_stop",
+      "daemon_restart",
+      "indexing::lxmf_index_status",
+      "indexing::get_runtime_metrics",
+      "indexing::lxmf_query_threads",
+      "indexing::query_threads_page",
+      "indexing::lxmf_query_thread_messages",
+      "indexing::query_thread_messages_page",
+      "indexing::lxmf_search_messages",
+      "indexing::lxmf_query_files",
+      "indexing::query_files_page",
+      "indexing::lxmf_query_map_points",
+      "indexing::lxmf_get_attachment_blob",
+      "indexing::get_attachment_bytes",
+      "indexing::open_attachment_handle",
+      "indexing::close_attachment_handle",
+      "indexing::lxmf_force_reindex",
+      "indexing::rebuild_thread_summaries",
+      "lxmf_list_messages",
+      "lxmf_list_peers",
+      "lxmf_list_interfaces",
+      "lxmf_clear_messages",
+      "lxmf_clear_peers",
+      "lxmf_set_interfaces",
+      "lxmf_reload_config",
+      "lxmf_peer_sync",
+      "lxmf_peer_unpeer",
+      "lxmf_list_announces",
+      "lxmf_get_delivery_policy",
+      "lxmf_set_delivery_policy",
+      "lxmf_propagation_status",
+      "lxmf_propagation_enable",
+      "lxmf_propagation_ingest",
+      "lxmf_propagation_fetch",
+      "lxmf_stamp_policy_get",
+      "lxmf_stamp_policy_set",
+      "lxmf_ticket_generate",
+      "lxmf_interface_metrics",
+      "lxmf_list_propagation_nodes",
+      "lxmf_get_outbound_propagation_node",
+      "lxmf_set_outbound_propagation_node",
+      "lxmf_message_delivery_trace",
+      "lxmf_announce_now",
+      "lxmf_paper_ingest_uri",
+      "lxmf_poll_event",
+      "lxmf_start_event_pump",
+      "lxmf_set_event_pump_policy",
+      "lxmf_stop_event_pump",
+      "lxmf_get_profile",
+      "lxmf_set_display_name",
+      "lxmf_send_message",
+      "lxmf_send_rich_message",
+      "lxmf_send_rich_message_refs",
+      "lxmf_send_command",
+      "desktop_get_shell_preferences",
+      "desktop_set_shell_preferences"
+    ]
+  }
+}
