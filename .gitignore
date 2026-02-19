@@ -24,3 +24,7 @@ src-tauri/gen
 *.njsproj
 *.sln
 *.sw?
+
+# Perf artifacts
+reports/perf/*.json
+!reports/perf/memory-checkpoints.sample.json

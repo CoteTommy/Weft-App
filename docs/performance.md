@@ -12,9 +12,11 @@ This document defines the baseline scenarios and acceptance thresholds for memor
    - `WEFT_INDEX_STORE_PATH="$(pwd)/.tmp/weft-bench-index.sqlite3" VITE_ENABLE_PERF_HARNESS=true bun run dev`
 4. Idle CPU benchmark (5 minutes):
    - `bun run perf:bench:idle`
-5. Capture memory checkpoints (repeat for each phase: `cold_start`, `chats_open_idle_2m`, `files_open`, `settings_open`, `hidden_idle_5m`):
+5. Initialize checkpoint template (one-time):
+   - `bun run perf:init:memory`
+6. Capture memory checkpoints (repeat for each phase: `cold_start`, `chats_open_idle_2m`, `files_open`, `settings_open`, `hidden_idle_5m`):
    - `bun run perf:checkpoint:memory -- --name cold_start --rss <bytes> --heap-used <bytes> --heap-limit <bytes>`
-6. Memory benchmark summary (from captured checkpoints):
+7. Memory benchmark summary (from captured checkpoints):
    - `bun run perf:bench:memory`
 
 ## Thresholds
