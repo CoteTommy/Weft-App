@@ -3,18 +3,18 @@ use super::actor::{
 };
 use super::attachment_handles::AttachmentHandleManager;
 use super::index_store::IndexStore;
-use super::selector::{
-    clean_arg, default_profile, default_rpc, default_transport, RuntimeSelector,
-};
+use super::selector::{clean_arg, default_profile, default_rpc, RuntimeSelector};
 use super::{
     current_system_appearance, DesktopShellPreferencePatch, DesktopShellState, EventPumpControl,
     DEFAULT_EVENT_PUMP_INTERVAL_MS, TRAY_ACTION_CHANNEL,
 };
 use base64::Engine as _;
-use lxmf::cli::profile::{load_profile_settings, save_profile_settings};
-use lxmf::constants::{FIELD_FILE_ATTACHMENTS, FIELD_TELEMETRY};
-use lxmf::payload_fields::{decode_transport_fields_json, TRANSPORT_FIELDS_MSGPACK_B64_KEY};
-use lxmf::runtime::{SendCommandRequest, SendMessageRequest};
+use lxmf_adapter::cli::profile::{load_profile_settings, save_profile_settings};
+use lxmf_adapter::constants::{FIELD_FILE_ATTACHMENTS, FIELD_TELEMETRY};
+use lxmf_adapter::payload_fields::{
+    decode_transport_fields_json, TRANSPORT_FIELDS_MSGPACK_B64_KEY,
+};
+use lxmf_adapter::runtime::{SendCommandRequest, SendMessageRequest};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
@@ -23,85 +23,8 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, State};
 
+pub(crate) mod daemon;
 pub(crate) mod indexing;
-
-#[tauri::command]
-pub(crate) fn daemon_probe(
-    actor: State<'_, RuntimeActor>,
-    profile: Option<String>,
-    rpc: Option<String>,
-) -> Result<Value, String> {
-    let selector = RuntimeSelector::load(profile, rpc)?;
-    actor.request(ActorCommand::Probe { selector })
-}
-
-#[tauri::command]
-pub(crate) fn daemon_status(
-    actor: State<'_, RuntimeActor>,
-    profile: Option<String>,
-    rpc: Option<String>,
-) -> Result<Value, String> {
-    let selector = RuntimeSelector::load(profile, rpc)?;
-    actor.request(ActorCommand::Status { selector })
-}
-
-#[tauri::command]
-pub(crate) fn daemon_start(
-    actor: State<'_, RuntimeActor>,
-    profile: Option<String>,
-    rpc: Option<String>,
-    managed: Option<bool>,
-    reticulumd: Option<String>,
-    transport: Option<String>,
-) -> Result<Value, String> {
-    if managed == Some(false) {
-        return Err("embedded runtime is managed-only; managed=false is not supported".to_string());
-    }
-    if clean_arg(reticulumd).is_some() {
-        return Err("embedded runtime does not support --reticulumd override".to_string());
-    }
-
-    let selector = RuntimeSelector::load(profile, rpc)?;
-    let transport = clean_arg(transport).or_else(default_transport);
-    actor.request(ActorCommand::Start {
-        selector,
-        transport,
-    })
-}
-
-#[tauri::command]
-pub(crate) fn daemon_stop(
-    actor: State<'_, RuntimeActor>,
-    profile: Option<String>,
-    rpc: Option<String>,
-) -> Result<Value, String> {
-    let selector = RuntimeSelector::load(profile, rpc)?;
-    actor.request(ActorCommand::Stop { selector })
-}
-
-#[tauri::command]
-pub(crate) fn daemon_restart(
-    actor: State<'_, RuntimeActor>,
-    profile: Option<String>,
-    rpc: Option<String>,
-    managed: Option<bool>,
-    reticulumd: Option<String>,
-    transport: Option<String>,
-) -> Result<Value, String> {
-    if managed == Some(false) {
-        return Err("embedded runtime is managed-only; managed=false is not supported".to_string());
-    }
-    if clean_arg(reticulumd).is_some() {
-        return Err("embedded runtime does not support --reticulumd override".to_string());
-    }
-
-    let selector = RuntimeSelector::load(profile, rpc)?;
-    let transport = clean_arg(transport).or_else(default_transport);
-    actor.request(ActorCommand::Restart {
-        selector,
-        transport,
-    })
-}
 
 #[tauri::command]
 pub(crate) fn lxmf_list_messages(
@@ -1533,7 +1456,7 @@ mod tests {
         .expect("build fields")
         .expect("some fields");
 
-        let decoded = lxmf::payload_fields::decode_transport_fields_json(&fields)
+        let decoded = lxmf_adapter::payload_fields::decode_transport_fields_json(&fields)
             .expect("decode transport")
             .expect("msgpack map");
         let map = decoded.as_map().expect("map");
@@ -1601,7 +1524,7 @@ mod tests {
         .expect("merge fields")
         .expect("merged fields");
 
-        let decoded = lxmf::payload_fields::decode_transport_fields_json(&merged)
+        let decoded = lxmf_adapter::payload_fields::decode_transport_fields_json(&merged)
             .expect("decode transport")
             .expect("msgpack map");
         let map = decoded.as_map().expect("map");

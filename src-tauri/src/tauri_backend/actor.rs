@@ -1,9 +1,9 @@
 use super::selector::RuntimeSelector;
-use lxmf::cli::daemon::DaemonStatus;
-use lxmf::cli::daemon::DaemonSupervisor;
-use lxmf::cli::profile::{load_reticulum_config, profile_paths, ProfileSettings};
-use lxmf::payload_fields::CommandEntry;
-use lxmf::runtime::{
+use lxmf_adapter::cli::daemon::DaemonStatus;
+use lxmf_adapter::cli::daemon::DaemonSupervisor;
+use lxmf_adapter::cli::profile::{load_reticulum_config, profile_paths, ProfileSettings};
+use lxmf_adapter::payload_fields::CommandEntry;
+use lxmf_adapter::runtime::{
     self, EventsProbeReport, RpcProbeReport, RuntimeConfig, RuntimeHandle, RuntimeProbeReport,
     SendCommandRequest, SendMessageRequest,
 };
@@ -432,9 +432,9 @@ fn to_json_value<T: Serialize>(value: &T) -> Result<Value, String> {
 mod tests {
     use super::{ActorCommand, RuntimeActor};
     use crate::tauri_backend::selector::RuntimeSelector;
-    use lxmf::cli::profile::init_profile;
-    use lxmf::payload_fields::CommandEntry;
-    use lxmf::runtime::{SendCommandRequest, SendMessageRequest};
+    use lxmf_adapter::cli::profile::init_profile;
+    use lxmf_adapter::payload_fields::CommandEntry;
+    use lxmf_adapter::runtime::{SendCommandRequest, SendMessageRequest};
     use serde_json::json;
 
     #[test]

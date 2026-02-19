@@ -2,6 +2,7 @@ mod actor;
 mod attachment_handles;
 mod commands;
 mod index_store;
+mod ipc_v2;
 mod selector;
 
 use actor::{ActorCommand, RuntimeActor};
@@ -686,11 +687,16 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            commands::daemon_probe,
-            commands::daemon_status,
-            commands::daemon_start,
-            commands::daemon_stop,
-            commands::daemon_restart,
+            commands::daemon::daemon_probe,
+            commands::daemon::daemon_status,
+            commands::daemon::daemon_start,
+            commands::daemon::daemon_stop,
+            commands::daemon::daemon_restart,
+            commands::daemon::v2_daemon_probe,
+            commands::daemon::v2_daemon_status,
+            commands::daemon::v2_daemon_start,
+            commands::daemon::v2_daemon_stop,
+            commands::daemon::v2_daemon_restart,
             commands::indexing::lxmf_index_status,
             commands::indexing::get_runtime_metrics,
             commands::indexing::lxmf_query_threads,

@@ -1,4 +1,4 @@
-use lxmf::cli::profile::{
+use lxmf_adapter::cli::profile::{
     init_profile, load_profile_settings, resolve_runtime_profile_name, selected_profile_name,
     ProfileSettings,
 };
