@@ -505,9 +505,11 @@ fn spawn_index_backfill(
     selector: RuntimeSelector,
 ) {
     std::thread::spawn(move || {
-        if let Err(err) =
-            commands::reindex_index_store_from_runtime(&actor, index_store.as_ref(), selector)
-        {
+        if let Err(err) = commands::indexing::reindex_index_store_from_runtime(
+            &actor,
+            index_store.as_ref(),
+            selector,
+        ) {
             log::debug!("index backfill skipped: {err}");
         } else if let Ok(status) = index_store.index_status() {
             let freshness_ms = status
@@ -642,20 +644,20 @@ pub fn run() {
             commands::daemon_start,
             commands::daemon_stop,
             commands::daemon_restart,
-            commands::lxmf_index_status,
-            commands::get_runtime_metrics,
-            commands::lxmf_query_threads,
-            commands::query_threads_page,
-            commands::lxmf_query_thread_messages,
-            commands::query_thread_messages_page,
-            commands::lxmf_search_messages,
-            commands::lxmf_query_files,
-            commands::query_files_page,
-            commands::lxmf_query_map_points,
-            commands::lxmf_get_attachment_blob,
-            commands::get_attachment_bytes,
-            commands::lxmf_force_reindex,
-            commands::rebuild_thread_summaries,
+            commands::indexing::lxmf_index_status,
+            commands::indexing::get_runtime_metrics,
+            commands::indexing::lxmf_query_threads,
+            commands::indexing::query_threads_page,
+            commands::indexing::lxmf_query_thread_messages,
+            commands::indexing::query_thread_messages_page,
+            commands::indexing::lxmf_search_messages,
+            commands::indexing::lxmf_query_files,
+            commands::indexing::query_files_page,
+            commands::indexing::lxmf_query_map_points,
+            commands::indexing::lxmf_get_attachment_blob,
+            commands::indexing::get_attachment_bytes,
+            commands::indexing::lxmf_force_reindex,
+            commands::indexing::rebuild_thread_summaries,
             commands::lxmf_list_messages,
             commands::lxmf_list_peers,
             commands::lxmf_list_interfaces,
