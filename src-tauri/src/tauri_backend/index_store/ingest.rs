@@ -10,7 +10,7 @@ impl IndexStore {
     ) -> Result<(), String> {
         let messages = parse_message_list(messages_payload)?;
         let peers = parse_peer_list(peers_payload);
-        self.ingest_messages_and_peers(&messages, &peers)
+        self.ingest_messages_and_peers(messages, &peers)
     }
 
     pub(crate) fn ingest_event_payload(&self, event_payload: &Value) -> Result<(), String> {

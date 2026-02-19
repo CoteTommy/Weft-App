@@ -577,6 +577,7 @@ pub(crate) fn lxmf_start_event_pump(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn lxmf_set_event_pump_policy(
     app: AppHandle,
     actor: State<'_, RuntimeActor>,
