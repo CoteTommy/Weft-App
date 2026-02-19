@@ -11,6 +11,7 @@ export type UseChatRuntimeEventPumpParams = {
   applyReceiptEvent: (event: LxmfRpcEvent) => void
   scheduleRefresh: () => void
   getLastRefreshAt: () => number
+  enabled?: boolean
 }
 
 export function useChatRuntimeEventPump({
@@ -18,6 +19,7 @@ export function useChatRuntimeEventPump({
   applyReceiptEvent,
   scheduleRefresh,
   getLastRefreshAt,
+  enabled = true,
 }: UseChatRuntimeEventPumpParams) {
   const { subscribe, getLastEventAtMs } = useLxmfEventHub()
   const lastEventAtRef = useRef(0)
@@ -58,6 +60,10 @@ export function useChatRuntimeEventPump({
 
   const enqueueRuntimeEvent = useCallback(
     (event: LxmfRpcEvent) => {
+      if (!enabled || document.visibilityState !== 'visible') {
+        scheduleRefresh()
+        return
+      }
       lastEventAtRef.current = Date.now()
       pendingEventsRef.current.push(event)
       if (eventBatchTimerRef.current !== null) {
@@ -67,10 +73,13 @@ export function useChatRuntimeEventPump({
         flushEventBatch()
       }, CHAT_EVENT_BATCH_MS)
     },
-    [flushEventBatch]
+    [enabled, flushEventBatch, scheduleRefresh]
   )
 
   useEffect(() => {
+    if (!enabled) {
+      return
+    }
     const unlisten = subscribe(event => {
       enqueueRuntimeEvent(event)
     })
@@ -78,21 +87,53 @@ export function useChatRuntimeEventPump({
     return () => {
       unlisten()
     }
-  }, [enqueueRuntimeEvent, subscribe])
+  }, [enabled, enqueueRuntimeEvent, subscribe])
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
+    if (!enabled) {
+      return
+    }
+    let timerId: number | null = null
+    let intervalMs = CHAT_WATCHDOG_INTERVAL_MS
+    let disposed = false
+
+    const scheduleTick = () => {
+      if (disposed) {
+        return
+      }
+      timerId = window.setTimeout(runTick, intervalMs)
+    }
+
+    const runTick = () => {
+      if (disposed) {
+        return
+      }
+      if (document.visibilityState !== 'visible') {
+        intervalMs = Math.min(intervalMs * 2, 60_000)
+        scheduleTick()
+        return
+      }
       const now = Date.now()
       const freshestAt = Math.max(lastEventAtRef.current, getLastEventAtMs(), getLastRefreshAt())
       const staleMs = freshestAt === 0 ? Number.POSITIVE_INFINITY : now - freshestAt
       if (staleMs >= CHAT_WATCHDOG_STALE_MS) {
         scheduleRefresh()
+        intervalMs = CHAT_WATCHDOG_INTERVAL_MS
+      } else {
+        intervalMs = Math.min(intervalMs + 5_000, 30_000)
       }
-    }, CHAT_WATCHDOG_INTERVAL_MS)
-    return () => {
-      window.clearInterval(intervalId)
+      scheduleTick()
     }
-  }, [getLastEventAtMs, getLastRefreshAt, scheduleRefresh])
+
+    scheduleTick()
+
+    return () => {
+      disposed = true
+      if (timerId !== null) {
+        window.clearTimeout(timerId)
+      }
+    }
+  }, [enabled, getLastEventAtMs, getLastRefreshAt, scheduleRefresh])
 
   useEffect(() => {
     return () => {

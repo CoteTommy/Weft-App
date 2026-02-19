@@ -4,7 +4,7 @@ import { lxmfQueryMapPoints, sendLxmfMessage } from '@lib/lxmf-api'
 export type { MapPoint }
 
 export async function fetchMapPoints(): Promise<MapPoint[]> {
-  const response = await lxmfQueryMapPoints({}, { limit: 1500 })
+  const response = await lxmfQueryMapPoints({}, { limit: 500 })
   return response.items.map(item => ({
     id: item.id,
     label: item.label,

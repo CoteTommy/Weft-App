@@ -8,14 +8,15 @@ import {
   useRef,
   useSyncExternalStore,
 } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 
+import { APP_ROUTES } from '@app/config/routes'
 import type { ChatThread, OutboundMessageDraft, OutboundSendOutcome } from '@shared/types/chat'
 
 import { useChatEvents } from '../hooks/useChatEvents'
 import { useChatStore } from '../hooks/useChatStore'
 import { useOfflineQueue } from '../hooks/useOfflineQueue'
-import { type ChatsState, type IncomingNotificationItem } from '../types'
+import { type ChatsState } from '../types'
 import type { OfflineQueueEntry } from './offlineQueue'
 
 interface ChatsSnapshot {
@@ -38,6 +39,8 @@ interface ChatsActions {
   createThread: (destination: string, name?: string) => string | null
   setThreadPinned: (threadId: string, pinned?: boolean) => void
   setThreadMuted: (threadId: string, muted?: boolean) => void
+  selectThread: (threadId?: string) => void
+  loadMoreThreadMessages: (threadId: string) => Promise<void>
 }
 
 interface ChatsStoreContextValue {
@@ -56,24 +59,26 @@ const EMPTY_SNAPSHOT: ChatsSnapshot = {
 }
 
 export function ChatsProvider({ children }: PropsWithChildren) {
-  const notifyIncomingRef = useRef<(items: IncomingNotificationItem[]) => Promise<void>>(
-    async () => {}
-  )
+  const location = useLocation()
+  const runtimeEnabled = location.pathname.startsWith(APP_ROUTES.chats)
   const sendFailureRef = useRef<(params: SendFailureParams) => void>(() => {})
   const subscribersRef = useRef<Set<() => void>>(new Set())
   const snapshotRef = useRef<ChatsSnapshot>(EMPTY_SNAPSHOT)
 
   const store = useChatStore({
-    onIncomingNotifications: items => notifyIncomingRef.current(items),
     onSendFailure: params => sendFailureRef.current(params),
+    runtimeEnabled,
   })
-  const events = useChatEvents(store.runtime)
-  const queue = useOfflineQueue({ threads: store.threads, refresh: store.refresh })
+  useChatEvents(store.runtime)
+  const queue = useOfflineQueue({
+    threads: store.threads,
+    refresh: store.refresh,
+    runtimeEnabled,
+  })
 
   useEffect(() => {
-    notifyIncomingRef.current = events.notifyIncoming
     sendFailureRef.current = queue.enqueueSendFailure
-  }, [events.notifyIncoming, queue.enqueueSendFailure])
+  }, [queue.enqueueSendFailure])
 
   const snapshot = useMemo<ChatsSnapshot>(
     () => ({
@@ -106,6 +111,8 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       createThread: store.createThread,
       setThreadPinned: store.setThreadPinned,
       setThreadMuted: store.setThreadMuted,
+      selectThread: store.selectThread,
+      loadMoreThreadMessages: store.loadMoreThreadMessages,
     }),
     [
       queue.clearQueue,
@@ -118,8 +125,10 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       store.markThreadRead,
       store.refresh,
       store.sendMessage,
+      store.selectThread,
       store.setThreadMuted,
       store.setThreadPinned,
+      store.loadMoreThreadMessages,
     ]
   )
 
@@ -198,6 +207,8 @@ export function useChatsState(): ChatsState {
     createThread: actions.createThread,
     setThreadPinned: actions.setThreadPinned,
     setThreadMuted: actions.setThreadMuted,
+    selectThread: actions.selectThread,
+    loadMoreThreadMessages: actions.loadMoreThreadMessages,
   }
 }
 

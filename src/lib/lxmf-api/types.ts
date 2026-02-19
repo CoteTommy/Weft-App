@@ -243,8 +243,11 @@ export type LxmfIndexedFileItem = {
   name: string
   kind: string
   sizeLabel: string
+  sizeBytes: number
+  createdAtMs: number
   owner: string
   mime?: string
+  hasInlineData: boolean
   dataBase64?: string
   paperUri?: string
   paperTitle?: string
@@ -275,4 +278,19 @@ export type LxmfAttachmentBlobResponse = {
   mime: string | null
   sizeBytes: number
   dataBase64: string
+}
+
+export type LxmfAttachmentBytesResponse = {
+  attachmentId: string
+  mime: string | null
+  sizeBytes: number
+  dataBase64: string
+}
+
+export type LxmfRuntimeMetrics = {
+  rssBytes: number | null
+  dbSizeBytes: number
+  queueSize: number
+  messageCount: number
+  threadCount: number
 }

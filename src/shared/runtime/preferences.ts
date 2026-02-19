@@ -4,6 +4,7 @@ import { readStoredJson, type StorageWriteResult, writeStoredJson } from '@share
 
 export type ConnectivityMode = 'automatic' | 'local_only' | 'lan_shared' | 'custom'
 export type MotionPreference = 'smooth' | 'snappy' | 'off'
+export type AttachmentPreviewMode = 'on_demand' | 'eager'
 
 export interface WeftPreferences {
   onboardingCompleted: boolean
@@ -20,6 +21,9 @@ export interface WeftPreferences {
   notificationSoundEnabled: boolean
   motionPreference: MotionPreference
   performanceHudEnabled: boolean
+  threadPageSize: number
+  messagePageSize: number
+  attachmentPreviewMode: AttachmentPreviewMode
   commandCenterEnabled: boolean
   lastMainRoute?: string
   pendingRoute?: string
@@ -42,6 +46,9 @@ const DEFAULT_PREFERENCES: WeftPreferences = {
   notificationSoundEnabled: false,
   motionPreference: 'snappy',
   performanceHudEnabled: false,
+  threadPageSize: 120,
+  messagePageSize: 80,
+  attachmentPreviewMode: 'on_demand',
   commandCenterEnabled: false,
   lastMainRoute: DEFAULT_MAIN_ROUTE,
 }
@@ -89,6 +96,19 @@ export function getRuntimeConnectionOptions(): { profile?: string; rpc?: string 
 
 export function getRuntimeTransportOption(): string | undefined {
   return normalizeOptional(getWeftPreferences().transport)
+}
+
+export function getDataLoadingProfile(): {
+  threadPageSize: number
+  messagePageSize: number
+  attachmentPreviewMode: AttachmentPreviewMode
+} {
+  const preferences = getWeftPreferences()
+  return {
+    threadPageSize: preferences.threadPageSize,
+    messagePageSize: preferences.messagePageSize,
+    attachmentPreviewMode: preferences.attachmentPreviewMode,
+  }
 }
 
 export function setPendingLaunchRoute(route: string): void {
@@ -168,6 +188,15 @@ function sanitizePreferences(value: Partial<WeftPreferences>): Partial<WeftPrefe
   if ('performanceHudEnabled' in value) {
     out.performanceHudEnabled = parseBoolean(value.performanceHudEnabled, false)
   }
+  if ('threadPageSize' in value) {
+    out.threadPageSize = parsePageSize(value.threadPageSize, 120)
+  }
+  if ('messagePageSize' in value) {
+    out.messagePageSize = parsePageSize(value.messagePageSize, 80)
+  }
+  if ('attachmentPreviewMode' in value) {
+    out.attachmentPreviewMode = parseAttachmentPreviewMode(value.attachmentPreviewMode)
+  }
   if ('commandCenterEnabled' in value) {
     out.commandCenterEnabled = parseBoolean(value.commandCenterEnabled, false)
   }
@@ -197,6 +226,27 @@ function parseMotionPreference(value: unknown): MotionPreference {
     return value
   }
   return 'snappy'
+}
+
+function parseAttachmentPreviewMode(value: unknown): AttachmentPreviewMode {
+  if (value === 'on_demand' || value === 'eager') {
+    return value
+  }
+  return 'on_demand'
+}
+
+function parsePageSize(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback
+  }
+  const normalized = Math.trunc(value)
+  if (normalized < 20) {
+    return 20
+  }
+  if (normalized > 300) {
+    return 300
+  }
+  return normalized
 }
 
 function normalizeOptional(value: unknown): string | undefined {

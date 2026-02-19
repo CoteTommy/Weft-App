@@ -19,10 +19,20 @@ import { filterThreadIndex, indexThreads } from '../utils/filterThreads'
 
 export function ChatThreadPage() {
   const { chatId } = useParams()
-  const { threads, loading, error, sendMessage, markThreadRead, setThreadMuted, setThreadPinned } =
-    useChatsState()
+  const {
+    threads,
+    loading,
+    error,
+    sendMessage,
+    markThreadRead,
+    setThreadMuted,
+    setThreadPinned,
+    selectThread,
+    loadMoreThreadMessages,
+  } = useChatsState()
   const [threadQuery, setThreadQuery] = useState('')
   const [messageQuery, setMessageQuery] = useState('')
+  const [loadingMore, setLoadingMore] = useState(false)
   const [composerFocusToken, setComposerFocusToken] = useState(0)
   const messageSearchInputRef = useRef<HTMLInputElement | null>(null)
   const deferredThreadQuery = useDeferredValue(threadQuery)
@@ -49,6 +59,10 @@ export function ChatThreadPage() {
       ])
     )
   }, [deferredMessageQuery, thread])
+
+  useEffect(() => {
+    selectThread(chatId)
+  }, [chatId, selectThread])
 
   useEffect(() => {
     if (thread && thread.unread > 0) {
@@ -158,6 +172,28 @@ export function ChatThreadPage() {
             {error ? (
               <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
             ) : null}
+            <div className="mb-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!thread) {
+                    return
+                  }
+                  void (async () => {
+                    try {
+                      setLoadingMore(true)
+                      await loadMoreThreadMessages(thread.id)
+                    } finally {
+                      setLoadingMore(false)
+                    }
+                  })()
+                }}
+                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                disabled={loadingMore}
+              >
+                {loadingMore ? 'Loading…' : 'Load older messages'}
+              </button>
+            </div>
             <div className="mb-4 min-h-0 flex-1 pr-1">
               {thread.messages.length > 0 && filteredMessages.length === 0 ? (
                 <p className="text-sm text-slate-500">No messages match your search.</p>

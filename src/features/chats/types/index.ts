@@ -19,6 +19,8 @@ export interface ChatsState {
   createThread: (destination: string, name?: string) => string | null
   setThreadPinned: (threadId: string, pinned?: boolean) => void
   setThreadMuted: (threadId: string, muted?: boolean) => void
+  selectThread: (threadId?: string) => void
+  loadMoreThreadMessages: (threadId: string) => Promise<void>
 }
 
 export const CHAT_EVENT_BATCH_MS = 80

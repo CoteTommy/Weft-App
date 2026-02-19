@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-
-import clsx from 'clsx'
+import { useNavigate } from 'react-router-dom'
 
 import { APP_ROUTES } from '@app/config/routes'
-import type { ConnectivityMode, MotionPreference } from '@shared/runtime/preferences'
+import type {
+  AttachmentPreviewMode,
+  ConnectivityMode,
+  MotionPreference,
+} from '@shared/runtime/preferences'
 import type { SettingsSnapshot } from '@shared/types/settings'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
@@ -14,13 +16,13 @@ import { InteropHealthCard } from '../components/InteropHealthCard'
 import { NotificationToggle } from '../components/NotificationToggle'
 import { OutboundPropagationRelayCard } from '../components/OutboundPropagationRelayCard'
 import { SettingsRow } from '../components/SettingsRow'
-import {
-  CONNECTIVITY_OPTIONS,
-  DEFAULT_NOTIFICATION_SETTINGS,
-  SETTINGS_SECTIONS,
-} from '../constants'
+import { CONNECTIVITY_OPTIONS, DEFAULT_NOTIFICATION_SETTINGS } from '../constants'
 import { useSettings } from '../hooks/useSettings'
+import { useSettingsSectionNavigation } from '../hooks/useSettingsSectionNavigation'
+import { SettingsSectionTabs } from '../sections/SettingsSectionTabs'
 import {
+  refreshRuntimeMetrics,
+  runSettingsMaintenance,
   saveConnectivitySettings,
   saveDesktopShellSettings,
   saveDisplayName,
@@ -30,11 +32,11 @@ import {
   savePerformanceSettings,
 } from '../services/settingsService'
 import type { BackupPayload, SettingsConfigPayload } from '../types'
-import { buildConfigPayload, mergeNotificationSettings, parseSettingsSection } from '../utils'
+import { buildConfigPayload, mergeNotificationSettings } from '../utils'
 
 export function SettingsPage() {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const { activeSection, selectSection } = useSettingsSectionNavigation()
   const { settings, loading, error, refresh } = useSettings()
   const [displayNameDraft, setDisplayNameDraft] = useState('')
   const [savingName, setSavingName] = useState(false)
@@ -52,6 +54,12 @@ export function SettingsPage() {
   >(DEFAULT_NOTIFICATION_SETTINGS)
   const [motionPreference, setMotionPreference] = useState<MotionPreference>('snappy')
   const [performanceHudEnabled, setPerformanceHudEnabled] = useState(false)
+  const [threadPageSize, setThreadPageSize] = useState(120)
+  const [messagePageSize, setMessagePageSize] = useState(80)
+  const [attachmentPreviewMode, setAttachmentPreviewMode] =
+    useState<AttachmentPreviewMode>('on_demand')
+  const [runtimeMetrics, setRuntimeMetrics] =
+    useState<SettingsSnapshot['performance']['runtimeMetrics']>(undefined)
   const [minimizeToTrayOnClose, setMinimizeToTrayOnClose] = useState(true)
   const [startInTray, setStartInTray] = useState(false)
   const [singleInstanceFocus, setSingleInstanceFocus] = useState(true)
@@ -60,6 +68,7 @@ export function SettingsPage() {
   const [configPayload, setConfigPayload] = useState('')
   const [backupWorking, setBackupWorking] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
+  const jsHeapBytes = readJsHeapBytes()
 
   useEffect(() => {
     if (!settings) {
@@ -75,6 +84,10 @@ export function SettingsPage() {
     setNotificationSettings(settings.notifications)
     setMotionPreference(settings.performance.motionPreference)
     setPerformanceHudEnabled(settings.performance.hudEnabled)
+    setThreadPageSize(settings.performance.threadPageSize)
+    setMessagePageSize(settings.performance.messagePageSize)
+    setAttachmentPreviewMode(settings.performance.attachmentPreviewMode)
+    setRuntimeMetrics(settings.performance.runtimeMetrics)
     setMinimizeToTrayOnClose(settings.desktop.minimizeToTrayOnClose)
     setStartInTray(settings.desktop.startInTray)
     setSingleInstanceFocus(settings.desktop.singleInstanceFocus)
@@ -113,10 +126,16 @@ export function SettingsPage() {
     const next = {
       motionPreference,
       hudEnabled: performanceHudEnabled,
+      threadPageSize,
+      messagePageSize,
+      attachmentPreviewMode,
       ...patch,
     }
     setMotionPreference(next.motionPreference)
     setPerformanceHudEnabled(next.hudEnabled)
+    setThreadPageSize(next.threadPageSize)
+    setMessagePageSize(next.messagePageSize)
+    setAttachmentPreviewMode(next.attachmentPreviewMode)
     savePerformanceSettings(next)
     setSaveFeedback(feedback)
   }
@@ -156,8 +175,6 @@ export function SettingsPage() {
       })
   }
 
-  const activeSection = parseSettingsSection(searchParams.get('section'))
-
   return (
     <Panel className="flex h-full min-h-0 flex-col overflow-hidden">
       <PageHeading
@@ -182,29 +199,7 @@ export function SettingsPage() {
 
         {settings ? (
           <>
-            <div className="sticky top-0 z-20 mb-3 rounded-xl border border-slate-200 bg-white/95 p-2 backdrop-blur">
-              <div className="flex flex-wrap gap-2">
-                {SETTINGS_SECTIONS.map(section => (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => {
-                      const next = new URLSearchParams(searchParams)
-                      next.set('section', section.id)
-                      setSearchParams(next, { replace: true })
-                    }}
-                    className={clsx(
-                      'rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
-                      activeSection === section.id
-                        ? 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                    )}
-                  >
-                    {section.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <SettingsSectionTabs activeSection={activeSection} onSelect={selectSection} />
 
             {saveFeedback ? (
               <p className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
@@ -576,6 +571,15 @@ export function SettingsPage() {
                                 if (typeof parsed.performance.hudEnabled === 'boolean') {
                                   setPerformanceHudEnabled(parsed.performance.hudEnabled)
                                 }
+                                if (typeof parsed.performance.threadPageSize === 'number') {
+                                  setThreadPageSize(parsed.performance.threadPageSize)
+                                }
+                                if (typeof parsed.performance.messagePageSize === 'number') {
+                                  setMessagePageSize(parsed.performance.messagePageSize)
+                                }
+                                if (parsed.performance.attachmentPreviewMode) {
+                                  setAttachmentPreviewMode(parsed.performance.attachmentPreviewMode)
+                                }
                               }
                               if (parsed.desktop) {
                                 const savedDesktop = await saveDesktopShellSettings(parsed.desktop)
@@ -633,6 +637,9 @@ export function SettingsPage() {
                             performance: {
                               motionPreference,
                               hudEnabled: performanceHudEnabled,
+                              threadPageSize,
+                              messagePageSize,
+                              attachmentPreviewMode,
                             },
                             desktop: {
                               minimizeToTrayOnClose,
@@ -708,6 +715,17 @@ export function SettingsPage() {
                                   if (typeof parsed.performance.hudEnabled === 'boolean') {
                                     setPerformanceHudEnabled(parsed.performance.hudEnabled)
                                   }
+                                  if (typeof parsed.performance.threadPageSize === 'number') {
+                                    setThreadPageSize(parsed.performance.threadPageSize)
+                                  }
+                                  if (typeof parsed.performance.messagePageSize === 'number') {
+                                    setMessagePageSize(parsed.performance.messagePageSize)
+                                  }
+                                  if (parsed.performance.attachmentPreviewMode) {
+                                    setAttachmentPreviewMode(
+                                      parsed.performance.attachmentPreviewMode
+                                    )
+                                  }
                                 }
                                 if (parsed.desktop) {
                                   const savedDesktop = await saveDesktopShellSettings(
@@ -750,9 +768,7 @@ export function SettingsPage() {
                   <InteropHealthCard
                     interop={settings.interop}
                     onOpenConnectivity={() => {
-                      const next = new URLSearchParams(searchParams)
-                      next.set('section', 'connectivity')
-                      setSearchParams(next, { replace: true })
+                      selectSection('connectivity')
                     }}
                     onOpenChats={() => {
                       void navigate(APP_ROUTES.chats)
@@ -881,6 +897,160 @@ export function SettingsPage() {
                         />
                         Show FPS HUD
                       </label>
+                      <label className="text-xs text-slate-600">
+                        Thread page size
+                        <select
+                          value={String(threadPageSize)}
+                          onChange={event => {
+                            const next = Number.parseInt(event.target.value, 10)
+                            updatePerformance(
+                              { threadPageSize: Number.isFinite(next) ? next : 120 },
+                              'Thread page size updated.'
+                            )
+                          }}
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
+                        >
+                          <option value="80">80</option>
+                          <option value="120">120</option>
+                          <option value="180">180</option>
+                          <option value="240">240</option>
+                        </select>
+                      </label>
+                      <label className="text-xs text-slate-600">
+                        Message page size
+                        <select
+                          value={String(messagePageSize)}
+                          onChange={event => {
+                            const next = Number.parseInt(event.target.value, 10)
+                            updatePerformance(
+                              { messagePageSize: Number.isFinite(next) ? next : 80 },
+                              'Message page size updated.'
+                            )
+                          }}
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
+                        >
+                          <option value="50">50</option>
+                          <option value="80">80</option>
+                          <option value="120">120</option>
+                          <option value="160">160</option>
+                        </select>
+                      </label>
+                      <label className="text-xs text-slate-600 sm:col-span-2">
+                        Attachment preview mode
+                        <select
+                          value={attachmentPreviewMode}
+                          onChange={event => {
+                            const next = event.target.value as AttachmentPreviewMode
+                            updatePerformance(
+                              { attachmentPreviewMode: next },
+                              `Attachment preview mode set to ${next.replace('_', ' ')}.`
+                            )
+                          }}
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 transition outline-none focus:border-blue-300"
+                        >
+                          <option value="on_demand">On demand</option>
+                          <option value="eager">Eager</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void refreshRuntimeMetrics()
+                            .then(metrics => {
+                              setRuntimeMetrics(metrics)
+                              setSaveFeedback('Runtime metrics refreshed.')
+                            })
+                            .catch(runtimeError => {
+                              setSaveFeedback(
+                                runtimeError instanceof Error
+                                  ? runtimeError.message
+                                  : String(runtimeError)
+                              )
+                            })
+                        }}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Refresh runtime metrics
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const diagnostics = buildPerformanceDiagnostics({
+                            runtimeMetrics,
+                            jsHeapBytes,
+                            threadPageSize,
+                            messagePageSize,
+                            attachmentPreviewMode,
+                          })
+                          void navigator.clipboard
+                            .writeText(diagnostics)
+                            .then(() => {
+                              setSaveFeedback('Diagnostics copied to clipboard.')
+                            })
+                            .catch(copyError => {
+                              setSaveFeedback(
+                                copyError instanceof Error ? copyError.message : String(copyError)
+                              )
+                            })
+                        }}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Copy diagnostics
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void runSettingsMaintenance({
+                            action: 'clear_attachment_cache',
+                          })
+                            .then(result => {
+                              setSaveFeedback(result.detail)
+                            })
+                            .catch(maintenanceError => {
+                              setSaveFeedback(
+                                maintenanceError instanceof Error
+                                  ? maintenanceError.message
+                                  : String(maintenanceError)
+                              )
+                            })
+                        }}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Clear attachment cache
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void runSettingsMaintenance({
+                            action: 'rebuild_thread_summaries',
+                          })
+                            .then(result => {
+                              setSaveFeedback(result.detail)
+                            })
+                            .catch(maintenanceError => {
+                              setSaveFeedback(
+                                maintenanceError instanceof Error
+                                  ? maintenanceError.message
+                                  : String(maintenanceError)
+                              )
+                            })
+                        }}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Rebuild thread summaries
+                      </button>
+                    </div>
+                    <div className="mt-3 grid gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:grid-cols-2">
+                      <p>RSS: {formatBytes(runtimeMetrics?.rssBytes ?? 0)}</p>
+                      <p>JS heap: {formatBytes(jsHeapBytes ?? 0)}</p>
+                      <p>Index DB: {formatBytes(runtimeMetrics?.dbSizeBytes ?? 0)}</p>
+                      <p>Queue size: {runtimeMetrics?.queueSize ?? 0}</p>
+                      <p>
+                        Indexed rows: {runtimeMetrics?.threadCount ?? 0} threads /{' '}
+                        {runtimeMetrics?.messageCount ?? 0} messages
+                      </p>
                     </div>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-white p-3">
@@ -908,5 +1078,68 @@ export function SettingsPage() {
         ) : null}
       </div>
     </Panel>
+  )
+}
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) {
+    return '—'
+  }
+  if (value < 1024) {
+    return `${value} B`
+  }
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`
+  }
+  if (value < 1024 * 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`
+  }
+  return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+function readJsHeapBytes(): number | undefined {
+  if (typeof performance === 'undefined') {
+    return undefined
+  }
+  const memoryValue = (
+    performance as Performance & {
+      memory?: { usedJSHeapSize?: number }
+    }
+  ).memory?.usedJSHeapSize
+  return typeof memoryValue === 'number' && Number.isFinite(memoryValue) ? memoryValue : undefined
+}
+
+function buildPerformanceDiagnostics({
+  runtimeMetrics,
+  jsHeapBytes,
+  threadPageSize,
+  messagePageSize,
+  attachmentPreviewMode,
+}: {
+  runtimeMetrics: SettingsSnapshot['performance']['runtimeMetrics']
+  jsHeapBytes: number | undefined
+  threadPageSize: number
+  messagePageSize: number
+  attachmentPreviewMode: AttachmentPreviewMode
+}): string {
+  return JSON.stringify(
+    {
+      generatedAt: new Date().toISOString(),
+      runtimeMetrics: {
+        rssBytes: runtimeMetrics?.rssBytes ?? null,
+        jsHeapBytes: jsHeapBytes ?? null,
+        dbSizeBytes: runtimeMetrics?.dbSizeBytes ?? null,
+        queueSize: runtimeMetrics?.queueSize ?? null,
+        threadCount: runtimeMetrics?.threadCount ?? null,
+        messageCount: runtimeMetrics?.messageCount ?? null,
+      },
+      loadingProfile: {
+        threadPageSize,
+        messagePageSize,
+        attachmentPreviewMode,
+      },
+    },
+    null,
+    2
   )
 }
