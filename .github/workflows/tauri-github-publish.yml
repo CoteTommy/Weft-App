@@ -1,4 +1,4 @@
-name: 'publish'
+name: publish
 
 on:
   workflow_dispatch:
@@ -11,19 +11,19 @@ env:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   publish-tauri:
-    permissions:
-      contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # Arm based macs (M1 and above).
+          - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
             artifact: 'macos-aarch64'
-          - platform: 'macos-latest' # Intel based macs.
+          - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
             artifact: 'macos-x64'
           - platform: 'ubuntu-22.04'
@@ -62,16 +62,12 @@ jobs:
       - name: setup bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Checkout LXMF-rs (workspace dependency)
-        run: git clone --depth 1 https://github.com/FreeTAKTeam/LXMF-rs.git ../LXMF-rs
-
-      - name: Checkout Reticulum-rs (workspace patch dependency)
-        run: git clone --depth 1 https://github.com/FreeTAKTeam/Reticulum-rs.git ../Reticulum-rs
-
       - name: cache bun dependencies
         uses: actions/cache@v4
         with:
-          path: node_modules
+          path: |
+            node_modules
+            ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-
@@ -101,6 +97,22 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      - name: Generate SBOM
+        if: always()
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom-${{ matrix.artifact }}.spdx.json
+
+      - name: attest build provenance
+        if: always()
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            src-tauri/target/**/release/bundle/**
+            sbom-${{ matrix.artifact }}.spdx.json
+
       - name: upload workflow artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -108,5 +120,6 @@ jobs:
           name: weft-desktop-${{ matrix.artifact }}
           path: |
             src-tauri/target/**/release/bundle/**
+            sbom-${{ matrix.artifact }}.spdx.json
           if-no-files-found: warn
           retention-days: 14
