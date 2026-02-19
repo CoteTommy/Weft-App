@@ -1419,7 +1419,6 @@ CREATE TABLE IF NOT EXISTS attachments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_attachments_message_id ON attachments(message_id);
-CREATE INDEX IF NOT EXISTS idx_attachments_created_at ON attachments(created_at_ms DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS threads (
   thread_id TEXT PRIMARY KEY,
