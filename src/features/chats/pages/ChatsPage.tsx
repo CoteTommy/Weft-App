@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { APP_ROUTES } from '@app/config/routes'
@@ -25,6 +25,7 @@ export function ChatsPage() {
     createThread,
     selectThread,
     loadMoreThreads,
+    canLoadMoreThreads,
   } = useChatsState()
   const [query, setQuery] = useState('')
   const [destinationInput, setDestinationInput] = useState('')
@@ -40,6 +41,19 @@ export function ChatsPage() {
   const primaryThread = filteredThreads[0] ?? threads[0]
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const destinationInputRef = useRef<HTMLInputElement | null>(null)
+  const handleLoadMoreThreads = useCallback(() => {
+    if (loadingMoreThreads || !canLoadMoreThreads()) {
+      return
+    }
+    void (async () => {
+      try {
+        setLoadingMoreThreads(true)
+        await loadMoreThreads()
+      } finally {
+        setLoadingMoreThreads(false)
+      }
+    })()
+  }, [canLoadMoreThreads, loadMoreThreads, loadingMoreThreads])
 
   useEffect(() => {
     selectThread(undefined)
@@ -188,6 +202,9 @@ export function ChatsPage() {
                 estimateItemHeight={98}
                 className="min-h-0 flex-1 overflow-y-auto pr-1"
                 listClassName="pb-1"
+                canLoadMore={canLoadMoreThreads()}
+                loadingMore={loadingMoreThreads}
+                onEndReached={handleLoadMoreThreads}
                 getKey={thread => thread.id}
                 renderItem={thread => (
                   <div className="py-1">
@@ -195,25 +212,11 @@ export function ChatsPage() {
                   </div>
                 )}
               />
-              <div className="mt-2 flex justify-end">
-                <button
-                  type="button"
-                  disabled={loadingMoreThreads}
-                  onClick={() => {
-                    void (async () => {
-                      try {
-                        setLoadingMoreThreads(true)
-                        await loadMoreThreads()
-                      } finally {
-                        setLoadingMoreThreads(false)
-                      }
-                    })()
-                  }}
-                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                >
-                  {loadingMoreThreads ? 'Loading…' : 'Load more'}
-                </button>
-              </div>
+              {loadingMoreThreads ? (
+                <p className="mt-2 text-right text-xs font-medium text-slate-500">
+                  Loading more chats…
+                </p>
+              ) : null}
             </div>
           )
         ) : null}

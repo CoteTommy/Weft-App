@@ -22,6 +22,8 @@ export interface ChatsState {
   selectThread: (threadId?: string) => void
   loadMoreThreadMessages: (threadId: string) => Promise<void>
   loadMoreThreads: () => Promise<void>
+  canLoadMoreThreadMessages: (threadId: string) => boolean
+  canLoadMoreThreads: () => boolean
 }
 
 export const CHAT_EVENT_BATCH_MS = 80

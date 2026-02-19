@@ -12,6 +12,9 @@ type VirtualMessageListProps = {
   className?: string
   stickToBottom: boolean
   onStickToBottomChange: (value: boolean) => void
+  canLoadOlder?: boolean
+  loadingOlder?: boolean
+  onReachStart?: () => void
   onStartHold: (message: ChatMessage) => void
   onClearHoldTimer: () => void
   onOpenDetails: (message: ChatMessage) => void
@@ -22,6 +25,9 @@ export function VirtualMessageList({
   className,
   stickToBottom,
   onStickToBottomChange,
+  canLoadOlder = false,
+  loadingOlder = false,
+  onReachStart,
   onStartHold,
   onClearHoldTimer,
   onOpenDetails,
@@ -30,6 +36,12 @@ export function VirtualMessageList({
   const estimatedMessageHeight = 118
   const overscan = 8
   const latestMessageId = messages[messages.length - 1]?.id ?? null
+  const startReachCooldownRef = useRef(0)
+  const prependAnchorRef = useRef<{
+    totalSize: number
+    scrollTop: number
+    itemCount: number
+  } | null>(null)
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
@@ -51,6 +63,23 @@ export function VirtualMessageList({
     virtualizer.scrollToIndex(messages.length - 1, { align: 'end' })
   }, [latestMessageId, messages.length, stickToBottom, virtualizer])
 
+  useLayoutEffect(() => {
+    const anchor = prependAnchorRef.current
+    const node = scrollContainerRef.current
+    if (!anchor || !node) {
+      return
+    }
+    if (messages.length > anchor.itemCount) {
+      const delta = virtualizer.getTotalSize() - anchor.totalSize
+      node.scrollTop = Math.max(anchor.scrollTop + delta, 0)
+      prependAnchorRef.current = null
+      return
+    }
+    if (!loadingOlder) {
+      prependAnchorRef.current = null
+    }
+  }, [loadingOlder, messages.length, virtualizer])
+
   return (
     <div
       ref={setTimelineContainerRef}
@@ -58,6 +87,23 @@ export function VirtualMessageList({
       onScroll={event => {
         const node = event.currentTarget
         onStickToBottomChange(node.scrollHeight - node.clientHeight - node.scrollTop <= 96)
+        if (!onReachStart || !canLoadOlder || loadingOlder) {
+          return
+        }
+        if (node.scrollTop > 120) {
+          return
+        }
+        const now = Date.now()
+        if (now - startReachCooldownRef.current < 600) {
+          return
+        }
+        startReachCooldownRef.current = now
+        prependAnchorRef.current = {
+          totalSize: virtualizer.getTotalSize(),
+          scrollTop: node.scrollTop,
+          itemCount: messages.length,
+        }
+        onReachStart()
       }}
       className={clsx('min-h-0 overflow-y-auto', className)}
     >
