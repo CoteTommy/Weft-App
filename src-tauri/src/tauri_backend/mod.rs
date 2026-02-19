@@ -530,9 +530,7 @@ fn spawn_index_backfill(
             let should_skip = status.message_count > 0
                 && status.thread_count > 0
                 && freshness_ms
-                    .map(|value| {
-                        value >= 0 && value <= INDEX_BACKFILL_FRESHNESS_THRESHOLD_MS
-                    })
+                    .map(|value| value >= 0 && value <= INDEX_BACKFILL_FRESHNESS_THRESHOLD_MS)
                     .unwrap_or(false);
             if should_skip {
                 index_store.mark_ready();

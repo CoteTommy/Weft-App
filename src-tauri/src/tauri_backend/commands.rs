@@ -3,7 +3,9 @@ use super::actor::{
 };
 use super::attachment_handles::AttachmentHandleManager;
 use super::index_store::IndexStore;
-use super::selector::{clean_arg, default_profile, default_rpc, default_transport, RuntimeSelector};
+use super::selector::{
+    clean_arg, default_profile, default_rpc, default_transport, RuntimeSelector,
+};
 use super::{
     current_system_appearance, DesktopShellPreferencePatch, DesktopShellState, EventPumpControl,
     DEFAULT_EVENT_PUMP_INTERVAL_MS, TRAY_ACTION_CHANNEL,

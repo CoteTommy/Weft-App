@@ -710,7 +710,10 @@ impl IndexStore {
             next_cursor = None;
         }
 
-        serde_json::to_value(CursorResult { items: points, next_cursor })
-            .map_err(|err| format!("serialize map query failed: {err}"))
+        serde_json::to_value(CursorResult {
+            items: points,
+            next_cursor,
+        })
+        .map_err(|err| format!("serialize map query failed: {err}"))
     }
 }
