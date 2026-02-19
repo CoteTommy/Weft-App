@@ -146,7 +146,7 @@ export async function listLxmfAnnounces(
     fields.limit = Math.trunc(params.limit)
   }
   if (typeof params.beforeTs === 'number' && Number.isFinite(params.beforeTs)) {
-    fields.before_ts = Math.trunc(params.beforeTs)
+    fields.beforeTs = Math.trunc(params.beforeTs)
   }
   if (typeof params.cursor === 'string' && params.cursor.trim().length > 0) {
     fields.cursor = params.cursor.trim()
@@ -191,8 +191,8 @@ export async function setLxmfPropagationStatus(
 ): Promise<LxmfPropagationStatusResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_propagation_enable', options, {
     enabled: input.enabled,
-    store_root: input.storeRoot ?? null,
-    target_cost: input.targetCost ?? null,
+    storeRoot: input.storeRoot ?? null,
+    targetCost: input.targetCost ?? null,
   })
   return parseLxmfPropagationStatusResponse(payload)
 }
@@ -202,8 +202,8 @@ export async function ingestLxmfPropagation(
   options: ProbeOptions = {}
 ): Promise<LxmfPropagationIngestResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_propagation_ingest', options, {
-    transient_id: input.transientId ?? null,
-    payload_hex: input.payloadHex ?? null,
+    transientId: input.transientId ?? null,
+    payloadHex: input.payloadHex ?? null,
   })
   return parseLxmfPropagationIngestResponse(payload)
 }
@@ -213,7 +213,7 @@ export async function fetchLxmfPropagation(
   options: ProbeOptions = {}
 ): Promise<LxmfPropagationFetchResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_propagation_fetch', options, {
-    transient_id: input.transientId,
+    transientId: input.transientId,
   })
   return parseLxmfPropagationFetchResponse(payload)
 }
@@ -237,7 +237,7 @@ export async function setLxmfStampPolicy(
   options: ProbeOptions = {}
 ): Promise<LxmfStampPolicyResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_stamp_policy_set', options, {
-    target_cost: input.targetCost ?? null,
+    targetCost: input.targetCost ?? null,
     flexibility: input.flexibility ?? null,
   })
   return parseLxmfStampPolicyResponse(payload)
@@ -249,7 +249,7 @@ export async function generateLxmfTicket(
 ): Promise<LxmfTicketGenerateResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_ticket_generate', options, {
     destination: input.destination,
-    ttl_secs: input.ttlSecs ?? null,
+    ttlSecs: input.ttlSecs ?? null,
   })
   return parseLxmfTicketGenerateResponse(payload)
 }
@@ -283,7 +283,7 @@ export async function getLxmfMessageDeliveryTrace(
   options: ProbeOptions = {}
 ): Promise<LxmfMessageDeliveryTraceResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_message_delivery_trace', options, {
-    message_id: messageId,
+    messageId,
   })
   return parseLxmfMessageDeliveryTrace(payload)
 }
@@ -326,7 +326,7 @@ export async function queryThreadsPage(
     query: params.query ?? null,
     limit: params.limit ?? null,
     cursor: params.cursor ?? null,
-    pinned_only: params.pinnedOnly ?? null,
+    pinnedOnly: params.pinnedOnly ?? null,
   })
   return parseThreadQueryResponse(payload)
 }
@@ -353,7 +353,7 @@ export async function queryThreadMessagesPage(
   } = {}
 ): Promise<LxmfThreadMessageQueryResponse> {
   const payload = await invokeWithProbe<unknown>('query_thread_messages_page', options, {
-    thread_id: threadId,
+    threadId,
     query: params.query ?? null,
     limit: params.limit ?? null,
     cursor: params.cursor ?? null,
@@ -372,7 +372,7 @@ export async function lxmfSearchMessages(
 ): Promise<LxmfSearchResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_search_messages', options, {
     query,
-    thread_id: params.threadId ?? null,
+    threadId: params.threadId ?? null,
     limit: params.limit ?? null,
     cursor: params.cursor ?? null,
   })
@@ -407,7 +407,7 @@ export async function queryFilesPage(
     kind: params.kind ?? null,
     limit: params.limit ?? null,
     cursor: params.cursor ?? null,
-    include_bytes: params.includeBytes ?? null,
+    includeBytes: params.includeBytes ?? null,
   })
   return parseFilesQueryResponse(payload)
 }
@@ -434,8 +434,8 @@ export async function lxmfGetAttachmentBlob(
   options: ProbeOptions = {}
 ): Promise<LxmfAttachmentBlobResponse> {
   const payload = await invokeWithProbe<unknown>('lxmf_get_attachment_blob', options, {
-    message_id: messageId,
-    attachment_name: attachmentName,
+    messageId,
+    attachmentName,
   })
   return parseAttachmentBlobResponse(payload)
 }
@@ -445,7 +445,7 @@ export async function getAttachmentBytes(
   options: ProbeOptions = {}
 ): Promise<LxmfAttachmentBytesResponse> {
   const payload = await invokeWithProbe<unknown>('get_attachment_bytes', options, {
-    attachment_id: attachmentId,
+    attachmentId,
   })
   return parseAttachmentBytesResponse(payload)
 }
@@ -456,7 +456,7 @@ export async function openAttachmentHandle(
   options: ProbeOptions = {}
 ): Promise<LxmfAttachmentHandle> {
   const payload = await invokeWithProbe<unknown>('open_attachment_handle', options, {
-    attachment_id: attachmentId,
+    attachmentId,
     disposition,
   })
   return parseAttachmentHandleResponse(payload)
@@ -467,7 +467,7 @@ export async function closeAttachmentHandle(
   options: ProbeOptions = {}
 ): Promise<{ closed: boolean }> {
   const payload = await invokeWithProbe<unknown>('close_attachment_handle', options, {
-    handle_id: handleId,
+    handleId,
   })
   const root = asIndexedQueryPayload(payload, 'attachment_handle_close')
   return {
