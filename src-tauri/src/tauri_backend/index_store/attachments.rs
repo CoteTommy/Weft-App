@@ -57,11 +57,45 @@ impl IndexStore {
         &self,
         params: AttachmentBytesParams,
     ) -> Result<Value, String> {
+        let attachment_id = params.attachment_id.trim().to_string();
+        let (mime, size_bytes, data_base64) = self.query_attachment_entry_by_id(&attachment_id)?;
+        Ok(json!({
+            "attachment_id": attachment_id,
+            "mime": mime,
+            "size_bytes": size_bytes.max(0),
+            "data_base64": data_base64,
+        }))
+    }
+
+    pub(crate) fn get_attachment_binary(
+        &self,
+        params: AttachmentBytesParams,
+    ) -> Result<AttachmentBinary, String> {
         let attachment_id = params.attachment_id.trim();
         if attachment_id.is_empty() {
             return Err("attachment_id is required".to_string());
         }
-        let parsed_id = attachment_id
+        let (mime, size_bytes, data_base64) = self.query_attachment_entry_by_id(attachment_id)?;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(data_base64.as_bytes())
+            .map_err(|err| format!("decode attachment payload failed: {err}"))?;
+
+        Ok(AttachmentBinary {
+            mime,
+            size_bytes: size_bytes.max(0),
+            bytes,
+        })
+    }
+
+    fn query_attachment_entry_by_id(
+        &self,
+        attachment_id: &str,
+    ) -> Result<(Option<String>, i64, String), String> {
+        let normalized_id = attachment_id.trim();
+        if normalized_id.is_empty() {
+            return Err("attachment_id is required".to_string());
+        }
+        let parsed_id = normalized_id
             .parse::<i64>()
             .map_err(|_| "attachment_id must be numeric".to_string())?;
 
@@ -96,12 +130,6 @@ impl IndexStore {
         };
         let data_base64 =
             data_base64.ok_or_else(|| "attachment payload unavailable".to_string())?;
-
-        Ok(json!({
-            "attachment_id": attachment_id,
-            "mime": mime,
-            "size_bytes": size_bytes.max(0),
-            "data_base64": data_base64,
-        }))
+        Ok((mime, size_bytes, data_base64))
     }
 }

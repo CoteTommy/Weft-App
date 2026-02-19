@@ -81,6 +81,14 @@ pub(crate) struct RuntimeMetrics {
     pub queue_size: usize,
     pub message_count: usize,
     pub thread_count: usize,
+    pub index_last_sync_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AttachmentBinary {
+    pub mime: Option<String>,
+    pub size_bytes: i64,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Serialize)]
@@ -190,6 +198,12 @@ struct MessageCursorKey {
     message_id: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct FileCursorKey {
+    created_at_ms: i64,
+    sort_id: String,
+}
+
 #[derive(Debug)]
 struct PeerSummary {
     peer: String,
@@ -245,6 +259,10 @@ impl IndexStore {
         self.ready.load(Ordering::Relaxed)
     }
 
+    pub(crate) fn mark_ready(&self) {
+        self.ready.store(true, Ordering::Relaxed);
+    }
+
     pub(crate) fn index_status(&self) -> Result<IndexStatus, String> {
         let conn = self
             .conn
@@ -289,13 +307,14 @@ fn sanitize_fields_for_client(conn: &Connection, message_id: &str, fields: Value
 
     let mut attachments = Vec::new();
     if let Ok(mut stmt) = conn.prepare(
-        "SELECT name, mime, size_bytes FROM attachments WHERE message_id = ?1 ORDER BY ordinal ASC",
+        "SELECT id, name, mime, size_bytes FROM attachments WHERE message_id = ?1 ORDER BY ordinal ASC",
     ) {
         if let Ok(rows) = stmt.query_map(params![message_id], |row| {
             Ok(json!({
-                "name": row.get::<_, String>(0)?,
-                "mime": row.get::<_, Option<String>>(1).ok().flatten(),
-                "size_bytes": row.get::<_, i64>(2).unwrap_or(0).max(0),
+                "id": row.get::<_, i64>(0).unwrap_or_default().to_string(),
+                "name": row.get::<_, String>(1)?,
+                "mime": row.get::<_, Option<String>>(2).ok().flatten(),
+                "size_bytes": row.get::<_, i64>(3).unwrap_or(0).max(0),
             }))
         }) {
             for value in rows.flatten() {
@@ -567,17 +586,28 @@ fn rebuild_threads_table(conn: &mut Connection) -> Result<(), String> {
     rebuild_threads_from_message_rows(conn, &messages, &[])
 }
 
-fn rebuild_threads_from_messages(
-    conn: &mut Connection,
-    messages: &[MessageParseResult],
-    peers: &[PeerSummary],
-) -> Result<(), String> {
-    let rows = messages
-        .iter()
-        .map(|entry| &entry.row)
-        .cloned()
-        .collect::<Vec<_>>();
-    rebuild_threads_from_message_rows(conn, &rows, peers)
+fn apply_peer_names_to_threads(conn: &mut Connection, peers: &[PeerSummary]) -> Result<(), String> {
+    if peers.is_empty() {
+        return Ok(());
+    }
+    let tx = conn
+        .transaction()
+        .map_err(|err| format!("start peer name apply transaction failed: {err}"))?;
+    for peer in peers {
+        let thread_id = peer.peer.trim();
+        let name = peer.name.trim();
+        if thread_id.is_empty() || name.is_empty() {
+            continue;
+        }
+        tx.execute(
+            "UPDATE threads SET display_name = ?1 WHERE thread_id = ?2",
+            params![name, thread_id],
+        )
+        .map_err(|err| format!("update thread display name from peer failed: {err}"))?;
+    }
+    tx.commit()
+        .map_err(|err| format!("commit peer name apply failed: {err}"))?;
+    Ok(())
 }
 
 fn rebuild_threads_from_message_rows(
@@ -709,9 +739,9 @@ fn update_last_sync_state(
     Ok(())
 }
 
-fn parse_message_list(payload: &Value) -> Result<Vec<Value>, String> {
+fn parse_message_list(payload: &Value) -> Result<&[Value], String> {
     if let Some(array) = payload.as_array() {
-        return Ok(array.clone());
+        return Ok(array.as_slice());
     }
     let object = payload
         .as_object()
@@ -720,7 +750,7 @@ fn parse_message_list(payload: &Value) -> Result<Vec<Value>, String> {
         .get("messages")
         .and_then(Value::as_array)
         .ok_or_else(|| "message payload missing messages array".to_string())?;
-    Ok(messages.clone())
+    Ok(messages.as_slice())
 }
 
 fn parse_peer_list(payload: &Value) -> Vec<PeerSummary> {
@@ -1110,6 +1140,26 @@ fn decode_message_cursor(cursor: Option<&str>) -> Option<MessageCursorKey> {
     serde_json::from_slice::<MessageCursorKey>(&decoded).ok()
 }
 
+fn encode_file_cursor(cursor: &FileCursorKey) -> Option<String> {
+    serde_json::to_vec(cursor)
+        .ok()
+        .map(|payload| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload))
+}
+
+fn decode_file_cursor(cursor: Option<&str>) -> Option<FileCursorKey> {
+    let raw = cursor?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    if raw.parse::<usize>().is_ok() {
+        return None;
+    }
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(raw.as_bytes())
+        .ok()?;
+    serde_json::from_slice::<FileCursorKey>(&decoded).ok()
+}
+
 fn parse_cursor_offset(cursor: Option<&str>) -> usize {
     cursor
         .and_then(|value| value.trim().parse::<usize>().ok())
@@ -1310,23 +1360,6 @@ fn size_label(size_bytes: i64) -> String {
         return format!("{:.1} KB", size_bytes as f64 / 1024.0);
     }
     format!("{:.1} MB", size_bytes as f64 / (1024.0 * 1024.0))
-}
-
-fn kind_from_mime(mime: Option<&str>) -> String {
-    let Some(mime) = mime else {
-        return "Document".to_string();
-    };
-    let value = mime.trim().to_ascii_lowercase();
-    if value.starts_with("image/") {
-        return "Image".to_string();
-    }
-    if value.starts_with("audio/") {
-        return "Audio".to_string();
-    }
-    if value.contains("zip") || value.contains("tar") {
-        return "Archive".to_string();
-    }
-    "Document".to_string()
 }
 
 fn format_timestamp(timestamp_ms: i64) -> String {

@@ -289,6 +289,7 @@ function cloneDraft(draft: OutboundMessageDraft): OutboundMessageDraft {
       mime: attachment.mime,
       sizeBytes: attachment.sizeBytes,
       dataBase64: attachment.dataBase64,
+      blobKey: attachment.blobKey,
     })),
     paper: draft.paper
       ? {

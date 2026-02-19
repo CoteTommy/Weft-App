@@ -12,7 +12,7 @@ import {
   getAttachmentPreviewCacheStats,
   getOrCreateAttachmentPreviewBlob,
 } from '../services/attachmentPreviewCache'
-import { fetchFileAttachmentBytes } from '../services/filesService'
+import { fetchFileAttachmentBytes, openFileAttachmentHandle } from '../services/filesService'
 
 export function FilesPage() {
   const { files, loading, error, refresh } = useFiles()
@@ -189,23 +189,34 @@ export function FilesPage() {
                     try {
                       setActiveFileId(file.id)
                       setFileFeedback(null)
-                      const bytes = await fetchFileAttachmentBytes(file)
-                      const preview = await getOrCreateAttachmentPreviewBlob({
-                        key: file.id,
-                        mime: bytes.mime,
-                        dataBase64: bytes.dataBase64,
-                      })
-                      const anchor = document.createElement('a')
-                      anchor.href = preview.objectUrl
-                      anchor.download = file.name
-                      anchor.click()
-                      setCacheStats(getAttachmentPreviewCacheStats())
+                      try {
+                        const opened = await openFileAttachmentHandle(file, 'download')
+                        const anchor = document.createElement('a')
+                        anchor.href = opened.url
+                        anchor.download = file.name
+                        anchor.click()
+                        window.setTimeout(() => {
+                          void opened.close()
+                        }, 30_000)
+                      } catch {
+                        const bytes = await fetchFileAttachmentBytes(file)
+                        const preview = await getOrCreateAttachmentPreviewBlob({
+                          key: file.id,
+                          mime: bytes.mime,
+                          dataBase64: bytes.dataBase64,
+                        })
+                        const anchor = document.createElement('a')
+                        anchor.href = preview.objectUrl
+                        anchor.download = file.name
+                        anchor.click()
+                      }
                     } catch (fileError) {
                       setFileFeedback(
                         fileError instanceof Error ? fileError.message : String(fileError)
                       )
                     } finally {
                       setActiveFileId(null)
+                      setCacheStats(getAttachmentPreviewCacheStats())
                     }
                   })()
                 }}

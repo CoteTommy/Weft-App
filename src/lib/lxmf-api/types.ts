@@ -287,10 +287,21 @@ export type LxmfAttachmentBytesResponse = {
   dataBase64: string
 }
 
+export type LxmfAttachmentHandle = {
+  handleId: string
+  path: string
+  mime: string | null
+  sizeBytes: number
+  expiresAtMs: number
+}
+
 export type LxmfRuntimeMetrics = {
   rssBytes: number | null
   dbSizeBytes: number
   queueSize: number
   messageCount: number
   threadCount: number
+  eventPumpIntervalMs: number | null
+  attachmentHandleCount: number
+  indexLastSyncMs: number | null
 }

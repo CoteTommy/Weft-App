@@ -45,12 +45,22 @@ impl IndexStore {
             .query_row("PRAGMA page_size", [], |row| row.get::<_, i64>(0))
             .map_err(|err| format!("read runtime metrics page_size failed: {err}"))?
             .max(0) as u64;
+        let index_last_sync_ms = conn
+            .query_row(
+                "SELECT value FROM sync_state WHERE key = 'last_sync_ms'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|err| format!("read runtime metrics last_sync failed: {err}"))?
+            .and_then(|value| value.parse::<i64>().ok());
 
         Ok(RuntimeMetrics {
             db_size_bytes: page_count.saturating_mul(page_size),
             queue_size,
             message_count,
             thread_count,
+            index_last_sync_ms,
         })
     }
 

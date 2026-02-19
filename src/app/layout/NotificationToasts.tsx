@@ -4,7 +4,7 @@ import clsx from 'clsx'
 import { BellRing, CircleAlert, MessageSquare, X } from 'lucide-react'
 
 import { OPEN_THREAD_EVENT } from '@app/config/events'
-import { useChatsState } from '@features/chats/state/ChatsProvider'
+import { setStoredThreadMutedPreference } from '@features/chats/state/threadPreferences'
 import type { AppNotification } from '@shared/runtime/notifications'
 import { formatRelativeFromNow } from '@shared/utils/time'
 
@@ -18,7 +18,6 @@ interface ToastView extends AppNotification {
 
 export function NotificationToasts() {
   const { notifications, markRead } = useNotificationCenter()
-  const { setThreadMuted } = useChatsState()
   const [toasts, setToasts] = useState<ToastView[]>([])
   const seenIdsRef = useRef<Set<string>>(new Set())
   const initializedRef = useRef(false)
@@ -102,7 +101,7 @@ export function NotificationToasts() {
             if (!threadId) {
               return
             }
-            setThreadMuted(threadId, true)
+            setStoredThreadMutedPreference(threadId, true)
             markRead(toast.id)
             dismiss(toast.id)
           }}

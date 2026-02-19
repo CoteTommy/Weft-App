@@ -17,6 +17,8 @@ import {
 } from '@shared/runtime/preferences'
 import { normalizeMainRoute } from '@shared/runtime/sessionRestore'
 
+const CHAT_ROUTE_PATHS = new Set<string>([APP_ROUTES.chats, APP_ROUTES.chatThread])
+
 const WelcomePage = lazy(() =>
   import('@features/welcome/pages/WelcomePage').then(module => ({ default: module.WelcomePage }))
 )
@@ -30,6 +32,8 @@ export default function App() {
   const [lastMainRoute, setLastMainRoute] = useState(
     sanitizeMainRoute(normalizeMainRoute(initialPreferences.lastMainRoute))
   )
+  const chatRoutes = MAIN_ROUTES.filter(route => CHAT_ROUTE_PATHS.has(route.path))
+  const nonChatRoutes = MAIN_ROUTES.filter(route => !CHAT_ROUTE_PATHS.has(route.path))
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -71,8 +75,7 @@ export default function App() {
                 }
               >
                 <Route element={<AppShell />}>
-                  <Route index element={<Navigate to={lastMainRoute} replace />} />
-                  {MAIN_ROUTES.map(route => (
+                  {chatRoutes.map(route => (
                     <Route
                       key={route.path}
                       path={route.path}
@@ -80,6 +83,20 @@ export default function App() {
                     />
                   ))}
                 </Route>
+              </Route>
+              <Route
+                element={
+                  onboardingCompleted ? <AppShell /> : <Navigate to={APP_ROUTES.welcome} replace />
+                }
+              >
+                <Route index element={<Navigate to={lastMainRoute} replace />} />
+                {nonChatRoutes.map(route => (
+                  <Route
+                    key={route.path}
+                    path={route.path}
+                    element={route.element({ commandCenterEnabled })}
+                  />
+                ))}
               </Route>
               <Route
                 path="*"

@@ -6,10 +6,11 @@ import {
   queryThreadMessagesPage,
   queryThreadsPage,
   sendLxmfMessage,
-  sendLxmfRichMessage,
+  sendLxmfRichMessageRefs,
 } from '@lib/lxmf-api'
 import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 
+import { loadOfflineAttachmentAsBase64 } from '../state/offlineQueueAttachmentStore'
 import { buildThreads } from './chatThreadBuilders'
 
 export type ThreadSummary = {
@@ -114,10 +115,38 @@ export async function postChatMessage(
     if (draft.paper) {
       throw new Error('paper messages cannot include attachments')
     }
-    const response = await sendLxmfRichMessage({
+    const resolvedAttachments = await Promise.all(
+      attachments.map(async attachment => {
+        const inline = attachment.dataBase64?.trim()
+        if (inline) {
+          return {
+            name: attachment.name,
+            dataBase64: inline,
+            mime: attachment.mime,
+            sizeBytes: attachment.sizeBytes,
+          }
+        }
+        const blobKey = attachment.blobKey?.trim()
+        if (!blobKey) {
+          throw new Error(`Attachment "${attachment.name}" payload unavailable.`)
+        }
+        const loaded = await loadOfflineAttachmentAsBase64(blobKey)
+        if (!loaded?.dataBase64) {
+          throw new Error(`Attachment "${attachment.name}" payload unavailable.`)
+        }
+        return {
+          name: attachment.name,
+          dataBase64: loaded.dataBase64,
+          mime: attachment.mime ?? loaded.mime,
+          sizeBytes: attachment.sizeBytes || loaded.sizeBytes,
+        }
+      })
+    )
+
+    const response = await sendLxmfRichMessageRefs({
       destination,
       content,
-      attachments: attachments.map(attachment => ({
+      attachments: resolvedAttachments.map(attachment => ({
         name: attachment.name,
         dataBase64: attachment.dataBase64,
         mime: attachment.mime,

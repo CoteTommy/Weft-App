@@ -1,5 +1,8 @@
 use super::*;
 
+const MAP_QUERY_MESSAGE_BATCH: usize = 320;
+const MAP_QUERY_SCAN_LIMIT: usize = 4_000;
+
 impl IndexStore {
     pub(crate) fn query_threads(&self, params: ThreadQueryParams) -> Result<Value, String> {
         let limit = normalize_limit(params.limit);
@@ -349,15 +352,14 @@ impl IndexStore {
 
     pub(crate) fn query_files(&self, params: FilesQueryParams) -> Result<Value, String> {
         let limit = normalize_limit(params.limit);
-        let offset = parse_cursor_offset(params.cursor.as_deref());
+        let keyset = decode_file_cursor(params.cursor.as_deref());
         let include_bytes = params.include_bytes.unwrap_or(false);
-        let query_filter = params
+        let query_like = params
             .query
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
-            .map(|value| value.to_ascii_lowercase());
-        let query_like = query_filter.as_deref().map(|value| format!("%{}%", value));
+            .map(|value| format!("%{}%", value.to_ascii_lowercase()));
         let kind_filter = params
             .kind
             .as_deref()
@@ -374,32 +376,105 @@ impl IndexStore {
             .prepare(
                 "
                 SELECT
-                  a.id,
-                  a.message_id,
-                  a.name,
-                  a.mime,
-                  a.size_bytes,
-                  CASE
-                    WHEN ?1 = 1 THEN a.inline_base64
-                    ELSE NULL
-                  END AS inline_base64,
-                  CASE
-                    WHEN a.inline_base64 IS NULL OR a.inline_base64 = '' THEN 0
-                    ELSE 1
-                  END AS has_inline_data,
-                  m.source,
-                  m.fields_json,
-                  m.ts_ms
-                FROM attachments a
-                JOIN messages m ON m.message_id = a.message_id
+                  file_rows.id,
+                  file_rows.name,
+                  file_rows.kind,
+                  file_rows.size_bytes,
+                  file_rows.created_at_ms,
+                  file_rows.owner_source,
+                  file_rows.mime,
+                  file_rows.has_inline_data,
+                  file_rows.data_base64,
+                  file_rows.paper_uri,
+                  file_rows.paper_title,
+                  file_rows.paper_category,
+                  file_rows.sort_id
+                FROM (
+                  SELECT
+                    CAST(a.id AS TEXT) AS id,
+                    a.name AS name,
+                    CASE
+                      WHEN LOWER(COALESCE(a.mime, '')) LIKE 'image/%' THEN 'Image'
+                      WHEN LOWER(COALESCE(a.mime, '')) LIKE 'audio/%' THEN 'Audio'
+                      WHEN LOWER(COALESCE(a.mime, '')) IN (
+                        'application/zip',
+                        'application/x-zip-compressed',
+                        'application/x-tar',
+                        'application/gzip',
+                        'application/x-gzip'
+                      ) THEN 'Archive'
+                      ELSE 'Document'
+                    END AS kind,
+                    a.size_bytes AS size_bytes,
+                    m.ts_ms AS created_at_ms,
+                    m.source AS owner_source,
+                    a.mime AS mime,
+                    CASE
+                      WHEN a.inline_base64 IS NULL OR a.inline_base64 = '' THEN 0
+                      ELSE 1
+                    END AS has_inline_data,
+                    CASE
+                      WHEN ?1 = 1 THEN a.inline_base64
+                      ELSE NULL
+                    END AS data_base64,
+                    NULL AS paper_uri,
+                    NULL AS paper_title,
+                    NULL AS paper_category,
+                    printf('a:%020d', a.id) AS sort_id
+                  FROM attachments a
+                  JOIN messages m ON m.message_id = a.message_id
+                  WHERE (
+                    ?2 IS NULL
+                    OR LOWER(a.name) LIKE ?2
+                    OR LOWER(COALESCE(a.mime, '')) LIKE ?2
+                    OR LOWER(m.source) LIKE ?2
+                  )
+
+                  UNION ALL
+
+                  SELECT
+                    m.message_id || ':paper' AS id,
+                    COALESCE(
+                      NULLIF(TRIM(json_extract(m.fields_json, '$.paper.title')), ''),
+                      NULLIF(TRIM(json_extract(m.fields_json, '$.paper.uri')), ''),
+                      'Note'
+                    ) AS name,
+                    'Note' AS kind,
+                    0 AS size_bytes,
+                    m.ts_ms AS created_at_ms,
+                    m.source AS owner_source,
+                    NULL AS mime,
+                    0 AS has_inline_data,
+                    NULL AS data_base64,
+                    NULLIF(TRIM(json_extract(m.fields_json, '$.paper.uri')), '') AS paper_uri,
+                    NULLIF(TRIM(json_extract(m.fields_json, '$.paper.title')), '') AS paper_title,
+                    NULLIF(TRIM(json_extract(m.fields_json, '$.paper.category')), '') AS paper_category,
+                    'p:' || m.message_id AS sort_id
+                  FROM messages m
+                  WHERE m.fields_json IS NOT NULL
+                    AND json_type(m.fields_json, '$.paper') = 'object'
+                    AND (
+                      NULLIF(TRIM(json_extract(m.fields_json, '$.paper.title')), '') IS NOT NULL
+                      OR NULLIF(TRIM(json_extract(m.fields_json, '$.paper.uri')), '') IS NOT NULL
+                    )
+                    AND (
+                      ?2 IS NULL
+                      OR LOWER(COALESCE(json_extract(m.fields_json, '$.paper.title'), '')) LIKE ?2
+                      OR LOWER(COALESCE(json_extract(m.fields_json, '$.paper.uri'), '')) LIKE ?2
+                      OR LOWER(m.source) LIKE ?2
+                    )
+                ) file_rows
                 WHERE (
-                  ?2 IS NULL
-                  OR LOWER(a.name) LIKE ?2
-                  OR LOWER(COALESCE(a.mime, '')) LIKE ?2
-                  OR LOWER(m.source) LIKE ?2
+                  ?3 IS NULL
+                  OR file_rows.created_at_ms < ?3
+                  OR (
+                    file_rows.created_at_ms = ?3
+                    AND file_rows.sort_id < ?4
+                  )
                 )
-                ORDER BY m.ts_ms DESC, a.id DESC
-                LIMIT ?3 OFFSET ?4
+                  AND (?5 IS NULL OR LOWER(file_rows.kind) = ?5)
+                ORDER BY file_rows.created_at_ms DESC, file_rows.sort_id DESC
+                LIMIT ?6
                 ",
             )
             .map_err(|err| format!("prepare file query failed: {err}"))?;
@@ -409,150 +484,77 @@ impl IndexStore {
                 params![
                     if include_bytes { 1 } else { 0 },
                     query_like,
+                    keyset.as_ref().map(|cursor| cursor.created_at_ms),
+                    keyset.as_ref().map(|cursor| cursor.sort_id.as_str()),
+                    kind_filter,
                     (limit + 1) as i64,
-                    offset as i64
                 ],
                 |row| {
-                    let mime = row.get::<_, Option<String>>(3).ok().flatten();
-                    let size_bytes = row.get::<_, i64>(4).unwrap_or(0).max(0);
-                    let source = row.get::<_, String>(7)?;
-                    let name = row.get::<_, String>(2)?;
-                    Ok(IndexedFileItem {
-                        id: row.get::<_, i64>(0).unwrap_or_default().to_string(),
-                        name: name.clone(),
-                        kind: kind_from_mime(mime.as_deref()),
-                        size_label: size_label(size_bytes),
-                        size_bytes,
-                        created_at_ms: row.get::<_, i64>(9).unwrap_or(0),
-                        owner: short_hash(&source, 6),
-                        mime,
-                        has_inline_data: row.get::<_, i64>(6).unwrap_or(0) == 1,
-                        data_base64: row.get::<_, Option<String>>(5).ok().flatten(),
-                        paper_uri: None,
-                        paper_title: None,
-                        paper_category: None,
-                    })
+                    let id = row.get::<_, String>(0)?;
+                    let name = row.get::<_, String>(1)?;
+                    let kind = row.get::<_, String>(2)?;
+                    let size_bytes = row.get::<_, i64>(3).unwrap_or(0).max(0);
+                    let created_at_ms = row.get::<_, i64>(4).unwrap_or(0);
+                    let owner_source = row.get::<_, String>(5)?;
+                    let mime = row.get::<_, Option<String>>(6).ok().flatten();
+                    let has_inline_data = row.get::<_, i64>(7).unwrap_or(0) == 1;
+                    let data_base64 = row.get::<_, Option<String>>(8).ok().flatten();
+                    let paper_uri = row.get::<_, Option<String>>(9).ok().flatten();
+                    let paper_title = row.get::<_, Option<String>>(10).ok().flatten();
+                    let paper_category = row.get::<_, Option<String>>(11).ok().flatten();
+                    let sort_id = row.get::<_, String>(12)?;
+                    let size_label = if kind == "Note" {
+                        "—".to_string()
+                    } else {
+                        size_label(size_bytes)
+                    };
+                    Ok((
+                        IndexedFileItem {
+                            id,
+                            name,
+                            kind,
+                            size_label,
+                            size_bytes,
+                            created_at_ms,
+                            owner: short_hash(&owner_source, 6),
+                            mime,
+                            has_inline_data,
+                            data_base64,
+                            paper_uri,
+                            paper_title,
+                            paper_category,
+                        },
+                        created_at_ms,
+                        sort_id,
+                    ))
                 },
             )
             .map_err(|err| format!("run file query failed: {err}"))?;
 
-        let mut items = Vec::new();
+        let mut entries = Vec::<(IndexedFileItem, i64, String)>::new();
         for result in rows {
-            let item = result.map_err(|err| format!("parse file row failed: {err}"))?;
-            if let Some(kind) = kind_filter.as_deref() {
-                if item.kind.to_ascii_lowercase() != kind {
-                    continue;
-                }
-            }
-            items.push(item);
+            entries.push(result.map_err(|err| format!("parse file row failed: {err}"))?);
         }
 
-        // Include paper references as file-like notes.
-        let mut paper_stmt = conn
-            .prepare(
-                "
-                SELECT message_id, source, fields_json, ts_ms
-                FROM messages
-                WHERE fields_json IS NOT NULL
-                ORDER BY ts_ms DESC, message_id DESC
-                LIMIT ?1 OFFSET ?2
-                ",
-            )
-            .map_err(|err| format!("prepare paper query failed: {err}"))?;
-        let paper_rows = paper_stmt
-            .query_map(params![(limit + 1) as i64, offset as i64], |row| {
-                let fields_json = row.get::<_, Option<String>>(2).ok().flatten();
-                let source = row.get::<_, String>(1)?;
-                let message_id = row.get::<_, String>(0)?;
-                let created_at_ms = row.get::<_, i64>(3).unwrap_or(0);
-                let fields = fields_json
-                    .as_deref()
-                    .and_then(|value| serde_json::from_str::<Value>(value).ok())
-                    .unwrap_or(Value::Null);
-                let paper = fields
-                    .as_object()
-                    .and_then(|root| root.get("paper"))
-                    .and_then(Value::as_object)
-                    .cloned();
-                Ok((message_id, source, created_at_ms, paper))
+        let next_cursor = if entries.len() > limit {
+            let marker = entries
+                .get(limit.saturating_sub(1))
+                .map(|(_, created_at_ms, sort_id)| (*created_at_ms, sort_id.clone()));
+            entries.truncate(limit);
+            marker.and_then(|(created_at_ms, sort_id)| {
+                encode_file_cursor(&FileCursorKey {
+                    created_at_ms,
+                    sort_id,
+                })
             })
-            .map_err(|err| format!("run paper query failed: {err}"))?;
-
-        for result in paper_rows {
-            let (message_id, source, created_at_ms, paper) =
-                result.map_err(|err| format!("parse paper row failed: {err}"))?;
-            let Some(paper) = paper else {
-                continue;
-            };
-            let title = paper
-                .get("title")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(str::to_string);
-            let uri = paper
-                .get("uri")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(str::to_string);
-            let category = paper
-                .get("category")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(str::to_string);
-            if title.is_none() && uri.is_none() {
-                continue;
-            }
-            if let Some(kind) = kind_filter.as_deref() {
-                if kind != "note" {
-                    continue;
-                }
-            }
-            if let Some(search) = query_filter.as_deref() {
-                let candidate_name = title
-                    .as_deref()
-                    .or(uri.as_deref())
-                    .unwrap_or("note")
-                    .to_ascii_lowercase();
-                let haystack = format!(
-                    "{} {}",
-                    candidate_name,
-                    short_hash(&source, 6).to_ascii_lowercase()
-                );
-                if !haystack.contains(search) {
-                    continue;
-                }
-            }
-            items.push(IndexedFileItem {
-                id: format!("{message_id}:paper"),
-                name: title
-                    .clone()
-                    .or_else(|| uri.clone())
-                    .unwrap_or_else(|| "Note".to_string()),
-                kind: "Note".to_string(),
-                size_label: "—".to_string(),
-                size_bytes: 0,
-                created_at_ms,
-                owner: short_hash(&source, 6),
-                mime: None,
-                has_inline_data: false,
-                data_base64: None,
-                paper_uri: uri,
-                paper_title: title,
-                paper_category: category,
-            });
-        }
-
-        let next_cursor = if items.len() > limit {
-            Some((offset + limit).to_string())
         } else {
             None
         };
-        if items.len() > limit {
-            items.truncate(limit);
-        }
+
+        let items = entries
+            .into_iter()
+            .map(|(item, _, _)| item)
+            .collect::<Vec<_>>();
 
         serde_json::to_value(CursorResult { items, next_cursor })
             .map_err(|err| format!("serialize file query failed: {err}"))
@@ -560,7 +562,7 @@ impl IndexStore {
 
     pub(crate) fn query_map_points(&self, params: MapPointsQueryParams) -> Result<Value, String> {
         let limit = normalize_limit(params.limit);
-        let offset = parse_cursor_offset(params.cursor.as_deref());
+        let mut cursor = decode_message_cursor(params.cursor.as_deref());
         let query = params
             .query
             .as_deref()
@@ -573,91 +575,142 @@ impl IndexStore {
             .lock()
             .map_err(|_| "index lock poisoned".to_string())?;
 
-        let mut stmt = conn
-            .prepare(
-                "
-                SELECT message_id, source, destination, direction, title, body, ts_ms, fields_json
-                FROM messages
-                ORDER BY ts_ms DESC, message_id DESC
-                LIMIT ?1 OFFSET ?2
-                ",
-            )
-            .map_err(|err| format!("prepare map query failed: {err}"))?;
+        let mut points = Vec::new();
+        let mut scanned_messages = 0usize;
+        let mut next_cursor: Option<String> = None;
+        let mut has_more = false;
 
-        let rows = stmt
-            .query_map(params![(limit + 1) as i64, offset as i64], |row| {
-                let message_id = row.get::<_, String>(0)?;
-                let source = row.get::<_, String>(1)?;
-                let destination = row.get::<_, String>(2)?;
-                let direction = row.get::<_, String>(3)?;
-                let title = row.get::<_, String>(4)?;
-                let body = row.get::<_, String>(5)?;
-                let ts_ms = row.get::<_, i64>(6)?;
-                let fields_json = row.get::<_, Option<String>>(7).ok().flatten();
-                let fields = fields_json
-                    .as_deref()
-                    .and_then(|value| serde_json::from_str::<Value>(value).ok())
-                    .unwrap_or(Value::Null);
-                Ok((
+        'scan: loop {
+            if scanned_messages >= MAP_QUERY_SCAN_LIMIT {
+                has_more = true;
+                next_cursor = cursor.as_ref().and_then(encode_message_cursor);
+                break;
+            }
+
+            let mut stmt = conn
+                .prepare(
+                    "
+                    SELECT message_id, source, destination, direction, title, body, ts_ms, fields_json
+                    FROM messages
+                    WHERE (
+                      ?1 IS NULL
+                      OR ts_ms < ?1
+                      OR (ts_ms = ?1 AND message_id < ?2)
+                    )
+                    ORDER BY ts_ms DESC, message_id DESC
+                    LIMIT ?3
+                    ",
+                )
+                .map_err(|err| format!("prepare map query failed: {err}"))?;
+
+            let rows = stmt
+                .query_map(
+                    params![
+                        cursor.as_ref().map(|value| value.timestamp),
+                        cursor.as_ref().map(|value| value.message_id.as_str()),
+                        MAP_QUERY_MESSAGE_BATCH as i64
+                    ],
+                    |row| {
+                        let message_id = row.get::<_, String>(0)?;
+                        let source = row.get::<_, String>(1)?;
+                        let destination = row.get::<_, String>(2)?;
+                        let direction = row.get::<_, String>(3)?;
+                        let title = row.get::<_, String>(4)?;
+                        let body = row.get::<_, String>(5)?;
+                        let ts_ms = row.get::<_, i64>(6)?;
+                        let fields_json = row.get::<_, Option<String>>(7).ok().flatten();
+                        let fields = fields_json
+                            .as_deref()
+                            .and_then(|value| serde_json::from_str::<Value>(value).ok())
+                            .unwrap_or(Value::Null);
+                        Ok((
+                            message_id,
+                            source,
+                            destination,
+                            direction,
+                            title,
+                            body,
+                            ts_ms,
+                            fields,
+                        ))
+                    },
+                )
+                .map_err(|err| format!("run map query failed: {err}"))?;
+
+            let mut batch = Vec::new();
+            for result in rows {
+                batch.push(result.map_err(|err| format!("parse map row failed: {err}"))?);
+            }
+
+            if batch.is_empty() {
+                break;
+            }
+
+            for (message_id, source, destination, direction, title, body, ts_ms, fields) in &batch {
+                scanned_messages += 1;
+                let context = MapPointMessageContext {
                     message_id,
                     source,
                     destination,
                     direction,
                     title,
                     body,
-                    ts_ms,
-                    fields,
-                ))
-            })
-            .map_err(|err| format!("run map query failed: {err}"))?;
+                    ts_ms: *ts_ms,
+                };
+                let extracted = extract_map_points(&context, fields);
 
-        let mut points = Vec::new();
-        for result in rows {
-            let (message_id, source, destination, direction, title, body, ts_ms, fields) =
-                result.map_err(|err| format!("parse map row failed: {err}"))?;
-            let context = MapPointMessageContext {
-                message_id: &message_id,
-                source: &source,
-                destination: &destination,
-                direction: &direction,
-                title: &title,
-                body: &body,
-                ts_ms,
-            };
-            let extracted = extract_map_points(&context, &fields);
-            for item in extracted {
-                if let Some(search) = query.as_deref() {
-                    let haystack = format!(
-                        "{} {} {} {} {}",
-                        item.label.to_ascii_lowercase(),
-                        item.source.to_ascii_lowercase(),
-                        item.when.to_ascii_lowercase(),
-                        item.lat,
-                        item.lon
-                    );
-                    if !haystack.contains(search) {
-                        continue;
+                let mut filtered = Vec::new();
+                for item in extracted {
+                    if let Some(search) = query.as_deref() {
+                        let haystack = format!(
+                            "{} {} {} {} {}",
+                            item.label.to_ascii_lowercase(),
+                            item.source.to_ascii_lowercase(),
+                            item.when.to_ascii_lowercase(),
+                            item.lat,
+                            item.lon
+                        );
+                        if !haystack.contains(search) {
+                            continue;
+                        }
                     }
+                    filtered.push(item);
                 }
-                points.push(item);
+
+                if !filtered.is_empty() && points.len() + filtered.len() > limit {
+                    has_more = true;
+                    next_cursor = cursor.as_ref().and_then(encode_message_cursor);
+                    break 'scan;
+                }
+
+                points.extend(filtered);
+                cursor = Some(MessageCursorKey {
+                    timestamp: *ts_ms,
+                    message_id: message_id.clone(),
+                });
+
+                if scanned_messages >= MAP_QUERY_SCAN_LIMIT {
+                    has_more = true;
+                    next_cursor = cursor.as_ref().and_then(encode_message_cursor);
+                    break 'scan;
+                }
+            }
+
+            if batch.len() < MAP_QUERY_MESSAGE_BATCH {
+                break;
+            }
+            if points.len() >= limit {
+                has_more = true;
+                next_cursor = cursor.as_ref().and_then(encode_message_cursor);
+                break;
             }
         }
 
-        points.sort_by(|left, right| right.id.cmp(&left.id));
-
-        let next_cursor = if points.len() > limit {
-            Some((offset + limit).to_string())
-        } else {
-            None
-        };
-        if points.len() > limit {
-            points.truncate(limit);
+        if !has_more {
+            next_cursor = None;
         }
 
-        serde_json::to_value(CursorResult {
-            items: points,
-            next_cursor,
-        })
-        .map_err(|err| format!("serialize map query failed: {err}"))
+        serde_json::to_value(CursorResult { items: points, next_cursor })
+            .map_err(|err| format!("serialize map query failed: {err}"))
     }
 }

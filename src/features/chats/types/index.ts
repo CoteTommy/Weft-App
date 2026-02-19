@@ -21,6 +21,7 @@ export interface ChatsState {
   setThreadMuted: (threadId: string, muted?: boolean) => void
   selectThread: (threadId?: string) => void
   loadMoreThreadMessages: (threadId: string) => Promise<void>
+  loadMoreThreads: () => Promise<void>
 }
 
 export const CHAT_EVENT_BATCH_MS = 80

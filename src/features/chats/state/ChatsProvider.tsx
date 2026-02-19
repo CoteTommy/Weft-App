@@ -41,6 +41,7 @@ interface ChatsActions {
   setThreadMuted: (threadId: string, muted?: boolean) => void
   selectThread: (threadId?: string) => void
   loadMoreThreadMessages: (threadId: string) => Promise<void>
+  loadMoreThreads: () => Promise<void>
 }
 
 interface ChatsStoreContextValue {
@@ -56,6 +57,30 @@ const EMPTY_SNAPSHOT: ChatsSnapshot = {
   loading: true,
   error: null,
   offlineQueue: [],
+}
+
+const EMPTY_ACTIONS: ChatsActions = {
+  refresh: async () => {},
+  sendMessage: async () => ({}),
+  retryQueueNow: async () => {},
+  pauseQueue: () => {},
+  resumeQueue: () => {},
+  removeQueue: () => {},
+  clearQueue: () => {},
+  markThreadRead: () => {},
+  markAllRead: () => {},
+  createThread: () => null,
+  setThreadPinned: () => {},
+  setThreadMuted: () => {},
+  selectThread: () => {},
+  loadMoreThreadMessages: async () => {},
+  loadMoreThreads: async () => {},
+}
+
+const EMPTY_STORE: ChatsStoreContextValue = {
+  subscribe: () => () => {},
+  getSnapshot: () => EMPTY_SNAPSHOT,
+  actions: EMPTY_ACTIONS,
 }
 
 export function ChatsProvider({ children }: PropsWithChildren) {
@@ -113,6 +138,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       setThreadMuted: store.setThreadMuted,
       selectThread: store.selectThread,
       loadMoreThreadMessages: store.loadMoreThreadMessages,
+      loadMoreThreads: store.loadMoreThreads,
     }),
     [
       queue.clearQueue,
@@ -129,6 +155,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       store.setThreadMuted,
       store.setThreadPinned,
       store.loadMoreThreadMessages,
+      store.loadMoreThreads,
     ]
   )
 
@@ -150,11 +177,7 @@ export function ChatsProvider({ children }: PropsWithChildren) {
 }
 
 function useChatsStore(): ChatsStoreContextValue {
-  const value = useContext(ChatsStoreContext)
-  if (!value) {
-    throw new Error('Chat state hooks must be used within ChatsProvider')
-  }
-  return value
+  return useContext(ChatsStoreContext) ?? EMPTY_STORE
 }
 
 function useChatsSelector<T>(selector: (snapshot: ChatsSnapshot) => T): T {
@@ -209,6 +232,7 @@ export function useChatsState(): ChatsState {
     setThreadMuted: actions.setThreadMuted,
     selectThread: actions.selectThread,
     loadMoreThreadMessages: actions.loadMoreThreadMessages,
+    loadMoreThreads: actions.loadMoreThreads,
   }
 }
 

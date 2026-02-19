@@ -48,6 +48,11 @@ export interface SettingsSnapshot {
       queueSize: number
       messageCount: number
       threadCount: number
+      eventPumpIntervalMs: number | null
+      attachmentHandleCount: number
+      indexLastSyncMs: number | null
+      jsHeapUsedBytes: number | null
+      jsHeapLimitBytes: number | null
     }
   }
   desktop: {

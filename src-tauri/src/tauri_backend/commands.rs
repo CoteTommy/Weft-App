@@ -1,8 +1,9 @@
 use super::actor::{
     clean_required_arg, parse_command_entries, rpc_actor_call, ActorCommand, RuntimeActor,
 };
+use super::attachment_handles::AttachmentHandleManager;
 use super::index_store::IndexStore;
-use super::selector::{clean_arg, default_transport, RuntimeSelector};
+use super::selector::{clean_arg, default_profile, default_rpc, default_transport, RuntimeSelector};
 use super::{
     current_system_appearance, DesktopShellPreferencePatch, DesktopShellState, EventPumpControl,
     DEFAULT_EVENT_PUMP_INTERVAL_MS, TRAY_ACTION_CHANNEL,
@@ -574,6 +575,51 @@ pub(crate) fn lxmf_start_event_pump(
 }
 
 #[tauri::command]
+pub(crate) fn lxmf_set_event_pump_policy(
+    app: AppHandle,
+    actor: State<'_, RuntimeActor>,
+    index_store: State<'_, Arc<IndexStore>>,
+    event_pump: State<'_, EventPumpControl>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    mode: String,
+    interval_ms: Option<u64>,
+) -> Result<Value, String> {
+    let normalized_mode = mode.trim().to_ascii_lowercase();
+    let fallback_interval = match normalized_mode.as_str() {
+        "foreground" => 250,
+        "background" => 1_500,
+        "hidden" => 3_000,
+        _ => {
+            return Err("mode must be one of: foreground, background, hidden".to_string());
+        }
+    };
+    let desired_interval = interval_ms.unwrap_or(fallback_interval).clamp(150, 5_000);
+
+    let selector = if profile.is_some() || rpc.is_some() {
+        RuntimeSelector::load(profile, rpc)?
+    } else if let Some((active_profile, active_rpc)) = event_pump.current_target() {
+        RuntimeSelector::load(Some(active_profile), Some(active_rpc))?
+    } else {
+        RuntimeSelector::load(default_profile(), default_rpc())?
+    };
+
+    event_pump.start(
+        app,
+        actor.inner().clone(),
+        index_store.inner().clone(),
+        selector,
+        desired_interval,
+    )?;
+
+    Ok(json!({
+        "running": true,
+        "mode": normalized_mode,
+        "interval_ms": desired_interval,
+    }))
+}
+
+#[tauri::command]
 pub(crate) fn lxmf_stop_event_pump(
     event_pump: State<'_, EventPumpControl>,
 ) -> Result<Value, String> {
@@ -834,6 +880,48 @@ pub(crate) fn lxmf_send_rich_message(
             "destination": destination,
         }
     }))
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn lxmf_send_rich_message_refs(
+    actor: State<'_, RuntimeActor>,
+    profile: Option<String>,
+    rpc: Option<String>,
+    destination: String,
+    content: String,
+    title: Option<String>,
+    source: Option<String>,
+    id: Option<String>,
+    attachments: Option<Vec<RichAttachmentInput>>,
+    method: Option<String>,
+    stamp_cost: Option<u32>,
+    include_ticket: Option<bool>,
+    reply_to: Option<String>,
+    reaction_to: Option<String>,
+    reaction_emoji: Option<String>,
+    reaction_sender: Option<String>,
+    telemetry_location: Option<Value>,
+) -> Result<Value, String> {
+    lxmf_send_rich_message(
+        actor,
+        profile,
+        rpc,
+        destination,
+        content,
+        title,
+        source,
+        id,
+        attachments,
+        method,
+        stamp_cost,
+        include_ticket,
+        reply_to,
+        reaction_to,
+        reaction_emoji,
+        reaction_sender,
+        telemetry_location,
+    )
 }
 
 #[tauri::command]

@@ -82,20 +82,29 @@ pub(crate) fn lxmf_index_status(index_store: State<'_, Arc<IndexStore>>) -> Resu
 #[tauri::command]
 pub(crate) fn get_runtime_metrics(
     index_store: State<'_, Arc<IndexStore>>,
+    event_pump: State<'_, EventPumpControl>,
+    attachment_handles: State<'_, Arc<AttachmentHandleManager>>,
 ) -> Result<Value, String> {
     let started_at = Instant::now();
     let metrics = index_store.as_ref().runtime_metrics()?;
     let rss_bytes = current_process_rss_bytes();
+    let event_pump_interval_ms = event_pump.current_interval_ms();
+    attachment_handles.cleanup_expired();
+    let attachment_handle_count = attachment_handles.active_handle_count();
     let elapsed_ms = started_at.elapsed().as_millis();
     log::debug!(
-        "runtime_metrics elapsed_ms={elapsed_ms} rss_bytes={} db_size_bytes={} queue_size={} message_count={} thread_count={}",
+        "runtime_metrics elapsed_ms={elapsed_ms} rss_bytes={} db_size_bytes={} queue_size={} message_count={} thread_count={} event_pump_interval_ms={} attachment_handle_count={}",
         rss_bytes
             .map(|value| value.to_string())
             .unwrap_or_else(|| "unknown".to_string()),
         metrics.db_size_bytes,
         metrics.queue_size,
         metrics.message_count,
-        metrics.thread_count
+        metrics.thread_count,
+        event_pump_interval_ms
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "unknown".to_string()),
+        attachment_handle_count
     );
     Ok(json!({
         "rss_bytes": rss_bytes,
@@ -103,6 +112,9 @@ pub(crate) fn get_runtime_metrics(
         "queue_size": metrics.queue_size,
         "message_count": metrics.message_count,
         "thread_count": metrics.thread_count,
+        "event_pump_interval_ms": event_pump_interval_ms,
+        "attachment_handle_count": attachment_handle_count,
+        "index_last_sync_ms": metrics.index_last_sync_ms,
     }))
 }
 
@@ -290,6 +302,39 @@ pub(crate) fn get_attachment_bytes(
         .as_ref()
         .get_attachment_bytes(AttachmentBytesParams { attachment_id });
     log_index_query_latency("get_attachment_bytes", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn open_attachment_handle(
+    app: AppHandle,
+    index_store: State<'_, Arc<IndexStore>>,
+    attachment_handles: State<'_, Arc<AttachmentHandleManager>>,
+    attachment_id: String,
+    disposition: Option<String>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let _ = disposition;
+    let result = attachment_handles
+        .open_attachment_handle(&app, index_store.as_ref(), attachment_id)
+        .and_then(|payload| {
+            serde_json::to_value(payload)
+                .map_err(|err| format!("serialize attachment handle failed: {err}"))
+        });
+    log_index_query_latency("open_attachment_handle", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn close_attachment_handle(
+    attachment_handles: State<'_, Arc<AttachmentHandleManager>>,
+    handle_id: String,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = attachment_handles
+        .close_attachment_handle(&handle_id)
+        .map(|closed| json!({ "closed": closed }));
+    log_index_query_latency("close_attachment_handle", started_at, &result);
     result
 }
 

@@ -7,6 +7,7 @@ import {
 import type { OutboundAttachmentDraft, OutboundMessageDraft } from '@shared/types/chat'
 
 import {
+  isOfflineAttachmentStoreSupported,
   loadOfflineAttachment,
   pruneOfflineAttachments,
   storeOfflineAttachment,
@@ -43,7 +44,7 @@ type StoredOfflineQueueEntry = Omit<OfflineQueueEntry, 'draft'> & {
 const OFFLINE_QUEUE_KEY = 'weft.chat.offline-queue.v2'
 const OFFLINE_QUEUE_LEGACY_KEY = 'weft.chat.offline-queue.v1'
 const OFFLINE_QUEUE_IGNORED_KEY = 'weft.chat.offline-queue-ignored.v1'
-const INLINE_ATTACHMENT_STORAGE_LIMIT_BYTES = 16 * 1024
+const INLINE_ATTACHMENT_STORAGE_LIMIT_BYTES = 4 * 1024
 
 export async function loadStoredOfflineQueue(): Promise<OfflineQueueEntry[]> {
   if (typeof window === 'undefined') {
@@ -141,8 +142,21 @@ async function serializeQueueDraft(
 ): Promise<StoredOfflineQueueDraft> {
   const attachments = await Promise.all(
     (draft.attachments ?? []).map(async (attachment, index) => {
-      const blobKey = buildAttachmentBlobKey(queueId, index)
-      const stored = await storeOfflineAttachment(blobKey, attachment)
+      const inlinePayload = normalizeString(attachment.dataBase64)
+      const existingBlobKey = normalizeString(attachment.blobKey)
+      if (existingBlobKey && !inlinePayload) {
+        return {
+          name: attachment.name,
+          mime: attachment.mime,
+          sizeBytes: attachment.sizeBytes,
+          blobKey: existingBlobKey,
+        } satisfies StoredOfflineQueueAttachment
+      }
+      const blobKey = existingBlobKey ?? buildAttachmentBlobKey(queueId, index)
+      const stored = await storeOfflineAttachment(blobKey, {
+        ...attachment,
+        dataBase64: inlinePayload,
+      })
       if (stored) {
         return {
           name: attachment.name,
@@ -151,19 +165,27 @@ async function serializeQueueDraft(
           blobKey,
         } satisfies StoredOfflineQueueAttachment
       }
-      if (attachment.sizeBytes <= INLINE_ATTACHMENT_STORAGE_LIMIT_BYTES) {
+      if (inlinePayload && attachment.sizeBytes <= INLINE_ATTACHMENT_STORAGE_LIMIT_BYTES) {
         return {
           name: attachment.name,
           mime: attachment.mime,
           sizeBytes: attachment.sizeBytes,
-          dataBase64: attachment.dataBase64,
+          dataBase64: inlinePayload,
+        } satisfies StoredOfflineQueueAttachment
+      }
+      if (inlinePayload && !isOfflineAttachmentStoreSupported()) {
+        return {
+          name: attachment.name,
+          mime: attachment.mime,
+          sizeBytes: attachment.sizeBytes,
+          dataBase64: inlinePayload,
         } satisfies StoredOfflineQueueAttachment
       }
       return {
         name: attachment.name,
         mime: attachment.mime,
         sizeBytes: attachment.sizeBytes,
-        dataBase64: attachment.dataBase64,
+        ...(existingBlobKey ? { blobKey: existingBlobKey } : {}),
       } satisfies StoredOfflineQueueAttachment
     })
   )
@@ -219,7 +241,7 @@ async function hydrateStoredDraft(
         name: attachment.name,
         mime: attachment.mime ?? loaded.mime,
         sizeBytes: attachment.sizeBytes,
-        dataBase64: loaded.dataBase64,
+        blobKey,
       } satisfies OutboundAttachmentDraft
     })
   )

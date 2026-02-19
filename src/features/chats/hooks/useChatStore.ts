@@ -29,6 +29,7 @@ import {
   getStoredThreadPreferences,
   persistThreadPreferences,
   resolveThreadPreference,
+  THREAD_PREFERENCES_UPDATED_EVENT,
 } from '../state/threadPreferences'
 import { CHAT_REFRESH_DEBOUNCE_MS, type ChatsState } from '../types'
 
@@ -61,6 +62,7 @@ type UseChatStoreResult = Omit<
 > & {
   selectThread: (threadId?: string) => void
   loadMoreThreadMessages: (threadId: string) => Promise<void>
+  loadMoreThreads: () => Promise<void>
   runtime: ChatStoreRuntimeContext
 }
 
@@ -82,6 +84,8 @@ export function useChatStore({
   const refreshTimerRef = useRef<number | null>(null)
   const threadPreferencesRef = useRef(getStoredThreadPreferences())
   const draftThreadsRef = useRef<Map<string, ChatThread>>(new Map())
+  const threadSummariesRef = useRef<ThreadSummary[]>([])
+  const threadCursorRef = useRef<string | null>(null)
   const unreadOverridesRef = useRef<Map<string, number>>(new Map())
   const activeThreadIdRef = useRef<string | null>(null)
   const messageCacheRef = useRef<Map<string, ThreadMessageCache>>(new Map())
@@ -113,6 +117,28 @@ export function useChatStore({
       }
       messageCacheOrderRef.current.shift()
       messageCacheRef.current.delete(candidate)
+      setThreads(previous =>
+        previous.map(thread => (thread.id === candidate ? { ...thread, messages: [] } : thread))
+      )
+    }
+
+    let totalMessages = countCachedMessages(messageCacheRef.current)
+    while (totalMessages > MAX_CACHED_MESSAGES) {
+      const candidate = messageCacheOrderRef.current[0]
+      if (!candidate) {
+        break
+      }
+      if (candidate === activeThreadIdRef.current) {
+        if (messageCacheOrderRef.current.length <= 1) {
+          break
+        }
+        messageCacheOrderRef.current.shift()
+        messageCacheOrderRef.current.push(candidate)
+        continue
+      }
+      messageCacheOrderRef.current.shift()
+      messageCacheRef.current.delete(candidate)
+      totalMessages = countCachedMessages(messageCacheRef.current)
       setThreads(previous =>
         previous.map(thread => (thread.id === candidate ? { ...thread, messages: [] } : thread))
       )
@@ -262,28 +288,20 @@ export function useChatStore({
     lastRefreshAtRef.current = Date.now()
     try {
       setError(null)
-
-      const summaries: ThreadSummary[] = []
-      let cursor: string | undefined
-      let pageCount = 0
-      while (pageCount < MAX_THREAD_PAGES) {
-        const page = await fetchThreadPage({
-          cursor,
-          limit: getDataLoadingProfile().threadPageSize,
-        })
-        summaries.push(...page.items)
-        cursor = page.nextCursor ?? undefined
-        pageCount += 1
-        if (!cursor) {
-          break
-        }
-      }
+      const page = await fetchThreadPage({
+        limit: getDataLoadingProfile().threadPageSize,
+      })
+      threadSummariesRef.current = dedupeThreadSummaries(page.items)
+      threadCursorRef.current = page.nextCursor
 
       hasLoadedRef.current = true
-      hydrateThreads(summaries)
+      hydrateThreads(threadSummariesRef.current)
 
       const activeThreadId = activeThreadIdRef.current
-      if (activeThreadId && summaries.some(summary => summary.id === activeThreadId)) {
+      if (
+        activeThreadId &&
+        threadSummariesRef.current.some(summary => summary.id === activeThreadId)
+      ) {
         const cache = messageCacheRef.current.get(activeThreadId)
         if (!cache) {
           await loadInitialThreadMessages(activeThreadId)
@@ -296,6 +314,23 @@ export function useChatStore({
       refreshingRef.current = false
     }
   }, [hydrateThreads, loadInitialThreadMessages])
+
+  const loadMoreThreads = useCallback(async () => {
+    const cursor = threadCursorRef.current
+    if (!cursor) {
+      return
+    }
+    const page = await fetchThreadPage({
+      cursor,
+      limit: getDataLoadingProfile().threadPageSize,
+    })
+    threadSummariesRef.current = dedupeThreadSummaries([
+      ...threadSummariesRef.current,
+      ...page.items,
+    ])
+    threadCursorRef.current = page.nextCursor
+    hydrateThreads(threadSummariesRef.current)
+  }, [hydrateThreads])
 
   const scheduleRefresh = useCallback(
     (delayMs = CHAT_REFRESH_DEBOUNCE_MS) => {
@@ -471,6 +506,8 @@ export function useChatStore({
       messageCacheOrderRef.current = []
       inFlightMessageFetchRef.current.clear()
       draftThreadsRef.current.clear()
+      threadSummariesRef.current = []
+      threadCursorRef.current = null
       unreadOverridesRef.current.clear()
       if (refreshTimerRef.current !== null) {
         window.clearTimeout(refreshTimerRef.current)
@@ -499,6 +536,17 @@ export function useChatStore({
   }, [rewriteSelfAuthors])
 
   useEffect(() => {
+    const handleThreadPreferenceUpdate = () => {
+      threadPreferencesRef.current = getStoredThreadPreferences()
+      setThreads(previous => previous.map(thread => applyThreadMetadata(thread)))
+    }
+    window.addEventListener(THREAD_PREFERENCES_UPDATED_EVENT, handleThreadPreferenceUpdate)
+    return () => {
+      window.removeEventListener(THREAD_PREFERENCES_UPDATED_EVENT, handleThreadPreferenceUpdate)
+    }
+  }, [applyThreadMetadata])
+
+  useEffect(() => {
     return () => {
       if (refreshTimerRef.current !== null) {
         window.clearTimeout(refreshTimerRef.current)
@@ -520,6 +568,7 @@ export function useChatStore({
     setThreadMuted,
     selectThread,
     loadMoreThreadMessages,
+    loadMoreThreads,
     runtime: {
       threadPreferencesRef,
       hasLoadedRef,
@@ -548,5 +597,26 @@ function dedupeMessages(messages: ChatMessage[]): ChatMessage[] {
   return out
 }
 
-const MAX_THREAD_PAGES = 8
-const MAX_CACHED_THREAD_MESSAGE_SETS = 3
+const MAX_CACHED_THREAD_MESSAGE_SETS = 2
+const MAX_CACHED_MESSAGES = 500
+
+function countCachedMessages(cache: Map<string, ThreadMessageCache>): number {
+  let count = 0
+  for (const entry of cache.values()) {
+    count += entry.messages.length
+  }
+  return count
+}
+
+function dedupeThreadSummaries(summaries: ThreadSummary[]): ThreadSummary[] {
+  const seen = new Set<string>()
+  const out: ThreadSummary[] = []
+  for (const summary of summaries) {
+    if (!summary.id || seen.has(summary.id)) {
+      continue
+    }
+    seen.add(summary.id)
+    out.push(summary)
+  }
+  return out
+}

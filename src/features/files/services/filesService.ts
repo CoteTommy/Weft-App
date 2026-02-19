@@ -1,5 +1,11 @@
 import type { FileItem } from '@shared/types/files'
-import { getAttachmentBytes, queryFilesPage } from '@lib/lxmf-api'
+import {
+  closeAttachmentHandle,
+  getAttachmentBytes,
+  openAttachmentHandle,
+  queryFilesPage,
+} from '@lib/lxmf-api'
+import { toTauriFileUrl } from '@lib/tauri-runtime'
 
 export async function fetchFiles(): Promise<FileItem[]> {
   const items: FileItem[] = []
@@ -61,6 +67,36 @@ export async function fetchFileAttachmentBytes(file: FileItem): Promise<{
   }
 }
 
+export async function openFileAttachmentHandle(
+  file: FileItem,
+  disposition: 'preview' | 'download' = 'download'
+): Promise<{
+  handleId: string
+  url: string
+  mime: string | null
+  sizeBytes: number
+  expiresAtMs: number
+  close: () => Promise<void>
+}> {
+  if (file.kind === 'Note') {
+    throw new Error('Notes do not have attachment bytes.')
+  }
+  if (!/^\d+$/.test(file.id)) {
+    throw new Error('Attachment handle unavailable for this file item.')
+  }
+  const handle = await openAttachmentHandle(file.id, disposition)
+  return {
+    handleId: handle.handleId,
+    url: toAttachmentHandleUrl(handle.path),
+    mime: handle.mime,
+    sizeBytes: handle.sizeBytes,
+    expiresAtMs: handle.expiresAtMs,
+    close: async () => {
+      await closeAttachmentHandle(handle.handleId).catch(() => ({ closed: false }))
+    },
+  }
+}
+
 function normalizeKind(value: string): FileItem['kind'] {
   if (value === 'Image' || value === 'Audio' || value === 'Archive' || value === 'Note') {
     return value
@@ -70,3 +106,7 @@ function normalizeKind(value: string): FileItem['kind'] {
 
 const PAGE_SIZE = 250
 const MAX_PAGES = 8
+
+function toAttachmentHandleUrl(path: string): string {
+  return toTauriFileUrl(path)
+}

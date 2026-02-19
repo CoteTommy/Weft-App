@@ -1,5 +1,7 @@
 use super::*;
 
+const REINDEX_BATCH_SIZE: usize = 500;
+
 impl IndexStore {
     pub(crate) fn reindex_from_runtime_payloads(
         &self,
@@ -59,47 +61,60 @@ impl IndexStore {
         messages: &[Value],
         peers: &[PeerSummary],
     ) -> Result<(), String> {
-        let parsed_messages = messages
-            .iter()
-            .filter_map(|value| parse_message_row(value).ok())
-            .collect::<Vec<_>>();
-
         let mut conn = self
             .conn
             .lock()
             .map_err(|_| "index lock poisoned".to_string())?;
-        let tx = conn
-            .transaction()
-            .map_err(|err| format!("start reindex transaction failed: {err}"))?;
-
-        tx.execute_batch(
+        conn.execute_batch(
             "
+            BEGIN IMMEDIATE;
             DELETE FROM attachments;
             DELETE FROM messages;
+            COMMIT;
             ",
         )
         .map_err(|err| format!("clear tables for reindex failed: {err}"))?;
 
-        for parsed in &parsed_messages {
-            upsert_message_row(&tx, parsed)?;
+        let mut latest_ts = 0_i64;
+        let mut latest_id: Option<String> = None;
+        let mut batch_count = 0_usize;
+        let mut tx = conn
+            .transaction()
+            .map_err(|err| format!("start reindex batch transaction failed: {err}"))?;
+
+        for value in messages {
+            let parsed = match parse_message_row(value) {
+                Ok(parsed) => parsed,
+                Err(_) => continue,
+            };
+            upsert_message_row(&tx, &parsed)?;
+            if latest_id.is_none() || parsed.row.ts_ms >= latest_ts {
+                latest_ts = parsed.row.ts_ms;
+                latest_id = Some(parsed.row.message_id.clone());
+            }
+            batch_count += 1;
+            if batch_count >= REINDEX_BATCH_SIZE {
+                tx.commit()
+                    .map_err(|err| format!("commit reindex batch failed: {err}"))?;
+                tx = conn
+                    .transaction()
+                    .map_err(|err| format!("start reindex batch transaction failed: {err}"))?;
+                batch_count = 0;
+            }
         }
 
         tx.commit()
             .map_err(|err| format!("commit reindex transaction failed: {err}"))?;
+        rebuild_threads_table(&mut conn)?;
+        apply_peer_names_to_threads(&mut conn, peers)?;
 
-        rebuild_threads_from_messages(&mut conn, &parsed_messages, peers)?;
+        let sync_ts = if latest_id.is_some() {
+            latest_ts
+        } else {
+            current_timestamp_ms()
+        };
 
-        let latest_ts = parsed_messages
-            .iter()
-            .map(|entry| entry.row.ts_ms)
-            .max()
-            .unwrap_or_else(current_timestamp_ms);
-        let latest_id = parsed_messages
-            .iter()
-            .max_by_key(|entry| entry.row.ts_ms)
-            .map(|entry| entry.row.message_id.clone());
-
-        update_last_sync_state(&mut conn, latest_ts, latest_id)?;
+        update_last_sync_state(&mut conn, sync_ts, latest_id)?;
         self.ready.store(true, Ordering::Relaxed);
         Ok(())
     }
