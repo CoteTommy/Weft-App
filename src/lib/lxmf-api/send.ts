@@ -1,4 +1,5 @@
 import { invokeWithProbe, parseLxmfSendMessageResponse } from './common'
+import { TAURI_IPC_COMMANDS } from './generated/tauriIpcV2'
 import type {
   LxmfSendCommandOptions,
   LxmfSendMessageOptions,
@@ -9,7 +10,7 @@ import type {
 export async function sendLxmfMessage(
   options: LxmfSendMessageOptions
 ): Promise<LxmfSendMessageResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_send_message', options, {
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_SEND_MESSAGE, options, {
     destination: options.destination,
     content: options.content,
     title: options.title ?? null,
@@ -31,7 +32,7 @@ export async function sendLxmfMessage(
 export async function sendLxmfCommand(
   options: LxmfSendCommandOptions
 ): Promise<LxmfSendMessageResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_send_command', options, {
+  const payload = await invokeWithProbe<unknown>(TAURI_IPC_COMMANDS.LXMF_SEND_COMMAND, options, {
     destination: options.destination,
     commands: options.commands ?? null,
     commands_hex: options.commandsHex ?? null,
@@ -49,28 +50,32 @@ export async function sendLxmfCommand(
 export async function sendLxmfRichMessage(
   options: LxmfSendRichMessageOptions
 ): Promise<LxmfSendMessageResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_send_rich_message', options, {
-    destination: options.destination,
-    content: options.content,
-    title: options.title ?? null,
-    source: options.source ?? null,
-    id: options.id ?? null,
-    attachments:
-      options.attachments?.map(attachment => ({
-        name: attachment.name,
-        data_base64: attachment.dataBase64,
-        mime: attachment.mime ?? null,
-        size_bytes: attachment.sizeBytes ?? null,
-      })) ?? null,
-    method: options.method ?? null,
-    stamp_cost: options.stampCost ?? null,
-    include_ticket: options.includeTicket ?? null,
-    reply_to: options.replyToId ?? null,
-    reaction_to: options.reaction?.to ?? null,
-    reaction_emoji: options.reaction?.emoji ?? null,
-    reaction_sender: options.reaction?.sender ?? null,
-    telemetry_location: options.telemetryLocation ?? null,
-  })
+  const payload = await invokeWithProbe<unknown>(
+    TAURI_IPC_COMMANDS.LXMF_SEND_RICH_MESSAGE,
+    options,
+    {
+      destination: options.destination,
+      content: options.content,
+      title: options.title ?? null,
+      source: options.source ?? null,
+      id: options.id ?? null,
+      attachments:
+        options.attachments?.map(attachment => ({
+          name: attachment.name,
+          data_base64: attachment.dataBase64,
+          mime: attachment.mime ?? null,
+          size_bytes: attachment.sizeBytes ?? null,
+        })) ?? null,
+      method: options.method ?? null,
+      stamp_cost: options.stampCost ?? null,
+      include_ticket: options.includeTicket ?? null,
+      reply_to: options.replyToId ?? null,
+      reaction_to: options.reaction?.to ?? null,
+      reaction_emoji: options.reaction?.emoji ?? null,
+      reaction_sender: options.reaction?.sender ?? null,
+      telemetry_location: options.telemetryLocation ?? null,
+    }
+  )
   return parseLxmfSendMessageResponse(payload)
 }
 
@@ -101,7 +106,11 @@ export async function sendLxmfRichMessageRefs(
   }
 
   try {
-    const payload = await invokeWithProbe<unknown>('lxmf_send_rich_message_refs', options, request)
+    const payload = await invokeWithProbe<unknown>(
+      TAURI_IPC_COMMANDS.LXMF_SEND_RICH_MESSAGE_REFS,
+      options,
+      request
+    )
     return parseLxmfSendMessageResponse(payload)
   } catch {
     return await sendLxmfRichMessage(options)

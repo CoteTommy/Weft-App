@@ -3,6 +3,14 @@ import { invoke } from '@tauri-apps/api/core'
 import { getRuntimeConnectionOptions, getRuntimeTransportOption } from '@shared/runtime/preferences'
 
 import { type LxmfDaemonLocalStatus, parseLxmfDaemonLocalStatus } from '../lxmf-contract'
+import {
+  invokeIpc,
+  invokeIpcV2,
+  TAURI_IPC_COMMANDS,
+  TAURI_IPC_V2_COMMANDS,
+  type TauriIpcCommand,
+  unwrapIpcV2Envelope,
+} from './generated/tauriIpcV2'
 import type {
   DaemonControlOptions,
   LxmfEventPumpStatus,
@@ -22,13 +30,40 @@ export function resolveProbeOptions(options: ProbeOptions): {
   }
 }
 
+export async function invokeDaemonProbeOrStatusV2<TPayload = unknown>(
+  kind: 'probe' | 'status',
+  options: ProbeOptions = {}
+): Promise<TPayload> {
+  const resolved = resolveProbeOptions(options)
+  const fields = {
+    profile: resolved.profile,
+    rpc: resolved.rpc,
+  }
+  const v2Command =
+    kind === 'probe'
+      ? TAURI_IPC_V2_COMMANDS.V2_DAEMON_PROBE
+      : TAURI_IPC_V2_COMMANDS.V2_DAEMON_STATUS
+  const legacyCommand =
+    kind === 'probe' ? TAURI_IPC_COMMANDS.DAEMON_PROBE : TAURI_IPC_COMMANDS.DAEMON_STATUS
+
+  try {
+    const envelope = await invokeIpcV2<TPayload>(v2Command, fields)
+    return unwrapIpcV2Envelope(envelope)
+  } catch (error) {
+    if (!isMissingCommandError(error)) {
+      throw error
+    }
+    return await invoke<TPayload>(legacyCommand, fields)
+  }
+}
+
 export async function invokeWithProbe<TPayload = unknown>(
-  command: string,
+  command: TauriIpcCommand,
   options: ProbeOptions = {},
   fields: Record<string, unknown> = {}
 ): Promise<TPayload> {
   const resolved = resolveProbeOptions(options)
-  return await invoke<TPayload>(command, {
+  return await invokeIpc<TPayload>(command, {
     profile: resolved.profile,
     rpc: resolved.rpc,
     ...fields,
@@ -40,14 +75,37 @@ export async function daemonControlAction(
   options: DaemonControlOptions | ProbeOptions
 ): Promise<LxmfDaemonLocalStatus> {
   const resolved = resolveProbeOptions(options)
-  const payload = await invoke<unknown>(tauriCommand, {
+  const fields = {
     profile: resolved.profile,
     rpc: resolved.rpc,
     managed: 'managed' in options ? (options.managed ?? null) : null,
     reticulumd: 'reticulumd' in options ? (options.reticulumd ?? null) : null,
     transport:
       'transport' in options ? (options.transport ?? getRuntimeTransportOption() ?? null) : null,
-  })
+  }
+  const v2Command =
+    tauriCommand === 'daemon_start'
+      ? TAURI_IPC_V2_COMMANDS.V2_DAEMON_START
+      : tauriCommand === 'daemon_stop'
+        ? TAURI_IPC_V2_COMMANDS.V2_DAEMON_STOP
+        : TAURI_IPC_V2_COMMANDS.V2_DAEMON_RESTART
+  const legacyCommand =
+    tauriCommand === 'daemon_start'
+      ? TAURI_IPC_COMMANDS.DAEMON_START
+      : tauriCommand === 'daemon_stop'
+        ? TAURI_IPC_COMMANDS.DAEMON_STOP
+        : TAURI_IPC_COMMANDS.DAEMON_RESTART
+
+  let payload: unknown
+  try {
+    const envelope = await invokeIpcV2<unknown>(v2Command, fields)
+    payload = unwrapIpcV2Envelope(envelope)
+  } catch (error) {
+    if (!isMissingCommandError(error)) {
+      throw error
+    }
+    payload = await invokeIpc<unknown>(legacyCommand, fields)
+  }
   return parseLxmfDaemonLocalStatus(payload)
 }
 
@@ -137,4 +195,16 @@ function asOptionalNumber(value: unknown, path: string): number | undefined {
     throw new Error(`${path} must be a finite number`)
   }
   return value
+}
+
+function isMissingCommandError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+  const message = error.message.toLowerCase()
+  return (
+    message.includes('not found') ||
+    message.includes('unknown command') ||
+    (message.includes('command') && message.includes('v2_daemon_'))
+  )
 }
