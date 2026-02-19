@@ -3,12 +3,8 @@ import { getStoredDisplayName, shortHash } from '@shared/utils/identity'
 import { formatRelativeFromNow } from '@shared/utils/time'
 import {
   getLxmfProfile,
-  listLxmfMessages,
-  listLxmfPeers,
-  lxmfForceReindex,
-  lxmfIndexStatus,
-  lxmfQueryThreadMessages,
-  lxmfQueryThreads,
+  queryThreadMessagesPage,
+  queryThreadsPage,
   sendLxmfMessage,
   sendLxmfRichMessage,
 } from '@lib/lxmf-api'
@@ -16,80 +12,87 @@ import type { LxmfMessageRecord } from '@lib/lxmf-payloads'
 
 import { buildThreads } from './chatThreadBuilders'
 
-export async function fetchChatThreads() {
-  const [profile, peersResponse] = await Promise.all([
-    getLxmfProfile().catch(() => null),
-    listLxmfPeers().catch(() => ({ peers: [], meta: null })),
-  ])
-  const selfAuthor = profile?.displayName?.trim() || getStoredDisplayName() || 'You'
-  const peerNames = new Map(peersResponse.peers.map(peer => [peer.peer, peer.name?.trim() || '']))
+export type ThreadSummary = {
+  id: string
+  name: string
+  destination: string
+  preview: string
+  unread: number
+  pinned: boolean
+  muted: boolean
+  lastActivity: string
+  lastActivityAtMs: number
+}
 
-  if (!isIndexedReadModelEnabled()) {
-    return fetchChatThreadsLegacy(selfAuthor, peerNames)
+export type ThreadPage = {
+  items: ThreadSummary[]
+  nextCursor: string | null
+}
+
+export type MessagePage = {
+  items: ReturnType<typeof buildThreads>[number]['messages']
+  nextCursor: string | null
+}
+
+export async function fetchThreadPage(params: {
+  cursor?: string
+  limit?: number
+  query?: string
+  pinnedOnly?: boolean
+}): Promise<ThreadPage> {
+  const response = await queryThreadsPage(
+    {},
+    {
+      cursor: params.cursor,
+      limit: params.limit,
+      query: params.query,
+      pinnedOnly: params.pinnedOnly,
+    }
+  )
+  return {
+    items: response.items.map(item => ({
+      id: item.threadId,
+      name: item.name || shortHash(item.threadId),
+      destination: item.destination || shortHash(item.threadId, 8),
+      preview: item.preview || 'No messages yet',
+      unread: item.unread,
+      pinned: item.pinned,
+      muted: item.muted,
+      lastActivity: formatRelativeFromNow(item.lastActivityMs),
+      lastActivityAtMs: item.lastActivityMs,
+    })),
+    nextCursor: response.nextCursor,
   }
+}
 
-  try {
-    const indexStatus = await lxmfIndexStatus().catch(() => null)
-    if (!indexStatus?.ready) {
-      await lxmfForceReindex().catch(() => undefined)
+export async function fetchMessagesPage(params: {
+  threadId: string
+  cursor?: string
+  limit?: number
+  query?: string
+}): Promise<MessagePage> {
+  const response = await queryThreadMessagesPage(
+    params.threadId,
+    {},
+    {
+      cursor: params.cursor,
+      limit: params.limit,
+      query: params.query,
     }
-
-    const threadResponse = await lxmfQueryThreads({}, { limit: 500 })
-    if (threadResponse.items.length === 0) {
-      return []
-    }
-
-    const messagesByThread = await Promise.all(
-      threadResponse.items.map(async thread => {
-        const page = await lxmfQueryThreadMessages(thread.threadId, {}, { limit: 500 })
-        return {
-          threadId: thread.threadId,
-          items: page.items.map(toMessageRecord),
-        }
-      })
-    )
-
-    const allMessages = messagesByThread.flatMap(entry => entry.items)
-    const threadNameOverrides = new Map(
-      threadResponse.items.map(item => [item.threadId, item.name || shortHash(item.threadId)])
-    )
-    const fromMessages = buildThreads(allMessages, threadNameOverrides, selfAuthor)
-    const byThread = new Map(threadResponse.items.map(item => [item.threadId, item]))
-
-    if (fromMessages.length === 0) {
-      return threadResponse.items.map(item => ({
-        id: item.threadId,
-        name: item.name || shortHash(item.threadId),
-        destination: item.destination || shortHash(item.threadId, 8),
-        preview: item.preview || 'No messages yet',
-        unread: item.unread,
-        pinned: item.pinned,
-        muted: item.muted,
-        lastActivity: formatRelativeFromNow(item.lastActivityMs),
-        lastActivityAtMs: item.lastActivityMs,
-        messages: [],
-      }))
-    }
-
-    return fromMessages.map(thread => {
-      const indexed = byThread.get(thread.id)
-      if (!indexed) {
-        return thread
-      }
-      return {
-        ...thread,
-        name: indexed.name || thread.name,
-        destination: indexed.destination || thread.destination,
-        preview: indexed.preview || thread.preview,
-        unread: indexed.unread,
-        pinned: indexed.pinned,
-        muted: indexed.muted,
-        lastActivity: formatRelativeFromNow(indexed.lastActivityMs),
-        lastActivityAtMs: indexed.lastActivityMs,
-      }
-    })
-  } catch {
-    return fetchChatThreadsLegacy(selfAuthor, peerNames)
+  )
+  const selfAuthor =
+    (await getLxmfProfile().catch(() => null))?.displayName?.trim() ||
+    getStoredDisplayName() ||
+    'You'
+  const records = response.items.map(toMessageRecord)
+  const thread = buildThreads(
+    records,
+    new Map([[params.threadId, shortHash(params.threadId)]]),
+    selfAuthor
+  )[0]
+  return {
+    items: thread?.messages ?? [],
+    nextCursor: response.nextCursor,
   }
 }
 
@@ -142,19 +145,6 @@ export async function postChatMessage(
 
 export { buildThreads } from './chatThreadBuilders'
 
-async function fetchChatThreadsLegacy(selfAuthor: string, peerNames: Map<string, string>) {
-  const [messagesResponse, peersResponse] = await Promise.all([
-    listLxmfMessages(),
-    listLxmfPeers().catch(() => ({ peers: [], meta: null })),
-  ])
-  for (const peer of peersResponse.peers) {
-    if (!peerNames.has(peer.peer)) {
-      peerNames.set(peer.peer, peer.name?.trim() || shortHash(peer.peer))
-    }
-  }
-  return buildThreads(messagesResponse.messages, peerNames, selfAuthor)
-}
-
 function toMessageRecord(value: {
   id: string
   source: string
@@ -177,10 +167,6 @@ function toMessageRecord(value: {
     fields: value.fields,
     receipt_status: value.receiptStatus,
   }
-}
-
-function isIndexedReadModelEnabled(): boolean {
-  return import.meta.env.VITE_USE_INDEXED_READ_MODEL !== 'false'
 }
 
 function parseSendOutcome(result: unknown): OutboundSendOutcome {

@@ -31,6 +31,9 @@ export interface BackupPayload {
   performance?: {
     motionPreference?: MotionPreference
     hudEnabled?: boolean
+    threadPageSize?: number
+    messagePageSize?: number
+    attachmentPreviewMode?: 'on_demand' | 'eager'
   }
   desktop?: {
     minimizeToTrayOnClose?: boolean

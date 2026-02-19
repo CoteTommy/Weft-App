@@ -1,6 +1,10 @@
 import type { DesktopAppearance } from '@lib/desktop-shell-api'
 
-import type { ConnectivityMode, MotionPreference } from '../runtime/preferences'
+import type {
+  AttachmentPreviewMode,
+  ConnectivityMode,
+  MotionPreference,
+} from '../runtime/preferences'
 
 export interface SettingsSnapshot {
   displayName: string
@@ -35,6 +39,16 @@ export interface SettingsSnapshot {
   performance: {
     motionPreference: MotionPreference
     hudEnabled: boolean
+    threadPageSize: number
+    messagePageSize: number
+    attachmentPreviewMode: AttachmentPreviewMode
+    runtimeMetrics?: {
+      rssBytes: number | null
+      dbSizeBytes: number
+      queueSize: number
+      messageCount: number
+      threadCount: number
+    }
   }
   desktop: {
     minimizeToTrayOnClose: boolean

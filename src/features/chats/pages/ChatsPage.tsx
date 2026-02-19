@@ -16,7 +16,8 @@ import { filterThreadIndex, indexThreads } from '../utils/filterThreads'
 export function ChatsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { threads, loading, error, refresh, markAllRead, createThread } = useChatsState()
+  const { threads, loading, error, refresh, markAllRead, createThread, selectThread } =
+    useChatsState()
   const [query, setQuery] = useState('')
   const [destinationInput, setDestinationInput] = useState('')
   const [nameInput, setNameInput] = useState('')
@@ -30,6 +31,10 @@ export function ChatsPage() {
   const primaryThread = filteredThreads[0] ?? threads[0]
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const destinationInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    selectThread(undefined)
+  }, [selectThread])
 
   useEffect(() => {
     const fromAnnounce = searchParams.get('new_dest')

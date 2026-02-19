@@ -40,6 +40,7 @@ import {
 import { asObject, invokeWithProbe } from './common'
 import type {
   LxmfAttachmentBlobResponse,
+  LxmfAttachmentBytesResponse,
   LxmfDeliveryPolicyUpdate,
   LxmfFilesQueryResponse,
   LxmfIndexStatus,
@@ -47,6 +48,7 @@ import type {
   LxmfPropagationEnableInput,
   LxmfPropagationFetchInput,
   LxmfPropagationIngestInput,
+  LxmfRuntimeMetrics,
   LxmfSearchResponse,
   LxmfSetInterfacesInput,
   LxmfSetInterfacesResponse,
@@ -307,7 +309,19 @@ export async function lxmfQueryThreads(
     pinnedOnly?: boolean
   } = {}
 ): Promise<LxmfThreadQueryResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_query_threads', options, {
+  return queryThreadsPage(options, params)
+}
+
+export async function queryThreadsPage(
+  options: ProbeOptions = {},
+  params: {
+    query?: string
+    limit?: number
+    cursor?: string
+    pinnedOnly?: boolean
+  } = {}
+): Promise<LxmfThreadQueryResponse> {
+  const payload = await invokeWithProbe<unknown>('query_threads_page', options, {
     query: params.query ?? null,
     limit: params.limit ?? null,
     cursor: params.cursor ?? null,
@@ -325,7 +339,19 @@ export async function lxmfQueryThreadMessages(
     cursor?: string
   } = {}
 ): Promise<LxmfThreadMessageQueryResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_query_thread_messages', options, {
+  return queryThreadMessagesPage(threadId, options, params)
+}
+
+export async function queryThreadMessagesPage(
+  threadId: string,
+  options: ProbeOptions = {},
+  params: {
+    query?: string
+    limit?: number
+    cursor?: string
+  } = {}
+): Promise<LxmfThreadMessageQueryResponse> {
+  const payload = await invokeWithProbe<unknown>('query_thread_messages_page', options, {
     thread_id: threadId,
     query: params.query ?? null,
     limit: params.limit ?? null,
@@ -359,13 +385,28 @@ export async function lxmfQueryFiles(
     kind?: string
     limit?: number
     cursor?: string
+    includeBytes?: boolean
   } = {}
 ): Promise<LxmfFilesQueryResponse> {
-  const payload = await invokeWithProbe<unknown>('lxmf_query_files', options, {
+  return queryFilesPage(options, params)
+}
+
+export async function queryFilesPage(
+  options: ProbeOptions = {},
+  params: {
+    query?: string
+    kind?: string
+    limit?: number
+    cursor?: string
+    includeBytes?: boolean
+  } = {}
+): Promise<LxmfFilesQueryResponse> {
+  const payload = await invokeWithProbe<unknown>('query_files_page', options, {
     query: params.query ?? null,
     kind: params.kind ?? null,
     limit: params.limit ?? null,
     cursor: params.cursor ?? null,
+    include_bytes: params.includeBytes ?? null,
   })
   return parseFilesQueryResponse(payload)
 }
@@ -396,6 +437,38 @@ export async function lxmfGetAttachmentBlob(
     attachment_name: attachmentName,
   })
   return parseAttachmentBlobResponse(payload)
+}
+
+export async function getAttachmentBytes(
+  attachmentId: string,
+  options: ProbeOptions = {}
+): Promise<LxmfAttachmentBytesResponse> {
+  const payload = await invokeWithProbe<unknown>('get_attachment_bytes', options, {
+    attachment_id: attachmentId,
+  })
+  return parseAttachmentBytesResponse(payload)
+}
+
+export async function getRuntimeMetrics(options: ProbeOptions = {}): Promise<LxmfRuntimeMetrics> {
+  const payload = await invokeWithProbe<unknown>('get_runtime_metrics', options)
+  const root = asIndexedQueryPayload(payload, 'runtime_metrics')
+  return {
+    rssBytes: asNullableFiniteNumber(root.rss_bytes),
+    dbSizeBytes: asFiniteNumber(root.db_size_bytes, 'runtime_metrics.db_size_bytes'),
+    queueSize: asFiniteNumber(root.queue_size, 'runtime_metrics.queue_size'),
+    messageCount: asFiniteNumber(root.message_count, 'runtime_metrics.message_count'),
+    threadCount: asFiniteNumber(root.thread_count, 'runtime_metrics.thread_count'),
+  }
+}
+
+export async function rebuildThreadSummaries(
+  options: ProbeOptions = {}
+): Promise<{ rebuilt: boolean }> {
+  const payload = await invokeWithProbe<unknown>('rebuild_thread_summaries', options)
+  const root = asIndexedQueryPayload(payload, 'rebuild_thread_summaries')
+  return {
+    rebuilt: Boolean(root.rebuilt),
+  }
 }
 
 export async function lxmfForceReindex(options: ProbeOptions = {}): Promise<{ started: boolean }> {
@@ -502,8 +575,11 @@ function parseFilesQueryResponse(value: unknown): LxmfFilesQueryResponse {
         name: asString(row.name, `files_query.items[${index}].name`),
         kind: asString(row.kind, `files_query.items[${index}].kind`),
         sizeLabel: asString(row.size_label, `files_query.items[${index}].size_label`),
+        sizeBytes: asFiniteNumber(row.size_bytes, `files_query.items[${index}].size_bytes`),
+        createdAtMs: asFiniteNumber(row.created_at_ms, `files_query.items[${index}].created_at_ms`),
         owner: asString(row.owner, `files_query.items[${index}].owner`),
         mime: asNullableString(row.mime) ?? undefined,
+        hasInlineData: Boolean(row.has_inline_data),
         dataBase64: asNullableString(row.data_base64) ?? undefined,
         paperUri: asNullableString(row.paper_uri) ?? undefined,
         paperTitle: asNullableString(row.paper_title) ?? undefined,
@@ -544,6 +620,16 @@ function parseAttachmentBlobResponse(value: unknown): LxmfAttachmentBlobResponse
     mime: asNullableString(root.mime),
     sizeBytes: asFiniteNumber(root.size_bytes, 'attachment_blob.size_bytes'),
     dataBase64: asString(root.data_base64, 'attachment_blob.data_base64'),
+  }
+}
+
+function parseAttachmentBytesResponse(value: unknown): LxmfAttachmentBytesResponse {
+  const root = asIndexedQueryPayload(value, 'attachment_bytes')
+  return {
+    attachmentId: asString(root.attachment_id, 'attachment_bytes.attachment_id'),
+    mime: asNullableString(root.mime),
+    sizeBytes: asFiniteNumber(root.size_bytes, 'attachment_bytes.size_bytes'),
+    dataBase64: asString(root.data_base64, 'attachment_bytes.data_base64'),
   }
 }
 

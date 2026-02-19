@@ -2,8 +2,8 @@ use super::actor::{
     clean_required_arg, parse_command_entries, rpc_actor_call, ActorCommand, RuntimeActor,
 };
 use super::index_store::{
-    AttachmentBlobParams, FilesQueryParams, IndexStore, MapPointsQueryParams, SearchQueryParams,
-    ThreadMessageQueryParams, ThreadQueryParams,
+    AttachmentBlobParams, AttachmentBytesParams, FilesQueryParams, IndexStore, MapPointsQueryParams,
+    SearchQueryParams, ThreadMessageQueryParams, ThreadQueryParams,
 };
 use super::selector::{clean_arg, default_transport, RuntimeSelector};
 use super::{
@@ -19,6 +19,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
+use std::process::Command;
 use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, State};
@@ -118,6 +119,23 @@ fn now_epoch_ms() -> i64 {
         .unwrap_or(0)
 }
 
+fn current_process_rss_bytes() -> Option<u64> {
+    let pid = std::process::id().to_string();
+    let output = Command::new("ps")
+        .args(["-o", "rss=", "-p", &pid])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let payload = String::from_utf8(output.stdout).ok()?;
+    let kb = payload
+        .split_whitespace()
+        .next()
+        .and_then(|value| value.parse::<u64>().ok())?;
+    Some(kb.saturating_mul(1024))
+}
+
 fn log_index_query_latency(command: &str, started_at: Instant, result: &Result<Value, String>) {
     let elapsed_ms = started_at.elapsed().as_millis();
     match result {
@@ -158,6 +176,31 @@ pub(crate) fn lxmf_index_status(index_store: State<'_, Arc<IndexStore>>) -> Resu
 }
 
 #[tauri::command]
+pub(crate) fn get_runtime_metrics(index_store: State<'_, Arc<IndexStore>>) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let metrics = index_store.as_ref().runtime_metrics()?;
+    let rss_bytes = current_process_rss_bytes();
+    let elapsed_ms = started_at.elapsed().as_millis();
+    log::debug!(
+        "runtime_metrics elapsed_ms={elapsed_ms} rss_bytes={} db_size_bytes={} queue_size={} message_count={} thread_count={}",
+        rss_bytes
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "unknown".to_string()),
+        metrics.db_size_bytes,
+        metrics.queue_size,
+        metrics.message_count,
+        metrics.thread_count
+    );
+    Ok(json!({
+        "rss_bytes": rss_bytes,
+        "db_size_bytes": metrics.db_size_bytes,
+        "queue_size": metrics.queue_size,
+        "message_count": metrics.message_count,
+        "thread_count": metrics.thread_count,
+    }))
+}
+
+#[tauri::command]
 pub(crate) fn lxmf_query_threads(
     index_store: State<'_, Arc<IndexStore>>,
     query: Option<String>,
@@ -173,6 +216,25 @@ pub(crate) fn lxmf_query_threads(
         pinned_only,
     });
     log_index_query_latency("lxmf_query_threads", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn query_threads_page(
+    index_store: State<'_, Arc<IndexStore>>,
+    query: Option<String>,
+    limit: Option<usize>,
+    cursor: Option<String>,
+    pinned_only: Option<bool>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = index_store.as_ref().query_threads(ThreadQueryParams {
+        query,
+        limit,
+        cursor,
+        pinned_only,
+    });
+    log_index_query_latency("query_threads_page", started_at, &result);
     result
 }
 
@@ -194,6 +256,27 @@ pub(crate) fn lxmf_query_thread_messages(
             query,
         });
     log_index_query_latency("lxmf_query_thread_messages", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn query_thread_messages_page(
+    index_store: State<'_, Arc<IndexStore>>,
+    thread_id: String,
+    limit: Option<usize>,
+    cursor: Option<String>,
+    query: Option<String>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = index_store
+        .as_ref()
+        .query_thread_messages(ThreadMessageQueryParams {
+            thread_id,
+            limit,
+            cursor,
+            query,
+        });
+    log_index_query_latency("query_thread_messages_page", started_at, &result);
     result
 }
 
@@ -230,8 +313,30 @@ pub(crate) fn lxmf_query_files(
         kind,
         limit,
         cursor,
+        include_bytes: None,
     });
     log_index_query_latency("lxmf_query_files", started_at, &result);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn query_files_page(
+    index_store: State<'_, Arc<IndexStore>>,
+    query: Option<String>,
+    kind: Option<String>,
+    limit: Option<usize>,
+    cursor: Option<String>,
+    include_bytes: Option<bool>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = index_store.as_ref().query_files(FilesQueryParams {
+        query,
+        kind,
+        limit,
+        cursor,
+        include_bytes,
+    });
+    log_index_query_latency("query_files_page", started_at, &result);
     result
 }
 
@@ -270,6 +375,19 @@ pub(crate) fn lxmf_get_attachment_blob(
 }
 
 #[tauri::command]
+pub(crate) fn get_attachment_bytes(
+    index_store: State<'_, Arc<IndexStore>>,
+    attachment_id: String,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    let result = index_store
+        .as_ref()
+        .get_attachment_bytes(AttachmentBytesParams { attachment_id });
+    log_index_query_latency("get_attachment_bytes", started_at, &result);
+    result
+}
+
+#[tauri::command]
 pub(crate) fn lxmf_force_reindex(
     actor: State<'_, RuntimeActor>,
     index_store: State<'_, Arc<IndexStore>>,
@@ -302,6 +420,19 @@ pub(crate) fn lxmf_force_reindex(
     Ok(json!({
         "started": true
     }))
+}
+
+#[tauri::command]
+pub(crate) fn rebuild_thread_summaries(
+    index_store: State<'_, Arc<IndexStore>>,
+) -> Result<Value, String> {
+    let started_at = Instant::now();
+    index_store.as_ref().rebuild_thread_summaries()?;
+    log::info!(
+        "rebuild_thread_summaries elapsed_ms={}",
+        started_at.elapsed().as_millis()
+    );
+    Ok(json!({ "rebuilt": true }))
 }
 
 #[tauri::command]

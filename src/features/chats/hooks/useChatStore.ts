@@ -1,19 +1,21 @@
-import {
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 
-import type { ChatThread, OutboundMessageDraft, OutboundSendOutcome } from '@shared/types/chat'
+import { getDataLoadingProfile } from '@shared/runtime/preferences'
+import type {
+  ChatMessage,
+  ChatThread,
+  OutboundMessageDraft,
+  OutboundSendOutcome,
+} from '@shared/types/chat'
 import { DISPLAY_NAME_UPDATED_EVENT, getStoredDisplayName, shortHash } from '@shared/utils/identity'
 
-import { fetchChatThreads, postChatMessage } from '../services/chatService'
+import {
+  fetchMessagesPage,
+  fetchThreadPage,
+  postChatMessage,
+  type ThreadSummary,
+} from '../services/chatService'
 import { deriveReasonCode, deriveReceiptStatus } from '../services/chatThreadBuilders'
-import { selectThreadById } from '../state/chatSelectors'
 import {
   reduceCreateDraftThread,
   reduceHydratedThreads,
@@ -28,7 +30,7 @@ import {
   persistThreadPreferences,
   resolveThreadPreference,
 } from '../state/threadPreferences'
-import { CHAT_REFRESH_DEBOUNCE_MS, type ChatsState, type IncomingNotificationItem } from '../types'
+import { CHAT_REFRESH_DEBOUNCE_MS, type ChatsState } from '../types'
 
 type SendFailureCallback = (params: {
   threadId: string
@@ -38,48 +40,53 @@ type SendFailureCallback = (params: {
   sourceMessageId?: string
 }) => void
 
-type IncomingNotificationCallback = (items: IncomingNotificationItem[]) => Promise<void>
+type ThreadMessageCache = {
+  messages: ChatMessage[]
+  nextCursor: string | null
+  loadedAtMs: number
+}
 
 export type ChatStoreRuntimeContext = {
-  setThreads: Dispatch<SetStateAction<ChatThread[]>>
-  applyThreadMetadata: (thread: ChatThread) => ChatThread
-  knownMessageIdsRef: RefObject<Map<string, Set<string>>>
-  unreadCountsRef: RefObject<Map<string, number>>
-  draftThreadsRef: RefObject<Map<string, ChatThread>>
   threadPreferencesRef: RefObject<Map<string, { pinned: boolean; muted: boolean }>>
   hasLoadedRef: RefObject<boolean>
   lastRefreshAtRef: RefObject<number>
   scheduleRefresh: () => void
   getLastRefreshAt: () => number
+  enabled: boolean
 }
 
 type UseChatStoreResult = Omit<
   ChatsState,
   'offlineQueue' | 'retryQueueNow' | 'pauseQueue' | 'resumeQueue' | 'removeQueue' | 'clearQueue'
 > & {
+  selectThread: (threadId?: string) => void
+  loadMoreThreadMessages: (threadId: string) => Promise<void>
   runtime: ChatStoreRuntimeContext
 }
 
 export type UseChatStoreParams = {
-  onIncomingNotifications: IncomingNotificationCallback
   onSendFailure: SendFailureCallback
+  runtimeEnabled?: boolean
 }
 
 export function useChatStore({
-  onIncomingNotifications,
   onSendFailure,
+  runtimeEnabled = true,
 }: UseChatStoreParams): UseChatStoreResult {
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const knownMessageIdsRef = useRef<Map<string, Set<string>>>(new Map())
-  const unreadCountsRef = useRef<Map<string, number>>(new Map())
-  const draftThreadsRef = useRef<Map<string, ChatThread>>(new Map())
   const hasLoadedRef = useRef(false)
   const refreshingRef = useRef(false)
   const lastRefreshAtRef = useRef(0)
   const refreshTimerRef = useRef<number | null>(null)
   const threadPreferencesRef = useRef(getStoredThreadPreferences())
+  const draftThreadsRef = useRef<Map<string, ChatThread>>(new Map())
+  const unreadOverridesRef = useRef<Map<string, number>>(new Map())
+  const activeThreadIdRef = useRef<string | null>(null)
+  const messageCacheRef = useRef<Map<string, ThreadMessageCache>>(new Map())
+  const messageCacheOrderRef = useRef<string[]>([])
+  const inFlightMessageFetchRef = useRef<Set<string>>(new Set())
 
   const applyThreadMetadata = useCallback((thread: ChatThread): ChatThread => {
     const preference = resolveThreadPreference(threadPreferencesRef.current, thread.id)
@@ -93,10 +100,159 @@ export function useChatStore({
     }
   }, [])
 
+  const enforceMessageCacheLimit = useCallback(() => {
+    while (messageCacheOrderRef.current.length > MAX_CACHED_THREAD_MESSAGE_SETS) {
+      const candidate = messageCacheOrderRef.current[0]
+      if (!candidate) {
+        break
+      }
+      if (candidate === activeThreadIdRef.current && messageCacheOrderRef.current.length > 1) {
+        messageCacheOrderRef.current.shift()
+        messageCacheOrderRef.current.push(candidate)
+        continue
+      }
+      messageCacheOrderRef.current.shift()
+      messageCacheRef.current.delete(candidate)
+      setThreads(previous =>
+        previous.map(thread => (thread.id === candidate ? { ...thread, messages: [] } : thread))
+      )
+    }
+  }, [])
+
+  const touchMessageCache = useCallback(
+    (threadId: string) => {
+      const normalized = threadId.trim()
+      if (!normalized) {
+        return
+      }
+      messageCacheOrderRef.current = [
+        ...messageCacheOrderRef.current.filter(value => value !== normalized),
+        normalized,
+      ]
+      enforceMessageCacheLimit()
+    },
+    [enforceMessageCacheLimit]
+  )
+
   const rewriteSelfAuthors = useCallback((nextAuthor: string) => {
     const normalizedAuthor = nextAuthor.trim() || 'You'
     setThreads(previous => reduceRewriteSelfAuthors(previous, normalizedAuthor))
+    const nextCache = new Map<string, ThreadMessageCache>()
+    for (const [threadId, cache] of messageCacheRef.current.entries()) {
+      nextCache.set(threadId, {
+        ...cache,
+        messages: cache.messages.map(message =>
+          message.sender === 'self' && message.author !== normalizedAuthor
+            ? { ...message, author: normalizedAuthor }
+            : message
+        ),
+      })
+    }
+    messageCacheRef.current = nextCache
   }, [])
+
+  const upsertThreadMessages = useCallback(
+    (threadId: string, cache: ThreadMessageCache) => {
+      messageCacheRef.current.set(threadId, cache)
+      touchMessageCache(threadId)
+      setThreads(previous =>
+        previous.map(thread =>
+          thread.id === threadId ? { ...thread, messages: cache.messages } : thread
+        )
+      )
+    },
+    [touchMessageCache]
+  )
+
+  const loadInitialThreadMessages = useCallback(
+    async (threadId: string) => {
+      const normalized = threadId.trim()
+      if (!normalized) {
+        return
+      }
+      const lockKey = `${normalized}:head`
+      if (inFlightMessageFetchRef.current.has(lockKey)) {
+        return
+      }
+      inFlightMessageFetchRef.current.add(lockKey)
+      try {
+        const page = await fetchMessagesPage({
+          threadId: normalized,
+          limit: getDataLoadingProfile().messagePageSize,
+        })
+        upsertThreadMessages(normalized, {
+          messages: dedupeMessages(page.items),
+          nextCursor: page.nextCursor,
+          loadedAtMs: Date.now(),
+        })
+      } finally {
+        inFlightMessageFetchRef.current.delete(lockKey)
+      }
+    },
+    [upsertThreadMessages]
+  )
+
+  const loadMoreThreadMessages = useCallback(
+    async (threadId: string) => {
+      const normalized = threadId.trim()
+      if (!normalized) {
+        return
+      }
+      const cache = messageCacheRef.current.get(normalized)
+      if (!cache?.nextCursor) {
+        return
+      }
+      const lockKey = `${normalized}:tail`
+      if (inFlightMessageFetchRef.current.has(lockKey)) {
+        return
+      }
+      inFlightMessageFetchRef.current.add(lockKey)
+      try {
+        const page = await fetchMessagesPage({
+          threadId: normalized,
+          limit: getDataLoadingProfile().messagePageSize,
+          cursor: cache.nextCursor,
+        })
+        upsertThreadMessages(normalized, {
+          messages: dedupeMessages([...page.items, ...cache.messages]),
+          nextCursor: page.nextCursor,
+          loadedAtMs: Date.now(),
+        })
+      } finally {
+        inFlightMessageFetchRef.current.delete(lockKey)
+      }
+    },
+    [upsertThreadMessages]
+  )
+
+  const hydrateThreads = useCallback(
+    (summaries: ThreadSummary[]) => {
+      const summaryIds = new Set(summaries.map(summary => summary.id))
+
+      for (const threadId of unreadOverridesRef.current.keys()) {
+        if (!summaryIds.has(threadId) && !draftThreadsRef.current.has(threadId)) {
+          unreadOverridesRef.current.delete(threadId)
+        }
+      }
+
+      const hydrated = summaries.map(summary => {
+        const cachedMessages = messageCacheRef.current.get(summary.id)?.messages ?? []
+        const unread = unreadOverridesRef.current.get(summary.id) ?? summary.unread
+        return applyThreadMetadata({
+          ...summary,
+          unread,
+          messages: cachedMessages,
+        })
+      })
+
+      for (const thread of hydrated) {
+        draftThreadsRef.current.delete(thread.id)
+      }
+      const draftThreads = [...draftThreadsRef.current.values()].map(applyThreadMetadata)
+      setThreads(reduceHydratedThreads(hydrated, draftThreads))
+    },
+    [applyThreadMetadata]
+  )
 
   const refresh = useCallback(async () => {
     if (refreshingRef.current) {
@@ -106,82 +262,32 @@ export function useChatStore({
     lastRefreshAtRef.current = Date.now()
     try {
       setError(null)
-      const loaded = await fetchChatThreads()
-      const pendingNotifications: IncomingNotificationItem[] = []
-      const activeIds = new Set([
-        ...loaded.map(thread => thread.id),
-        ...draftThreadsRef.current.keys(),
-      ])
 
-      for (const knownId of knownMessageIdsRef.current.keys()) {
-        if (!activeIds.has(knownId)) {
-          knownMessageIdsRef.current.delete(knownId)
-          unreadCountsRef.current.delete(knownId)
-        }
-      }
-
-      for (const thread of loaded) {
-        const knownIds = knownMessageIdsRef.current.get(thread.id)
-        if (!knownIds) {
-          const seeded = new Set(thread.messages.map(message => message.id))
-          knownMessageIdsRef.current.set(thread.id, seeded)
-          if (!hasLoadedRef.current) {
-            unreadCountsRef.current.set(thread.id, 0)
-          } else {
-            const incoming = thread.messages.filter(message => message.sender === 'peer').length
-            unreadCountsRef.current.set(thread.id, incoming)
-          }
-          continue
-        }
-
-        let incomingCount = 0
-        let latestIncoming = ''
-        for (const message of thread.messages) {
-          if (knownIds.has(message.id)) {
-            continue
-          }
-          knownIds.add(message.id)
-          if (message.sender === 'peer') {
-            incomingCount += 1
-            latestIncoming = message.body
-          }
-        }
-
-        if (incomingCount > 0) {
-          unreadCountsRef.current.set(
-            thread.id,
-            (unreadCountsRef.current.get(thread.id) ?? 0) + incomingCount
-          )
-          const preference = resolveThreadPreference(threadPreferencesRef.current, thread.id)
-          if (hasLoadedRef.current && !preference.muted) {
-            pendingNotifications.push({
-              threadId: thread.id,
-              threadName: thread.name,
-              latestBody: latestIncoming,
-              count: incomingCount,
-            })
-          }
-        } else if (!unreadCountsRef.current.has(thread.id)) {
-          unreadCountsRef.current.set(thread.id, 0)
+      const summaries: ThreadSummary[] = []
+      let cursor: string | undefined
+      let pageCount = 0
+      while (pageCount < MAX_THREAD_PAGES) {
+        const page = await fetchThreadPage({
+          cursor,
+          limit: getDataLoadingProfile().threadPageSize,
+        })
+        summaries.push(...page.items)
+        cursor = page.nextCursor ?? undefined
+        pageCount += 1
+        if (!cursor) {
+          break
         }
       }
 
       hasLoadedRef.current = true
-      const hydratedThreads = loaded
-        .map(thread => ({
-          ...thread,
-          unread: unreadCountsRef.current.get(thread.id) ?? 0,
-        }))
-        .map(applyThreadMetadata)
+      hydrateThreads(summaries)
 
-      for (const thread of hydratedThreads) {
-        draftThreadsRef.current.delete(thread.id)
-      }
-      const draftThreads = [...draftThreadsRef.current.values()].map(applyThreadMetadata)
-      setThreads(reduceHydratedThreads(hydratedThreads, draftThreads))
-
-      if (pendingNotifications.length > 0) {
-        void onIncomingNotifications(pendingNotifications)
+      const activeThreadId = activeThreadIdRef.current
+      if (activeThreadId && summaries.some(summary => summary.id === activeThreadId)) {
+        const cache = messageCacheRef.current.get(activeThreadId)
+        if (!cache) {
+          await loadInitialThreadMessages(activeThreadId)
+        }
       }
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : String(refreshError))
@@ -189,7 +295,7 @@ export function useChatStore({
       setLoading(false)
       refreshingRef.current = false
     }
-  }, [applyThreadMetadata, onIncomingNotifications])
+  }, [hydrateThreads, loadInitialThreadMessages])
 
   const scheduleRefresh = useCallback(
     (delayMs = CHAT_REFRESH_DEBOUNCE_MS) => {
@@ -204,30 +310,40 @@ export function useChatStore({
     [refresh]
   )
 
+  const selectThread = useCallback(
+    (threadId?: string) => {
+      const normalized = threadId?.trim() || ''
+      activeThreadIdRef.current = normalized || null
+      if (!normalized) {
+        enforceMessageCacheLimit()
+        return
+      }
+      const cached = messageCacheRef.current.get(normalized)
+      if (!cached) {
+        void loadInitialThreadMessages(normalized)
+      } else {
+        touchMessageCache(normalized)
+      }
+    },
+    [enforceMessageCacheLimit, loadInitialThreadMessages, touchMessageCache]
+  )
+
   const markThreadRead = useCallback((threadId: string) => {
     const id = threadId.trim()
     if (!id) {
       return
     }
-    if ((unreadCountsRef.current.get(id) ?? 0) === 0) {
-      return
-    }
-    unreadCountsRef.current.set(id, 0)
+    unreadOverridesRef.current.set(id, 0)
     setThreads(previous => reduceMarkThreadRead(previous, id))
   }, [])
 
   const markAllRead = useCallback(() => {
-    let hasUnread = false
-    for (const [threadId, unread] of unreadCountsRef.current.entries()) {
-      if (unread > 0) {
-        hasUnread = true
-        unreadCountsRef.current.set(threadId, 0)
+    setThreads(previous => {
+      for (const thread of previous) {
+        unreadOverridesRef.current.set(thread.id, 0)
       }
-    }
-    if (!hasUnread) {
-      return
-    }
-    setThreads(previous => reduceMarkAllThreadsRead(previous))
+      return reduceMarkAllThreadsRead(previous)
+    })
   }, [])
 
   const sendMessage = useCallback(
@@ -248,6 +364,9 @@ export function useChatStore({
           return {}
         }
         await refresh()
+        if ((activeThreadIdRef.current ?? '') === threadId.trim()) {
+          await loadInitialThreadMessages(threadId)
+        }
         return outcome
       } catch (sendError) {
         const message = sendError instanceof Error ? sendError.message : String(sendError)
@@ -261,7 +380,7 @@ export function useChatStore({
         return {}
       }
     },
-    [onSendFailure, refresh]
+    [loadInitialThreadMessages, onSendFailure, refresh]
   )
 
   const createThread = useCallback(
@@ -273,14 +392,11 @@ export function useChatStore({
       }
 
       setError(null)
-      const existing = selectThreadById(threads, threadId)
-      if (existing) {
-        return existing.id
-      }
-      if (draftThreadsRef.current.has(threadId)) {
+      if (threads.some(thread => thread.id === threadId) || draftThreadsRef.current.has(threadId)) {
         return threadId
       }
 
+      const cachedMessages = messageCacheRef.current.get(threadId)?.messages ?? []
       const draft: ChatThread = {
         id: threadId,
         name: name?.trim() || shortHash(threadId),
@@ -291,11 +407,10 @@ export function useChatStore({
         muted: false,
         lastActivity: 'new',
         lastActivityAtMs: Date.now(),
-        messages: [],
+        messages: cachedMessages,
       }
       draftThreadsRef.current.set(threadId, draft)
-      knownMessageIdsRef.current.set(threadId, new Set())
-      unreadCountsRef.current.set(threadId, 0)
+      unreadOverridesRef.current.set(threadId, 0)
       setThreads(previous => reduceCreateDraftThread(previous, applyThreadMetadata(draft)))
       return threadId
     },
@@ -349,11 +464,29 @@ export function useChatStore({
   }, [])
 
   useEffect(() => {
+    if (!runtimeEnabled) {
+      hasLoadedRef.current = false
+      activeThreadIdRef.current = null
+      messageCacheRef.current.clear()
+      messageCacheOrderRef.current = []
+      inFlightMessageFetchRef.current.clear()
+      draftThreadsRef.current.clear()
+      unreadOverridesRef.current.clear()
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
+      setThreads([])
+      setLoading(false)
+      setError(null)
+      return
+    }
     if (refreshingRef.current) {
       return
     }
+    setLoading(true)
     void refresh()
-  }, [refresh])
+  }, [refresh, runtimeEnabled])
 
   useEffect(() => {
     const handleDisplayNameUpdate = () => {
@@ -385,17 +518,15 @@ export function useChatStore({
     createThread,
     setThreadPinned,
     setThreadMuted,
+    selectThread,
+    loadMoreThreadMessages,
     runtime: {
-      setThreads,
-      applyThreadMetadata,
-      knownMessageIdsRef,
-      unreadCountsRef,
-      draftThreadsRef,
       threadPreferencesRef,
       hasLoadedRef,
       lastRefreshAtRef,
       scheduleRefresh,
       getLastRefreshAt: () => lastRefreshAtRef.current,
+      enabled: runtimeEnabled,
     },
   }
 }
@@ -403,3 +534,19 @@ export function useChatStore({
 function isFailedOutboundOutcome(message: OutboundSendOutcome): boolean {
   return deriveReceiptStatus('out', message.backendStatus ?? null) === 'failed'
 }
+
+function dedupeMessages(messages: ChatMessage[]): ChatMessage[] {
+  const seen = new Set<string>()
+  const out: ChatMessage[] = []
+  for (const message of messages) {
+    if (!message.id || seen.has(message.id)) {
+      continue
+    }
+    seen.add(message.id)
+    out.push(message)
+  }
+  return out
+}
+
+const MAX_THREAD_PAGES = 8
+const MAX_CACHED_THREAD_MESSAGE_SETS = 3

@@ -1,6 +1,6 @@
 use base64::Engine as _;
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -41,6 +41,7 @@ pub(crate) struct FilesQueryParams {
     pub kind: Option<String>,
     pub limit: Option<usize>,
     pub cursor: Option<String>,
+    pub include_bytes: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -56,6 +57,11 @@ pub(crate) struct AttachmentBlobParams {
     pub attachment_name: String,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct AttachmentBytesParams {
+    pub attachment_id: String,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct IndexStatus {
     pub ready: bool,
@@ -65,12 +71,20 @@ pub(crate) struct IndexStatus {
 }
 
 #[derive(Debug, Serialize)]
+pub(crate) struct RuntimeMetrics {
+    pub db_size_bytes: u64,
+    pub queue_size: usize,
+    pub message_count: usize,
+    pub thread_count: usize,
+}
+
+#[derive(Debug, Serialize)]
 struct CursorResult<T> {
     items: Vec<T>,
     next_cursor: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct IndexedThread {
     thread_id: String,
     name: String,
@@ -83,7 +97,7 @@ struct IndexedThread {
     last_activity_ms: i64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct IndexedMessage {
     id: String,
     source: String,
@@ -102,8 +116,11 @@ struct IndexedFileItem {
     name: String,
     kind: String,
     size_label: String,
+    size_bytes: i64,
+    created_at_ms: i64,
     owner: String,
     mime: Option<String>,
+    has_inline_data: bool,
     data_base64: Option<String>,
     paper_uri: Option<String>,
     paper_title: Option<String>,
@@ -155,6 +172,19 @@ struct ThreadSummary {
     muted: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ThreadCursorKey {
+    pinned: bool,
+    last_activity_ms: i64,
+    thread_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MessageCursorKey {
+    timestamp: i64,
+    message_id: String,
+}
+
 #[derive(Debug)]
 struct PeerSummary {
     peer: String,
@@ -198,6 +228,7 @@ impl IndexStore {
             .map_err(|err| format!("set synchronous mode failed: {err}"))?;
         conn.execute_batch(SCHEMA_SQL)
             .map_err(|err| format!("init index schema failed: {err}"))?;
+        run_schema_migrations(&conn)?;
 
         Ok(Self {
             conn: Mutex::new(conn),
@@ -242,6 +273,57 @@ impl IndexStore {
         })
     }
 
+    pub(crate) fn runtime_metrics(&self) -> Result<RuntimeMetrics, String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| "index lock poisoned".to_string())?;
+
+        let message_count = conn
+            .query_row("SELECT COUNT(*) FROM messages", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .map_err(|err| format!("read runtime metrics message count failed: {err}"))?
+            .max(0) as usize;
+        let thread_count = conn
+            .query_row("SELECT COUNT(*) FROM threads", [], |row| row.get::<_, i64>(0))
+            .map_err(|err| format!("read runtime metrics thread count failed: {err}"))?
+            .max(0) as usize;
+        let queue_size = conn
+            .query_row(
+                "
+                SELECT COUNT(*)
+                FROM messages
+                WHERE direction = 'out'
+                  AND (
+                    receipt_status IS NULL
+                    OR LOWER(receipt_status) LIKE '%pending%'
+                    OR LOWER(receipt_status) LIKE '%queue%'
+                    OR LOWER(receipt_status) LIKE '%send%'
+                  )
+                ",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|err| format!("read runtime metrics queue size failed: {err}"))?
+            .max(0) as usize;
+        let page_count = conn
+            .query_row("PRAGMA page_count", [], |row| row.get::<_, i64>(0))
+            .map_err(|err| format!("read runtime metrics page_count failed: {err}"))?
+            .max(0) as u64;
+        let page_size = conn
+            .query_row("PRAGMA page_size", [], |row| row.get::<_, i64>(0))
+            .map_err(|err| format!("read runtime metrics page_size failed: {err}"))?
+            .max(0) as u64;
+
+        Ok(RuntimeMetrics {
+            db_size_bytes: page_count.saturating_mul(page_size),
+            queue_size,
+            message_count,
+            thread_count,
+        })
+    }
+
     pub(crate) fn force_reindex(&self) -> Result<(), String> {
         self.ready.store(false, Ordering::Relaxed);
         let conn = self
@@ -258,6 +340,14 @@ impl IndexStore {
         )
         .map_err(|err| format!("clear index failed: {err}"))?;
         Ok(())
+    }
+
+    pub(crate) fn rebuild_thread_summaries(&self) -> Result<(), String> {
+        let mut conn = self
+            .conn
+            .lock()
+            .map_err(|_| "index lock poisoned".to_string())?;
+        rebuild_threads_table(&mut conn)
     }
 
     pub(crate) fn reindex_from_runtime_payloads(
@@ -301,7 +391,7 @@ impl IndexStore {
             upsert_message_row(&tx, &parsed)?;
             tx.commit()
                 .map_err(|err| format!("commit event ingest failed: {err}"))?;
-            rebuild_threads_table(&mut conn)?;
+            upsert_thread_summary_for_thread(&mut conn, &parsed.row.thread_id)?;
             update_last_sync_state(
                 &mut conn,
                 parsed.row.ts_ms,
@@ -315,9 +405,16 @@ impl IndexStore {
 
     pub(crate) fn query_threads(&self, params: ThreadQueryParams) -> Result<Value, String> {
         let limit = normalize_limit(params.limit);
-        let offset = parse_cursor_offset(params.cursor.as_deref());
-        let query = params.query.unwrap_or_default().trim().to_ascii_lowercase();
-        let filter_query = if query.is_empty() { None } else { Some(query) };
+        let keyset = decode_thread_cursor(params.cursor.as_deref());
+        let query_filter = params
+            .query
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase());
+        let query_like = query_filter
+            .as_deref()
+            .map(|value| format!("%{}%", value));
         let pinned_only = params.pinned_only.unwrap_or(false);
 
         let conn = self
@@ -339,8 +436,20 @@ impl IndexStore {
                   last_activity_ms
                 FROM threads
                 WHERE (?1 = 0 OR pinned = 1)
-                ORDER BY pinned DESC, last_activity_ms DESC, thread_id ASC
-                LIMIT ?2 OFFSET ?3
+                  AND (
+                    ?2 IS NULL
+                    OR LOWER(display_name) LIKE ?2
+                    OR LOWER(thread_id) LIKE ?2
+                    OR LOWER(preview) LIKE ?2
+                  )
+                  AND (
+                    ?3 IS NULL
+                    OR pinned < ?3
+                    OR (pinned = ?3 AND last_activity_ms < ?4)
+                    OR (pinned = ?3 AND last_activity_ms = ?4 AND thread_id < ?5)
+                  )
+                ORDER BY pinned DESC, last_activity_ms DESC, thread_id DESC
+                LIMIT ?6
                 ",
             )
             .map_err(|err| format!("prepare thread query failed: {err}"))?;
@@ -349,8 +458,11 @@ impl IndexStore {
             .query_map(
                 params![
                     if pinned_only { 1 } else { 0 },
-                    (limit + 1) as i64,
-                    offset as i64
+                    query_like,
+                    keyset.as_ref().map(|cursor| if cursor.pinned { 1 } else { 0 }),
+                    keyset.as_ref().map(|cursor| cursor.last_activity_ms),
+                    keyset.as_ref().map(|cursor| cursor.thread_id.as_str()),
+                    (limit + 1) as i64
                 ],
                 |row| {
                     Ok(IndexedThread {
@@ -370,29 +482,22 @@ impl IndexStore {
 
         let mut items = Vec::new();
         for result in rows {
-            let item = result.map_err(|err| format!("parse thread row failed: {err}"))?;
-            if let Some(filter) = filter_query.as_deref() {
-                let haystack = format!(
-                    "{} {} {}",
-                    item.name.to_ascii_lowercase(),
-                    item.thread_id.to_ascii_lowercase(),
-                    item.preview.to_ascii_lowercase()
-                );
-                if !haystack.contains(filter) {
-                    continue;
-                }
-            }
-            items.push(item);
+            items.push(result.map_err(|err| format!("parse thread row failed: {err}"))?);
         }
 
         let next_cursor = if items.len() > limit {
-            Some((offset + limit).to_string())
+            let marker = items.get(limit.saturating_sub(1)).cloned();
+            items.truncate(limit);
+            marker.and_then(|entry| {
+                encode_thread_cursor(&ThreadCursorKey {
+                    pinned: entry.pinned,
+                    last_activity_ms: entry.last_activity_ms,
+                    thread_id: entry.thread_id,
+                })
+            })
         } else {
             None
         };
-        if items.len() > limit {
-            items.truncate(limit);
-        }
 
         serde_json::to_value(CursorResult { items, next_cursor })
             .map_err(|err| format!("serialize thread query failed: {err}"))
@@ -408,13 +513,13 @@ impl IndexStore {
         }
 
         let limit = normalize_limit(params.limit);
-        let offset = parse_cursor_offset(params.cursor.as_deref());
+        let keyset = decode_message_cursor(params.cursor.as_deref());
         let filter_query = params
             .query
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
-            .map(|value| value.to_ascii_lowercase());
+            .map(|value| format!("%{}%", value.to_ascii_lowercase()));
 
         let conn = self
             .conn
@@ -436,15 +541,32 @@ impl IndexStore {
                   fields_json
                 FROM messages
                 WHERE thread_id = ?1
+                  AND (
+                    ?2 IS NULL
+                    OR LOWER(title) LIKE ?2
+                    OR LOWER(body) LIKE ?2
+                    OR LOWER(COALESCE(receipt_status, '')) LIKE ?2
+                  )
+                  AND (
+                    ?3 IS NULL
+                    OR ts_ms < ?3
+                    OR (ts_ms = ?3 AND message_id < ?4)
+                  )
                 ORDER BY ts_ms DESC, message_id DESC
-                LIMIT ?2 OFFSET ?3
+                LIMIT ?5
                 ",
             )
             .map_err(|err| format!("prepare message query failed: {err}"))?;
 
         let rows = stmt
             .query_map(
-                params![thread_id, (limit + 1) as i64, offset as i64],
+                params![
+                    thread_id,
+                    filter_query,
+                    keyset.as_ref().map(|cursor| cursor.timestamp),
+                    keyset.as_ref().map(|cursor| cursor.message_id.as_str()),
+                    (limit + 1) as i64
+                ],
                 |row| {
                     let message_id = row.get::<_, String>(0)?;
                     let fields_json = row.get::<_, Option<String>>(8).ok().flatten();
@@ -469,32 +591,21 @@ impl IndexStore {
 
         let mut items = Vec::new();
         for result in rows {
-            let item = result.map_err(|err| format!("parse message row failed: {err}"))?;
-            if let Some(filter) = filter_query.as_deref() {
-                let haystack = format!(
-                    "{} {} {}",
-                    item.title.to_ascii_lowercase(),
-                    item.content.to_ascii_lowercase(),
-                    item.receipt_status
-                        .as_deref()
-                        .unwrap_or_default()
-                        .to_ascii_lowercase()
-                );
-                if !haystack.contains(filter) {
-                    continue;
-                }
-            }
-            items.push(item);
+            items.push(result.map_err(|err| format!("parse message row failed: {err}"))?);
         }
 
         let next_cursor = if items.len() > limit {
-            Some((offset + limit).to_string())
+            let marker = items.get(limit.saturating_sub(1)).cloned();
+            items.truncate(limit);
+            marker.and_then(|entry| {
+                encode_message_cursor(&MessageCursorKey {
+                    timestamp: entry.timestamp,
+                    message_id: entry.id,
+                })
+            })
         } else {
             None
         };
-        if items.len() > limit {
-            items.truncate(limit);
-        }
 
         serde_json::to_value(CursorResult { items, next_cursor })
             .map_err(|err| format!("serialize thread message query failed: {err}"))
@@ -641,12 +752,16 @@ impl IndexStore {
     pub(crate) fn query_files(&self, params: FilesQueryParams) -> Result<Value, String> {
         let limit = normalize_limit(params.limit);
         let offset = parse_cursor_offset(params.cursor.as_deref());
-        let query = params
+        let include_bytes = params.include_bytes.unwrap_or(false);
+        let query_filter = params
             .query
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(|value| value.to_ascii_lowercase());
+        let query_like = query_filter
+            .as_deref()
+            .map(|value| format!("%{}%", value));
         let kind_filter = params
             .kind
             .as_deref()
@@ -668,37 +783,61 @@ impl IndexStore {
                   a.name,
                   a.mime,
                   a.size_bytes,
-                  a.inline_base64,
+                  CASE
+                    WHEN ?1 = 1 THEN a.inline_base64
+                    ELSE NULL
+                  END AS inline_base64,
+                  CASE
+                    WHEN a.inline_base64 IS NULL OR a.inline_base64 = '' THEN 0
+                    ELSE 1
+                  END AS has_inline_data,
                   m.source,
                   m.fields_json,
                   m.ts_ms
                 FROM attachments a
                 JOIN messages m ON m.message_id = a.message_id
+                WHERE (
+                  ?2 IS NULL
+                  OR LOWER(a.name) LIKE ?2
+                  OR LOWER(COALESCE(a.mime, '')) LIKE ?2
+                  OR LOWER(m.source) LIKE ?2
+                )
                 ORDER BY m.ts_ms DESC, a.id DESC
-                LIMIT ?1 OFFSET ?2
+                LIMIT ?3 OFFSET ?4
                 ",
             )
             .map_err(|err| format!("prepare file query failed: {err}"))?;
 
         let rows = stmt
-            .query_map(params![(limit + 1) as i64, offset as i64], |row| {
+            .query_map(
+                params![
+                    if include_bytes { 1 } else { 0 },
+                    query_like,
+                    (limit + 1) as i64,
+                    offset as i64
+                ],
+                |row| {
                 let mime = row.get::<_, Option<String>>(3).ok().flatten();
                 let size_bytes = row.get::<_, i64>(4).unwrap_or(0).max(0);
-                let source = row.get::<_, String>(6)?;
+                let source = row.get::<_, String>(7)?;
                 let name = row.get::<_, String>(2)?;
                 Ok(IndexedFileItem {
                     id: row.get::<_, i64>(0).unwrap_or_default().to_string(),
                     name: name.clone(),
                     kind: kind_from_mime(mime.as_deref()),
                     size_label: size_label(size_bytes),
+                    size_bytes,
+                    created_at_ms: row.get::<_, i64>(9).unwrap_or(0),
                     owner: short_hash(&source, 6),
                     mime,
+                    has_inline_data: row.get::<_, i64>(6).unwrap_or(0) == 1,
                     data_base64: row.get::<_, Option<String>>(5).ok().flatten(),
                     paper_uri: None,
                     paper_title: None,
                     paper_category: None,
                 })
-            })
+            },
+            )
             .map_err(|err| format!("run file query failed: {err}"))?;
 
         let mut items = Vec::new();
@@ -706,20 +845,6 @@ impl IndexStore {
             let item = result.map_err(|err| format!("parse file row failed: {err}"))?;
             if let Some(kind) = kind_filter.as_deref() {
                 if item.kind.to_ascii_lowercase() != kind {
-                    continue;
-                }
-            }
-            if let Some(search) = query.as_deref() {
-                let haystack = format!(
-                    "{} {} {}",
-                    item.name.to_ascii_lowercase(),
-                    item.owner.to_ascii_lowercase(),
-                    item.mime
-                        .as_deref()
-                        .unwrap_or_default()
-                        .to_ascii_lowercase()
-                );
-                if !haystack.contains(search) {
                     continue;
                 }
             }
@@ -743,6 +868,7 @@ impl IndexStore {
                 let fields_json = row.get::<_, Option<String>>(2).ok().flatten();
                 let source = row.get::<_, String>(1)?;
                 let message_id = row.get::<_, String>(0)?;
+                let created_at_ms = row.get::<_, i64>(3).unwrap_or(0);
                 let fields = fields_json
                     .as_deref()
                     .and_then(|value| serde_json::from_str::<Value>(value).ok())
@@ -752,12 +878,12 @@ impl IndexStore {
                     .and_then(|root| root.get("paper"))
                     .and_then(Value::as_object)
                     .cloned();
-                Ok((message_id, source, paper))
+                Ok((message_id, source, created_at_ms, paper))
             })
             .map_err(|err| format!("run paper query failed: {err}"))?;
 
         for result in paper_rows {
-            let (message_id, source, paper) =
+            let (message_id, source, created_at_ms, paper) =
                 result.map_err(|err| format!("parse paper row failed: {err}"))?;
             let Some(paper) = paper else {
                 continue;
@@ -783,6 +909,22 @@ impl IndexStore {
             if title.is_none() && uri.is_none() {
                 continue;
             }
+            if let Some(kind) = kind_filter.as_deref() {
+                if kind != "note" {
+                    continue;
+                }
+            }
+            if let Some(search) = query_filter.as_deref() {
+                let candidate_name = title
+                    .as_deref()
+                    .or(uri.as_deref())
+                    .unwrap_or("note")
+                    .to_ascii_lowercase();
+                let haystack = format!("{} {}", candidate_name, short_hash(&source, 6).to_ascii_lowercase());
+                if !haystack.contains(search) {
+                    continue;
+                }
+            }
             items.push(IndexedFileItem {
                 id: format!("{message_id}:paper"),
                 name: title
@@ -791,8 +933,11 @@ impl IndexStore {
                     .unwrap_or_else(|| "Note".to_string()),
                 kind: "Note".to_string(),
                 size_label: "—".to_string(),
+                size_bytes: 0,
+                created_at_ms,
                 owner: short_hash(&source, 6),
                 mime: None,
+                has_inline_data: false,
                 data_base64: None,
                 paper_uri: uri,
                 paper_title: title,
@@ -968,6 +1113,58 @@ impl IndexStore {
         }))
     }
 
+    pub(crate) fn get_attachment_bytes(
+        &self,
+        params: AttachmentBytesParams,
+    ) -> Result<Value, String> {
+        let attachment_id = params.attachment_id.trim();
+        if attachment_id.is_empty() {
+            return Err("attachment_id is required".to_string());
+        }
+        let parsed_id = attachment_id
+            .parse::<i64>()
+            .map_err(|_| "attachment_id must be numeric".to_string())?;
+
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| "index lock poisoned".to_string())?;
+        let mut stmt = conn
+            .prepare(
+                "
+                SELECT mime, size_bytes, inline_base64
+                FROM attachments
+                WHERE id = ?1
+                LIMIT 1
+                ",
+            )
+            .map_err(|err| format!("prepare attachment bytes query failed: {err}"))?;
+
+        let entry = stmt
+            .query_row(params![parsed_id], |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0).ok().flatten(),
+                    row.get::<_, i64>(1).unwrap_or(0),
+                    row.get::<_, Option<String>>(2).ok().flatten(),
+                ))
+            })
+            .optional()
+            .map_err(|err| format!("read attachment bytes failed: {err}"))?;
+
+        let Some((mime, size_bytes, data_base64)) = entry else {
+            return Err("attachment not found".to_string());
+        };
+        let data_base64 =
+            data_base64.ok_or_else(|| "attachment payload unavailable".to_string())?;
+
+        Ok(json!({
+            "attachment_id": attachment_id,
+            "mime": mime,
+            "size_bytes": size_bytes.max(0),
+            "data_base64": data_base64,
+        }))
+    }
+
     fn ingest_messages_and_peers(
         &self,
         messages: &[Value],
@@ -1046,6 +1243,14 @@ impl IndexStore {
             .conn
             .lock()
             .map_err(|_| "index lock poisoned".to_string())?;
+        let thread_id = conn
+            .query_row(
+                "SELECT thread_id FROM messages WHERE message_id = ?1",
+                params![message_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|err| format!("read thread for receipt update failed: {err}"))?;
 
         conn.execute(
             "
@@ -1060,7 +1265,9 @@ impl IndexStore {
         )
         .map_err(|err| format!("apply receipt update failed: {err}"))?;
 
-        rebuild_threads_table(&mut conn)?;
+        if let Some(thread_id) = thread_id.as_deref() {
+            upsert_thread_summary_for_thread(&mut conn, thread_id)?;
+        }
         update_last_sync_state(
             &mut conn,
             current_timestamp_ms(),
@@ -1177,8 +1384,9 @@ fn upsert_message_row(
               name,
               mime,
               size_bytes,
-              inline_base64
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+              inline_base64,
+              created_at_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             ",
             params![
                 &parsed.row.message_id,
@@ -1187,10 +1395,127 @@ fn upsert_message_row(
                 &attachment.mime,
                 attachment.size_bytes,
                 &attachment.inline_base64,
+                parsed.row.ts_ms,
             ],
         )
         .map_err(|err| format!("insert attachment failed: {err}"))?;
     }
+
+    Ok(())
+}
+
+fn upsert_thread_summary_for_thread(conn: &mut Connection, thread_id: &str) -> Result<(), String> {
+    let thread_id = thread_id.trim();
+    if thread_id.is_empty() {
+        return Ok(());
+    }
+
+    let existing = conn
+        .query_row(
+            "SELECT display_name, pinned, muted FROM threads WHERE thread_id = ?1",
+            params![thread_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0).unwrap_or_default(),
+                    row.get::<_, i64>(1).unwrap_or(0) == 1,
+                    row.get::<_, i64>(2).unwrap_or(0) == 1,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|err| format!("read existing thread summary failed: {err}"))?;
+    let (display_name, pinned, muted) =
+        existing.unwrap_or_else(|| (short_hash(thread_id, 6), false, false));
+
+    let latest = conn
+        .query_row(
+            "
+            SELECT
+              message_id,
+              thread_id,
+              direction,
+              source,
+              destination,
+              ts_ms,
+              title,
+              body,
+              receipt_status,
+              fields_json
+            FROM messages
+            WHERE thread_id = ?1
+            ORDER BY ts_ms DESC, message_id DESC
+            LIMIT 1
+            ",
+            params![thread_id],
+            |row| {
+                let fields_json = row.get::<_, Option<String>>(9).ok().flatten();
+                Ok(MessageRow {
+                    message_id: row.get::<_, String>(0)?,
+                    thread_id: row.get::<_, String>(1)?,
+                    direction: row.get::<_, String>(2)?,
+                    source: row.get::<_, String>(3)?,
+                    destination: row.get::<_, String>(4)?,
+                    ts_ms: row.get::<_, i64>(5)?,
+                    title: row.get::<_, String>(6)?,
+                    body: row.get::<_, String>(7)?,
+                    receipt_status: row.get::<_, Option<String>>(8).ok().flatten(),
+                    fields: fields_json
+                        .as_deref()
+                        .and_then(|value| serde_json::from_str::<Value>(value).ok()),
+                })
+            },
+        )
+        .optional()
+        .map_err(|err| format!("read latest message for thread summary failed: {err}"))?;
+
+    let Some(latest) = latest else {
+        conn.execute("DELETE FROM threads WHERE thread_id = ?1", params![thread_id])
+            .map_err(|err| format!("delete empty thread summary failed: {err}"))?;
+        return Ok(());
+    };
+
+    let unread = conn
+        .query_row(
+            "SELECT COUNT(*) FROM messages WHERE thread_id = ?1 AND direction != 'out'",
+            params![thread_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|err| format!("read unread count for thread summary failed: {err}"))?
+        .max(0) as usize;
+
+    conn.execute(
+        "
+        INSERT INTO threads (
+          thread_id,
+          display_name,
+          preview,
+          last_message_id,
+          last_activity_ms,
+          unread_count,
+          pinned,
+          muted
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+        ON CONFLICT(thread_id) DO UPDATE SET
+          display_name = excluded.display_name,
+          preview = excluded.preview,
+          last_message_id = excluded.last_message_id,
+          last_activity_ms = excluded.last_activity_ms,
+          unread_count = excluded.unread_count,
+          pinned = excluded.pinned,
+          muted = excluded.muted
+        ",
+        params![
+            thread_id,
+            display_name,
+            preview_from_message(&latest),
+            latest.message_id,
+            latest.ts_ms,
+            unread as i64,
+            if pinned { 1 } else { 0 },
+            if muted { 1 } else { 0 },
+        ],
+    )
+    .map_err(|err| format!("upsert thread summary failed: {err}"))?;
 
     Ok(())
 }
@@ -1739,6 +2064,46 @@ fn build_fts_query(query: &str) -> Option<String> {
     Some(terms.join(" AND "))
 }
 
+fn encode_thread_cursor(cursor: &ThreadCursorKey) -> Option<String> {
+    serde_json::to_vec(cursor)
+        .ok()
+        .map(|payload| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload))
+}
+
+fn decode_thread_cursor(cursor: Option<&str>) -> Option<ThreadCursorKey> {
+    let raw = cursor?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    if raw.parse::<usize>().is_ok() {
+        return None;
+    }
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(raw.as_bytes())
+        .ok()?;
+    serde_json::from_slice::<ThreadCursorKey>(&decoded).ok()
+}
+
+fn encode_message_cursor(cursor: &MessageCursorKey) -> Option<String> {
+    serde_json::to_vec(cursor)
+        .ok()
+        .map(|payload| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload))
+}
+
+fn decode_message_cursor(cursor: Option<&str>) -> Option<MessageCursorKey> {
+    let raw = cursor?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    if raw.parse::<usize>().is_ok() {
+        return None;
+    }
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(raw.as_bytes())
+        .ok()?;
+    serde_json::from_slice::<MessageCursorKey>(&decoded).ok()
+}
+
 fn parse_cursor_offset(cursor: Option<&str>) -> usize {
     cursor
         .and_then(|value| value.trim().parse::<usize>().ok())
@@ -1750,6 +2115,55 @@ fn normalize_limit(value: Option<usize>) -> usize {
         .filter(|limit| *limit > 0)
         .unwrap_or(DEFAULT_LIMIT)
         .min(MAX_LIMIT)
+}
+
+fn run_schema_migrations(conn: &Connection) -> Result<(), String> {
+    if !table_column_exists(conn, "attachments", "created_at_ms")? {
+        conn.execute(
+            "ALTER TABLE attachments ADD COLUMN created_at_ms INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .map_err(|err| format!("migrate attachments.created_at_ms failed: {err}"))?;
+        conn.execute(
+            "
+            UPDATE attachments
+            SET created_at_ms = COALESCE(
+              (SELECT m.ts_ms FROM messages m WHERE m.message_id = attachments.message_id),
+              ?1
+            )
+            ",
+            params![current_timestamp_ms()],
+        )
+        .map_err(|err| format!("backfill attachments.created_at_ms failed: {err}"))?;
+    }
+    conn.execute_batch(
+        "
+        CREATE INDEX IF NOT EXISTS idx_attachments_created_at
+          ON attachments(created_at_ms DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS idx_threads_activity
+          ON threads(last_activity_ms DESC, thread_id DESC);
+        ",
+    )
+    .map_err(|err| format!("apply index migrations failed: {err}"))?;
+    Ok(())
+}
+
+fn table_column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(|err| format!("inspect table {table} failed: {err}"))?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|err| format!("read table info {table} failed: {err}"))?;
+    for entry in rows {
+        if entry
+            .map_err(|err| format!("parse table info {table} failed: {err}"))?
+            == column
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn preview_from_message(row: &MessageRow) -> String {
@@ -1964,10 +2378,12 @@ CREATE TABLE IF NOT EXISTS attachments (
   mime TEXT,
   size_bytes INTEGER NOT NULL,
   inline_base64 TEXT,
+  created_at_ms INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY(message_id) REFERENCES messages(message_id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_attachments_message_id ON attachments(message_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_created_at ON attachments(created_at_ms DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS threads (
   thread_id TEXT PRIMARY KEY,
@@ -1985,6 +2401,7 @@ CREATE TABLE IF NOT EXISTS sync_state (
   value TEXT NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_threads_activity ON threads(last_activity_ms DESC, thread_id DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_thread_ts ON messages(thread_id, ts_ms DESC, message_id DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_ts ON messages(ts_ms DESC, message_id DESC);
 

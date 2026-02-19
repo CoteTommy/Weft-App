@@ -136,6 +136,7 @@ function extractFilesFromMessage(record: PayloadParseMessageRecord): FileItem[] 
   }
 
   const owner = shortHash(record.source)
+  const createdAtMs = normalizeTimestampMs(record.timestamp)
   const items: FileItem[] = []
 
   const attachments = Array.isArray(fields.attachments) ? fields.attachments : []
@@ -144,13 +145,17 @@ function extractFilesFromMessage(record: PayloadParseMessageRecord): FileItem[] 
     if (!parsed?.name) {
       continue
     }
+    const attachmentSize = parsed.size_bytes ?? 0
     items.push({
       id: `${record.id}:${parsed.name}`,
       name: parsed.name,
       kind: kindFromMime(parsed.mime),
-      sizeLabel: sizeLabel(parsed.size_bytes),
+      sizeLabel: sizeLabel(attachmentSize),
+      sizeBytes: attachmentSize,
+      createdAtMs,
       owner,
       mime: parsed.mime,
+      hasInlineData: Boolean(parsed.inline_base64),
       dataBase64: parsed.inline_base64,
     })
   }
@@ -161,8 +166,11 @@ function extractFilesFromMessage(record: PayloadParseMessageRecord): FileItem[] 
       name: attachment.name,
       kind: kindFromMime(attachment.mime),
       sizeLabel: sizeLabel(attachment.sizeBytes),
+      sizeBytes: attachment.sizeBytes,
+      createdAtMs,
       owner,
       mime: attachment.mime,
+      hasInlineData: Boolean(attachment.dataBase64),
       dataBase64: attachment.dataBase64,
     })
   }
@@ -174,7 +182,10 @@ function extractFilesFromMessage(record: PayloadParseMessageRecord): FileItem[] 
       name: paper.title ?? paper.uri ?? `Note ${shortHash(record.id, 4)}`,
       kind: 'Note',
       sizeLabel: '—',
+      sizeBytes: 0,
+      createdAtMs,
       owner,
+      hasInlineData: false,
       paperUri: paper.uri,
       paperTitle: paper.title,
       paperCategory: paper.category,

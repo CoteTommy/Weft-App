@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { FOCUS_SEARCH_EVENT } from '@shared/runtime/shortcuts'
-import type { FileItem } from '@shared/types/files'
 import { PageHeading } from '@shared/ui/PageHeading'
 import { Panel } from '@shared/ui/Panel'
 import { matchesQuery } from '@shared/utils/search'
 import { paperIngestUri } from '@lib/lxmf-api'
 
 import { useFiles } from '../hooks/useFiles'
+import {
+  clearAttachmentPreviewCache,
+  getAttachmentPreviewCacheStats,
+  getOrCreateAttachmentPreviewBlob,
+} from '../services/attachmentPreviewCache'
+import { fetchFileAttachmentBytes } from '../services/filesService'
 
 export function FilesPage() {
   const { files, loading, error, refresh } = useFiles()
@@ -15,6 +20,9 @@ export function FilesPage() {
   const [paperUriInput, setPaperUriInput] = useState('')
   const [paperWorking, setPaperWorking] = useState(false)
   const [paperFeedback, setPaperFeedback] = useState<string | null>(null)
+  const [fileFeedback, setFileFeedback] = useState<string | null>(null)
+  const [activeFileId, setActiveFileId] = useState<string | null>(null)
+  const [cacheStats, setCacheStats] = useState(() => getAttachmentPreviewCacheStats())
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const filteredFiles = useMemo(
     () =>
@@ -39,14 +47,27 @@ export function FilesPage() {
         title="Files"
         subtitle="Shared files and notes"
         action={
-          <button
-            onClick={() => {
-              void refresh()
-            }}
-            className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setFileFeedback(null)
+                void refresh()
+              }}
+              className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
+            >
+              Refresh
+            </button>
+            <button
+              onClick={() => {
+                clearAttachmentPreviewCache()
+                setCacheStats(getAttachmentPreviewCacheStats())
+                setFileFeedback('Attachment preview cache cleared.')
+              }}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Clear cache
+            </button>
+          </div>
         }
       />
       <input
@@ -133,6 +154,15 @@ export function FilesPage() {
       {error ? (
         <p className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
       ) : null}
+      <p className="mb-2 text-xs text-slate-500">
+        Preview cache: {cacheStats.count} item(s),{' '}
+        {(cacheStats.totalBytes / (1024 * 1024)).toFixed(1)} MB
+      </p>
+      {fileFeedback ? (
+        <p className="mb-2 rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-700">
+          {fileFeedback}
+        </p>
+      ) : null}
       {!loading && files.length === 0 ? (
         <p className="text-sm text-slate-500">
           No attachments or paper notes have been received yet.
@@ -147,7 +177,38 @@ export function FilesPage() {
             <li key={file.id}>
               <button
                 type="button"
-                onClick={() => openFileItem(file)}
+                onClick={() => {
+                  void (async () => {
+                    if (file.kind === 'Note') {
+                      if (file.paperUri) {
+                        await navigator.clipboard.writeText(file.paperUri)
+                        setFileFeedback('Paper URI copied to clipboard.')
+                      }
+                      return
+                    }
+                    try {
+                      setActiveFileId(file.id)
+                      setFileFeedback(null)
+                      const bytes = await fetchFileAttachmentBytes(file)
+                      const preview = await getOrCreateAttachmentPreviewBlob({
+                        key: file.id,
+                        mime: bytes.mime,
+                        dataBase64: bytes.dataBase64,
+                      })
+                      const anchor = document.createElement('a')
+                      anchor.href = preview.objectUrl
+                      anchor.download = file.name
+                      anchor.click()
+                      setCacheStats(getAttachmentPreviewCacheStats())
+                    } catch (fileError) {
+                      setFileFeedback(
+                        fileError instanceof Error ? fileError.message : String(fileError)
+                      )
+                    } finally {
+                      setActiveFileId(null)
+                    }
+                  })()
+                }}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition-colors hover:border-slate-300 hover:bg-slate-50/70"
               >
                 <div className="flex items-center justify-between gap-3">
@@ -158,7 +219,7 @@ export function FilesPage() {
                     </p>
                   </div>
                   <span className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700">
-                    Open
+                    {activeFileId === file.id ? 'Loading...' : 'Open'}
                   </span>
                 </div>
               </button>
@@ -168,42 +229,4 @@ export function FilesPage() {
       </div>
     </Panel>
   )
-}
-
-function openFileItem(file: FileItem): void {
-  if (file.kind === 'Note') {
-    if (file.paperUri) {
-      void navigator.clipboard.writeText(file.paperUri)
-    }
-    return
-  }
-  if (!file.dataBase64) {
-    return
-  }
-  const blob = decodeBlob(file)
-  if (!blob) {
-    return
-  }
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = file.name
-  anchor.click()
-  URL.revokeObjectURL(url)
-}
-
-function decodeBlob(file: FileItem): Blob | null {
-  if (!file.dataBase64) {
-    return null
-  }
-  try {
-    const binary = atob(file.dataBase64)
-    const bytes = new Uint8Array(binary.length)
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index)
-    }
-    return new Blob([bytes], { type: file.mime || 'application/octet-stream' })
-  } catch {
-    return null
-  }
 }

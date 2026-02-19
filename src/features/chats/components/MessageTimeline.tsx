@@ -4,9 +4,16 @@ import { useNavigate } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import clsx from 'clsx'
 
-import { APP_ROUTES } from '@app/config/routes'
+import { getOrCreateAttachmentPreviewBlob } from '@features/files/services/attachmentPreviewCache'
 import type { ChatMessage } from '@shared/types/chat'
 import { getLxmfMessageDeliveryTrace, lxmfGetAttachmentBlob } from '@lib/lxmf-api'
+
+import {
+  buildFailureGuidance,
+  formatBytes,
+  formatTraceTimestamp,
+  renderStatus,
+} from './messageTimelineFormatting'
 
 interface MessageTimelineProps {
   messages: ChatMessage[]
@@ -27,7 +34,6 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const detailsDialogRef = useRef<HTMLDivElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
-  const attachmentPayloadCacheRef = useRef<Map<string, string>>(new Map())
   const [stickToBottom, setStickToBottom] = useState(true)
   const estimatedMessageHeight = 118
   const overscan = 8
@@ -216,21 +222,13 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
     virtualizer.scrollToIndex(messages.length - 1, { align: 'end' })
   }, [latestMessageId, messages.length, stickToBottom, virtualizer])
 
-  const withAttachmentBlob = useCallback(
+  const withAttachmentPreview = useCallback(
     async (
       messageId: string,
       attachment: ChatMessage['attachments'][number],
-      action: (value: ChatMessage['attachments'][number]) => void
+      action: (value: { objectUrl: string; blob: Blob }) => void
     ) => {
       let dataBase64 = attachment.dataBase64
-      const cacheKey = `${messageId}:${attachment.name}`
-
-      if (!dataBase64) {
-        const cached = attachmentPayloadCacheRef.current.get(cacheKey)
-        if (cached) {
-          dataBase64 = cached
-        }
-      }
 
       if (!dataBase64) {
         try {
@@ -247,11 +245,15 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
         return
       }
 
-      attachmentPayloadCacheRef.current.set(cacheKey, dataBase64)
+      const preview = await getOrCreateAttachmentPreviewBlob({
+        key: `chat:${messageId}:${attachment.name}`,
+        mime: attachment.mime,
+        dataBase64,
+      })
 
       action({
-        ...attachment,
-        dataBase64,
+        objectUrl: preview.objectUrl,
+        blob: preview.blob,
       })
     },
     []
@@ -428,8 +430,8 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
                         <button
                           type="button"
                           onClick={() => {
-                            void withAttachmentBlob(selectedMessage.id, attachment, loaded => {
-                              openAttachment(loaded)
+                            void withAttachmentPreview(selectedMessage.id, attachment, loaded => {
+                              window.open(loaded.objectUrl, '_blank', 'noopener,noreferrer')
                             })
                           }}
                           className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
@@ -439,8 +441,11 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
                         <button
                           type="button"
                           onClick={() => {
-                            void withAttachmentBlob(selectedMessage.id, attachment, loaded => {
-                              saveAttachment(loaded)
+                            void withAttachmentPreview(selectedMessage.id, attachment, loaded => {
+                              const anchor = document.createElement('a')
+                              anchor.href = loaded.objectUrl
+                              anchor.download = attachment.name
+                              anchor.click()
                             })
                           }}
                           className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
@@ -567,141 +572,6 @@ function DetailRow({ label, value, mono = false }: DetailRowProps) {
       <span className={clsx(mono ? 'font-mono text-[11px] break-all' : '')}>{value}</span>
     </p>
   )
-}
-
-function renderStatus(status: ChatMessage['status']): string {
-  switch (status) {
-    case 'sending':
-      return 'Sending'
-    case 'sent':
-      return 'Sent'
-    case 'delivered':
-      return 'Delivered'
-    case 'failed':
-      return 'Failed'
-    default:
-      return ''
-  }
-}
-
-function buildFailureGuidance(reasonCode: string | undefined): {
-  title: string
-  body: string
-  actionLabel?: string
-  actionPath?: string
-} | null {
-  if (!reasonCode) {
-    return {
-      title: 'Delivery failed',
-      body: 'Retry now or keep Weft online while routes and announcements converge.',
-    }
-  }
-  if (reasonCode === 'relay_unset') {
-    return {
-      title: 'No relay selected',
-      body: 'This message requires propagated delivery. Select an outbound propagation relay first.',
-      actionLabel: 'Open settings',
-      actionPath: APP_ROUTES.settings,
-    }
-  }
-  if (reasonCode === 'no_path') {
-    return {
-      title: 'No route to destination',
-      body: 'A path to this peer is not known yet. Wait for announces or check network connectivity.',
-      actionLabel: 'Open network',
-      actionPath: APP_ROUTES.network,
-    }
-  }
-  if (reasonCode === 'timeout' || reasonCode === 'receipt_timeout') {
-    return {
-      title: 'Delivery timed out',
-      body: 'The recipient might be offline or out of range. Keep the app running and retry shortly.',
-    }
-  }
-  if (reasonCode === 'retry_budget_exhausted') {
-    return {
-      title: 'Retries exhausted',
-      body: 'All configured retries were used. Check relay selection and connectivity before retrying.',
-      actionLabel: 'Open settings',
-      actionPath: APP_ROUTES.settings,
-    }
-  }
-  return {
-    title: 'Delivery failed',
-    body: `Backend reason: ${reasonCode}`,
-  }
-}
-
-function formatTraceTimestamp(value: number): string {
-  if (!Number.isFinite(value)) {
-    return 'unknown'
-  }
-  const timestampMs = value > 1_000_000_000_000 ? value : value * 1000
-  return new Date(timestampMs).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
-}
-
-function openAttachment(attachment: ChatMessage['attachments'][number]): void {
-  if (!attachment.dataBase64) {
-    return
-  }
-  const blob = decodeAttachmentBlob(attachment)
-  if (!blob) {
-    return
-  }
-  const url = URL.createObjectURL(blob)
-  window.open(url, '_blank', 'noopener,noreferrer')
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
-}
-
-function saveAttachment(attachment: ChatMessage['attachments'][number]): void {
-  if (!attachment.dataBase64) {
-    return
-  }
-  const blob = decodeAttachmentBlob(attachment)
-  if (!blob) {
-    return
-  }
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = attachment.name
-  anchor.click()
-  URL.revokeObjectURL(url)
-}
-
-function decodeAttachmentBlob(attachment: ChatMessage['attachments'][number]): Blob | null {
-  if (!attachment.dataBase64) {
-    return null
-  }
-  try {
-    const binary = atob(attachment.dataBase64)
-    const bytes = new Uint8Array(binary.length)
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index)
-    }
-    return new Blob([bytes], {
-      type: attachment.mime || 'application/octet-stream',
-    })
-  } catch {
-    return null
-  }
-}
-
-function formatBytes(size: number): string {
-  if (!Number.isFinite(size) || size <= 0) {
-    return '—'
-  }
-  if (size < 1024) {
-    return `${size} B`
-  }
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`
-  }
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function getFocusableElements(root: HTMLElement): HTMLElement[] {

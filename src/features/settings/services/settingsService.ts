@@ -1,4 +1,6 @@
+import { clearAttachmentPreviewCache } from '@features/files/services/attachmentPreviewCache'
 import {
+  type AttachmentPreviewMode,
   type ConnectivityMode,
   getWeftPreferences,
   type MotionPreference,
@@ -12,11 +14,13 @@ import {
   daemonStatus,
   getLxmfOutboundPropagationNode,
   getLxmfProfile,
+  getRuntimeMetrics,
   listLxmfMessages,
   listLxmfPropagationNodes,
   lxmfQueryThreadMessages,
   lxmfQueryThreads,
   probeLxmf,
+  rebuildThreadSummaries,
   setLxmfDisplayName,
   setLxmfOutboundPropagationNode,
 } from '@lib/lxmf-api'
@@ -26,23 +30,38 @@ import { buildInteropSnapshot } from './interopHealth'
 
 export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
   const preferences = getWeftPreferences()
-  const [status, probe, profile, propagationNodes, outboundPropagationNode, messages, desktop] =
-    await Promise.all([
-      daemonStatus(),
-      probeLxmf(),
-      getLxmfProfile().catch(() => null),
-      listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
-      getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
-      loadInteropMessages().catch(() => []),
-      getDesktopShellPreferences().catch(() => ({
-        minimizeToTrayOnClose: true,
-        startInTray: false,
-        singleInstanceFocus: true,
-        notificationsMuted: !preferences.notificationsEnabled,
-        platform: 'unknown',
-        appearance: 'unknown' as const,
-      })),
-    ])
+  const [
+    status,
+    probe,
+    profile,
+    propagationNodes,
+    outboundPropagationNode,
+    messages,
+    desktop,
+    runtimeMetrics,
+  ] = await Promise.all([
+    daemonStatus(),
+    probeLxmf(),
+    getLxmfProfile().catch(() => null),
+    listLxmfPropagationNodes().catch(() => ({ nodes: [], meta: null })),
+    getLxmfOutboundPropagationNode().catch(() => ({ peer: null, meta: null })),
+    loadInteropMessages().catch(() => []),
+    getDesktopShellPreferences().catch(() => ({
+      minimizeToTrayOnClose: true,
+      startInTray: false,
+      singleInstanceFocus: true,
+      notificationsMuted: !preferences.notificationsEnabled,
+      platform: 'unknown',
+      appearance: 'unknown' as const,
+    })),
+    getRuntimeMetrics().catch(() => ({
+      rssBytes: null,
+      dbSizeBytes: 0,
+      queueSize: 0,
+      messageCount: 0,
+      threadCount: 0,
+    })),
+  ])
   const displayName = resolveDisplayName(
     status.profile,
     probe.rpc.identity_hash,
@@ -86,6 +105,10 @@ export async function fetchSettingsSnapshot(): Promise<SettingsSnapshot> {
     performance: {
       motionPreference: preferences.motionPreference,
       hudEnabled: preferences.performanceHudEnabled,
+      threadPageSize: preferences.threadPageSize,
+      messagePageSize: preferences.messagePageSize,
+      attachmentPreviewMode: preferences.attachmentPreviewMode,
+      runtimeMetrics,
     },
     desktop,
     features: {
@@ -217,11 +240,37 @@ export function saveNotificationSettings(input: {
 export function savePerformanceSettings(input: {
   motionPreference?: MotionPreference
   hudEnabled?: boolean
+  threadPageSize?: number
+  messagePageSize?: number
+  attachmentPreviewMode?: AttachmentPreviewMode
 }): void {
   updateWeftPreferences({
     motionPreference: input.motionPreference,
     performanceHudEnabled: input.hudEnabled,
+    threadPageSize: input.threadPageSize,
+    messagePageSize: input.messagePageSize,
+    attachmentPreviewMode: input.attachmentPreviewMode,
   })
+}
+
+export async function refreshRuntimeMetrics() {
+  return await getRuntimeMetrics()
+}
+
+export async function runSettingsMaintenance(input: {
+  action: 'clear_attachment_cache' | 'rebuild_thread_summaries'
+}): Promise<{ ok: boolean; detail: string }> {
+  if (input.action === 'clear_attachment_cache') {
+    clearAttachmentPreviewCache()
+    return { ok: true, detail: 'Attachment preview cache cleared.' }
+  }
+  const result = await rebuildThreadSummaries()
+  return {
+    ok: result.rebuilt,
+    detail: result.rebuilt
+      ? 'Thread summaries rebuilt from indexed messages.'
+      : 'Thread summary rebuild did not complete.',
+  }
 }
 
 export function saveFeatureSettings(input: { commandCenterEnabled?: boolean }): void {

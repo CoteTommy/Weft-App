@@ -14,7 +14,7 @@ import { daemonStatus, getLxmfProfile, probeLxmf } from '@lib/lxmf-api'
 import type { LxmfProfileInfo } from '@lib/lxmf-api/types'
 import type { LxmfDaemonLocalStatus, LxmfProbeReport } from '@lib/lxmf-contract'
 
-const RUNTIME_HEALTH_POLL_INTERVAL_MS = 20_000
+const RUNTIME_HEALTH_POLL_INTERVAL_MS = 60_000
 
 export interface RuntimeHealthSnapshot {
   status: LxmfDaemonLocalStatus
@@ -73,10 +73,22 @@ export function RuntimeHealthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     void refresh()
     const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') {
+        return
+      }
       void refresh()
     }, RUNTIME_HEALTH_POLL_INTERVAL_MS)
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refresh()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
     return () => {
       window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [refresh])
 

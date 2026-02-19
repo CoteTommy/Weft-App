@@ -45,11 +45,13 @@ export type UseOfflineQueueResult = {
 export type UseOfflineQueueParams = {
   threads: ChatThread[]
   refresh: () => Promise<void>
+  runtimeEnabled?: boolean
 }
 
 export function useOfflineQueue({
   threads,
   refresh,
+  runtimeEnabled = true,
 }: UseOfflineQueueParams): UseOfflineQueueResult {
   const ignoredFailedMessageIdsRef = useRef<Set<string>>(getIgnoredFailedMessageIds())
   const queueInFlightRef = useRef<Set<string>>(new Set())
@@ -192,7 +194,7 @@ export function useOfflineQueue({
     [markFailedMessagesIgnored, setOfflineQueue]
   )
 
-  useChatQueueRetryScheduler({ offlineQueueRef, runQueueEntry })
+  useChatQueueRetryScheduler({ offlineQueueRef, runQueueEntry, enabled: runtimeEnabled })
 
   return {
     offlineQueue,
