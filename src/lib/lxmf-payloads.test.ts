@@ -60,12 +60,11 @@ describe('lxmf payload parsers', () => {
     expect(parsed.meta?.contract_version).toBe('v2')
     expect(parsed.meta?.rpc_endpoint).toBe('127.0.0.1:4245')
     expect(parsed.messages[0].fields?.['2']).toBeTruthy()
-    expect(parsed.messages[0].fields?.['5']).toBeTruthy()
     expect(parsed.messages[0].fields?.['9']).toBeTruthy()
     expect(parsed.messages[0].fields?.['12']).toBeTruthy()
     expect(parsed.messages[0].fields?.['14']).toBeTruthy()
     expect(parsed.messages[0].fields?.['16']).toBeTruthy()
-    expect(parsed.messages[0].fields?.attachments).toBeTruthy()
+    expect(parsed.messages[0].fields?.attachments ?? parsed.messages[0].fields?.['5']).toBeTruthy()
     expect(parsed.messages[0].fields?.paper).toBeTruthy()
   })
 

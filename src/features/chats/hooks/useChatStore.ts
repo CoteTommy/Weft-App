@@ -63,6 +63,8 @@ type UseChatStoreResult = Omit<
   selectThread: (threadId?: string) => void
   loadMoreThreadMessages: (threadId: string) => Promise<void>
   loadMoreThreads: () => Promise<void>
+  canLoadMoreThreadMessages: (threadId: string) => boolean
+  canLoadMoreThreads: () => boolean
   runtime: ChatStoreRuntimeContext
 }
 
@@ -332,6 +334,18 @@ export function useChatStore({
     hydrateThreads(threadSummariesRef.current)
   }, [hydrateThreads])
 
+  const canLoadMoreThreads = useCallback(() => {
+    return Boolean(threadCursorRef.current)
+  }, [])
+
+  const canLoadMoreThreadMessages = useCallback((threadId: string) => {
+    const normalized = threadId.trim()
+    if (!normalized) {
+      return false
+    }
+    return Boolean(messageCacheRef.current.get(normalized)?.nextCursor)
+  }, [])
+
   const scheduleRefresh = useCallback(
     (delayMs = CHAT_REFRESH_DEBOUNCE_MS) => {
       if (refreshTimerRef.current !== null) {
@@ -569,6 +583,8 @@ export function useChatStore({
     selectThread,
     loadMoreThreadMessages,
     loadMoreThreads,
+    canLoadMoreThreadMessages,
+    canLoadMoreThreads,
     runtime: {
       threadPreferencesRef,
       hasLoadedRef,

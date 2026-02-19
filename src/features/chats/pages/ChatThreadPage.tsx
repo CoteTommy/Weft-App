@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 
 import { Bell, BellOff, Pin, PinOff } from 'lucide-react'
@@ -29,6 +29,7 @@ export function ChatThreadPage() {
     setThreadPinned,
     selectThread,
     loadMoreThreadMessages,
+    canLoadMoreThreadMessages,
   } = useChatsState()
   const [threadQuery, setThreadQuery] = useState('')
   const [messageQuery, setMessageQuery] = useState('')
@@ -59,6 +60,20 @@ export function ChatThreadPage() {
       ])
     )
   }, [deferredMessageQuery, thread])
+
+  const handleLoadOlderMessages = useCallback(() => {
+    if (!thread || loadingMore || !canLoadMoreThreadMessages(thread.id)) {
+      return
+    }
+    void (async () => {
+      try {
+        setLoadingMore(true)
+        await loadMoreThreadMessages(thread.id)
+      } finally {
+        setLoadingMore(false)
+      }
+    })()
+  }, [canLoadMoreThreadMessages, loadMoreThreadMessages, loadingMore, thread])
 
   useEffect(() => {
     selectThread(chatId)
@@ -172,28 +187,6 @@ export function ChatThreadPage() {
             {error ? (
               <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
             ) : null}
-            <div className="mb-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!thread) {
-                    return
-                  }
-                  void (async () => {
-                    try {
-                      setLoadingMore(true)
-                      await loadMoreThreadMessages(thread.id)
-                    } finally {
-                      setLoadingMore(false)
-                    }
-                  })()
-                }}
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                disabled={loadingMore}
-              >
-                {loadingMore ? 'Loading…' : 'Load older messages'}
-              </button>
-            </div>
             <div className="mb-4 min-h-0 flex-1 pr-1">
               {thread.messages.length > 0 && filteredMessages.length === 0 ? (
                 <p className="text-sm text-slate-500">No messages match your search.</p>
@@ -201,6 +194,9 @@ export function ChatThreadPage() {
                 <MessageTimeline
                   className="h-full"
                   messages={filteredMessages}
+                  canLoadOlder={canLoadMoreThreadMessages(thread.id)}
+                  loadingOlder={loadingMore}
+                  onLoadOlder={handleLoadOlderMessages}
                   onRetry={message => {
                     const attachments = message.attachments
                       .filter(attachment => Boolean(attachment.dataBase64))

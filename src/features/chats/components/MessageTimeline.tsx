@@ -13,9 +13,19 @@ interface MessageTimelineProps {
   messages: ChatMessage[]
   className?: string
   onRetry?: (message: ChatMessage) => Promise<void> | void
+  canLoadOlder?: boolean
+  loadingOlder?: boolean
+  onLoadOlder?: () => void
 }
 
-export function MessageTimeline({ messages, className, onRetry }: MessageTimelineProps) {
+export function MessageTimeline({
+  messages,
+  className,
+  onRetry,
+  canLoadOlder,
+  loadingOlder,
+  onLoadOlder,
+}: MessageTimelineProps) {
   const navigate = useNavigate()
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
@@ -182,6 +192,9 @@ export function MessageTimeline({ messages, className, onRetry }: MessageTimelin
         className={className}
         stickToBottom={stickToBottom}
         onStickToBottomChange={setStickToBottom}
+        canLoadOlder={canLoadOlder}
+        loadingOlder={loadingOlder}
+        onReachStart={onLoadOlder}
         onStartHold={startHold}
         onClearHoldTimer={clearHoldTimer}
         onOpenDetails={openDetails}

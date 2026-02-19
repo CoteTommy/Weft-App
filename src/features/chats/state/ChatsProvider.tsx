@@ -42,6 +42,8 @@ interface ChatsActions {
   selectThread: (threadId?: string) => void
   loadMoreThreadMessages: (threadId: string) => Promise<void>
   loadMoreThreads: () => Promise<void>
+  canLoadMoreThreadMessages: (threadId: string) => boolean
+  canLoadMoreThreads: () => boolean
 }
 
 interface ChatsStoreContextValue {
@@ -75,6 +77,8 @@ const EMPTY_ACTIONS: ChatsActions = {
   selectThread: () => {},
   loadMoreThreadMessages: async () => {},
   loadMoreThreads: async () => {},
+  canLoadMoreThreadMessages: () => false,
+  canLoadMoreThreads: () => false,
 }
 
 const EMPTY_STORE: ChatsStoreContextValue = {
@@ -139,6 +143,8 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       selectThread: store.selectThread,
       loadMoreThreadMessages: store.loadMoreThreadMessages,
       loadMoreThreads: store.loadMoreThreads,
+      canLoadMoreThreadMessages: store.canLoadMoreThreadMessages,
+      canLoadMoreThreads: store.canLoadMoreThreads,
     }),
     [
       queue.clearQueue,
@@ -156,6 +162,8 @@ export function ChatsProvider({ children }: PropsWithChildren) {
       store.setThreadPinned,
       store.loadMoreThreadMessages,
       store.loadMoreThreads,
+      store.canLoadMoreThreadMessages,
+      store.canLoadMoreThreads,
     ]
   )
 
@@ -233,6 +241,8 @@ export function useChatsState(): ChatsState {
     selectThread: actions.selectThread,
     loadMoreThreadMessages: actions.loadMoreThreadMessages,
     loadMoreThreads: actions.loadMoreThreads,
+    canLoadMoreThreadMessages: actions.canLoadMoreThreadMessages,
+    canLoadMoreThreads: actions.canLoadMoreThreads,
   }
 }
 

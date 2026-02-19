@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-02-19T00:00:00.000Z",
+  "checkpoints": [
+    {
+      "name": "cold_start",
+      "rssBytes": 0,
+      "jsHeapUsedBytes": 0,
+      "jsHeapLimitBytes": 0,
+      "notes": "Replace with real values from baseline machine.",
+      "capturedAt": "2026-02-19T00:00:00.000Z"
+    },
+    {
+      "name": "chats_open_idle_2m",
+      "rssBytes": 0,
+      "jsHeapUsedBytes": 0,
+      "jsHeapLimitBytes": 0,
+      "capturedAt": "2026-02-19T00:00:00.000Z"
+    },
+    {
+      "name": "files_open",
+      "rssBytes": 0,
+      "jsHeapUsedBytes": 0,
+      "jsHeapLimitBytes": 0,
+      "capturedAt": "2026-02-19T00:00:00.000Z"
+    },
+    {
+      "name": "settings_open",
+      "rssBytes": 0,
+      "jsHeapUsedBytes": 0,
+      "jsHeapLimitBytes": 0,
+      "capturedAt": "2026-02-19T00:00:00.000Z"
+    },
+    {
+      "name": "hidden_idle_5m",
+      "rssBytes": 0,
+      "jsHeapUsedBytes": 0,
+      "jsHeapLimitBytes": 0,
+      "capturedAt": "2026-02-19T00:00:00.000Z"
+    }
+  ]
+}
